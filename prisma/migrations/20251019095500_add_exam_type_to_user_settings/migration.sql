@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "exam_type" TEXT NOT NULL DEFAULT 'A_CLASS';

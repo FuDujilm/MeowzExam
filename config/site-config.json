@@ -1,0 +1,10 @@
+{
+  "siteTitle": "喵信台-AI辅助HAM考试",
+  "siteDescription": "喵信台是一款免费的AI辅助HAM考试网站。",
+  "seoKeywords": "HAM,业余无线电考试,喵之伊甸,喵信台,AI",
+  "logoUrl": "/logo.png",
+  "faviconUrl": "./favicon.ico",
+  "ogImageUrl": "",
+  "headerContent": "<strong>喵信台</strong>",
+  "footerContent": "<p>(c)2025 喵信台</p>"
+}

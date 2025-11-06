@@ -1,0 +1,674 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表 (NextAuth compatible)
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  callsign      String?   // 业余无线电呼号（可选）
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth 关联
+  accounts      Account[]
+  sessions      Session[]
+
+  // 用户设置
+  settings UserSettings?
+
+  // 关联数据
+  userQuestions UserQuestion[] // 用户答题记录
+  examResults   ExamResult[]   // 考试成绩
+  favoriteQuestions FavoriteQuestion[] // 收藏的题目
+  pointsHistory PointsHistory[] // 积分历史
+  checkInHistory CheckInHistory[] // 签到历史
+  auditLogs     AuditLog[]     // 审计日志
+  explanations  Explanation[]  // 创建的解析
+  explanationVotes ExplanationVote[] // 解析投票
+  aiUsageLogs   AiUsageLog[]   // AI使用记录
+  siteMessageReceipts SiteMessageReceipt[]
+  siteMessagesCreated SiteMessage[] @relation("SiteMessageCreatedBy")
+  questionLibraryAccesses QuestionLibraryAccess[] @relation("QuestionLibraryAccessUser")
+
+  // 积分信息
+  totalPoints Int @default(0) // 总积分
+  currentStreak Int @default(0) // 当前连续签到天数
+  lastCheckIn DateTime? // 最后签到时间
+
+  @@map("users")
+}
+
+// NextAuth Account model
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// NextAuth Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// NextAuth Verification Token model
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// 用户设置表
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 错题权重设置（是否在随机练习中提高错题出现概率）
+  enableWrongQuestionWeight Boolean @default(false)
+  // 主题设置
+  theme                     String  @default("light") // "light" | "dark" | "system"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+// 题目表
+model Question {
+  id          String      @id @default(cuid())
+  uuid        String      @unique // 题库JSON中的UUID
+  externalId  String      // 题库JSON中的id (如 "LY0001", "LX"等，可能重复)
+
+  type        QuestionType // A类、B类、C类
+  questionType String     // 题型: single_choice, multiple_choice, true_false
+  difficulty  String      // 难度: easy, medium, hard
+
+  // 分类信息
+  category    String      // 主分类名称（如"法规知识"）
+  categoryCode String     // 分类代码（如"LAW"）
+  subSection  String?     // 子章节（如"1.1.1"）
+
+  title       String      // 题干
+  options     Json        // 选项数组 [{"id":"A", "text":"...", "is_correct": true}]
+  correctAnswers Json     // 正确答案数组 ["A", "C"]
+
+  // 解析相关
+  explanation String?     // 官方解析
+  aiExplanation String?   // AI生成的解析（缓存）
+
+  // 元数据
+  tags        Json        @default("[]") // 标签数组
+  hasImage    Boolean     @default(false)
+  imagePath   String?     // 图片路径
+  imageAlt    String?     // 图片alt文本
+
+  sourceId    String?     // 原始题号
+  pageSection String?     // 页面章节
+  originalAnswer String?  // 原始答案格式
+
+  // 所属题库
+  libraryId    String?
+  libraryUuid  String?
+  libraryCode  String?
+  library      QuestionLibrary? @relation(fields: [libraryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联数据
+  userQuestions UserQuestion[] // 用户答题记录
+  examQuestions ExamQuestion[] // 考试中的题目
+  favoriteQuestions FavoriteQuestion[] // 被收藏的记录
+  explanations  Explanation[]  // 结构化解析
+
+  @@index([type])
+  @@index([difficulty])
+  @@index([categoryCode])
+  @@index([libraryId])
+  @@index([libraryCode])
+  @@index([libraryUuid])
+  @@map("questions")
+}
+
+model QuestionLibrary {
+  id             String   @id @default(cuid())
+  uuid           String   @unique
+  code           String   @unique
+  name           String
+  shortName      String
+  description    String?
+  author         String?
+  date           DateTime?
+  sourceType     String?
+  region         String?
+  version        String?
+  displayTemplate String?
+  metadata       Json?
+
+  visibility     QuestionLibraryVisibility @default(ADMIN_ONLY)
+  totalQuestions Int      @default(0)
+  singleChoiceCount Int   @default(0)
+  multipleChoiceCount Int @default(0)
+  trueFalseCount Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questions   Question[]
+  examPresets QuestionLibraryExamPreset[]
+  access      QuestionLibraryAccess[]
+  exams       Exam[] @relation("QuestionLibraryExams")
+
+  @@index([region])
+  @@index([visibility])
+  @@map("question_libraries")
+}
+
+model QuestionLibraryExamPreset {
+  id                 String   @id @default(cuid())
+  libraryId          String
+  library            QuestionLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+
+  code               String
+  name               String
+  description        String?
+  durationMinutes    Int
+  totalQuestions     Int
+  passScore          Int
+  singleChoiceCount  Int
+  multipleChoiceCount Int
+  trueFalseCount     Int      @default(0)
+  metadata           Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([libraryId, code])
+  @@index([libraryId])
+  @@map("question_library_exam_presets")
+}
+
+model QuestionLibraryAccess {
+  id        String   @id @default(cuid())
+  libraryId String
+  userId    String?
+  userEmail String?
+  library   QuestionLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  user      User?    @relation("QuestionLibraryAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([libraryId])
+  @@index([userId])
+  @@index([userEmail])
+  @@unique([libraryId, userId])
+  @@unique([libraryId, userEmail])
+  @@map("question_library_access")
+}
+
+// 用户答题记录表
+model UserQuestion {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  // 答题统计
+  correctCount   Int @default(0) // 答对次数
+  incorrectCount Int @default(0) // 答错次数
+  lastAnswered   DateTime? // 最后一次答题时间
+  lastCorrect    Boolean? // 最后一次是否答对
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, questionId])
+  @@map("user_questions")
+}
+
+// 收藏题目表
+model FavoriteQuestion {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, questionId])
+  @@map("favorite_questions")
+}
+
+// 模拟考试表
+model Exam {
+  id       String      @id @default(cuid())
+  type     QuestionType // 考试类型：A类、B类、C类
+  duration Int         // 考试时长（分钟）
+
+  libraryId   String?
+  libraryCode String?
+  presetCode  String?
+  library     QuestionLibrary? @relation("QuestionLibraryExams", fields: [libraryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联数据
+  examResults   ExamResult[]   // 考试成绩
+  examQuestions ExamQuestion[] // 考试题目
+
+  @@map("exams")
+}
+
+// 考试成绩表
+model ExamResult {
+  id       String @id @default(cuid())
+  userId   String
+  examId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam     Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  libraryCode String?
+  libraryName String?
+  presetCode  String?
+
+  // 成绩信息
+  score        Int     // 得分
+  totalQuestions Int   // 总题数
+  correctCount Int     // 答对题数
+  passed       Boolean // 是否通过
+  timeSpent    Int?    // 答题耗时（秒）
+
+  // 答题详情（JSON格式存储用户的答案）
+  answers      Json    // [{questionId: "xxx", userAnswer: "A", correct: true}, ...]
+
+  createdAt DateTime @default(now())
+
+  @@map("exam_results")
+}
+
+// 考试题目关联表（用于记录某次考试包含哪些题目）
+model ExamQuestion {
+  id         String   @id @default(cuid())
+  examId     String
+  questionId String
+  exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  orderIndex Int // 题目在考试中的顺序
+
+  @@unique([examId, questionId])
+  @@map("exam_questions")
+}
+
+// 公告表
+model SiteMessage {
+  id          String           @id @default(cuid())
+  title       String
+  content     String           @db.Text
+  level       SiteMessageLevel @default(NORMAL)
+  publishedAt DateTime         @default(now())
+  expiresAt   DateTime?
+  emailSentAt DateTime?
+  createdById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  createdBy User?                @relation("SiteMessageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  receipts  SiteMessageReceipt[]
+
+  @@index([level])
+  @@index([publishedAt])
+  @@map("site_messages")
+}
+
+model SiteMessageReceipt {
+  id          String   @id @default(cuid())
+  userId      String
+  messageId   String
+  readAt      DateTime?
+  confirmedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message SiteMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("site_message_receipts")
+}
+
+// 枚举类型
+enum QuestionLibraryVisibility {
+  ADMIN_ONLY // 仅管理员可见
+  PUBLIC     // 全员可见
+  CUSTOM     // 指定用户可见
+}
+
+enum QuestionType {
+  A_CLASS // A类（30题）
+  B_CLASS // B类（50题）
+  C_CLASS // C类（100题）
+  GENERIC // 通用题库
+}
+
+enum SiteMessageLevel {
+  NORMAL   // 普通消息，仅站内提示
+  GENERAL  // 一般消息，站内提示 + 邮件
+  URGENT   // 紧急消息，站内提示 + 邮件 + 强制弹窗
+}
+
+enum ModelType {
+  CHAT
+  IMAGE
+  EMBEDDING
+}
+
+// 积分历史表
+model PointsHistory {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  points Int    // 获得的积分（可以为负数表示扣分）
+  reason String // 积分原因
+  type   PointsType // 积分类型
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("points_history")
+}
+
+// 签到历史表
+model CheckInHistory {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date      DateTime @default(now()) // 签到日期
+  points    Int      // 获得的积分
+  streak    Int      // 当时的连续签到天数
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("check_in_history")
+}
+
+// 积分系统配置
+model PointsConfig {
+  id   String @id @default(cuid())
+  key  String @unique // 配置键名
+
+  // 积分配置
+  pointsName            String @default("积分") // 积分代币名称
+  answerCorrect         Int    @default(10)   // 答对一题的积分
+  dailyCheckIn          Int    @default(50)   // 每日签到积分
+  streak3Days           Int    @default(100)  // 连续签到3天奖励
+  streak7Days           Int    @default(150)  // 连续签到7天奖励
+  aiRegenerateDailyFree Int    @default(5)    // 每日免费重新生成次数
+  aiRegenerateCost      Int    @default(100)  // 超出免费次数的积分扣除
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("points_config")
+}
+
+
+enum PointsType {
+  ANSWER_CORRECT  // 答对题目
+  DAILY_CHECK_IN  // 每日签到
+  STREAK_BONUS    // 连续签到奖励
+  ADMIN_ADJUST    // 管理员调整
+  AI_REGENERATE   // AI 重新生成解析扣除
+}
+
+// 审计日志
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action     String
+  entityType String?
+  entityId   String?
+  details    Json?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// AI模型组配置
+model AiModelGroup {
+  id               String       @id @default(cuid())
+  name             String       @unique
+  provider         AiProvider   @default(OPENAI) // OPENAI | DIFY | AZURE_OPENAI
+  modelName        String
+  modelType        ModelType
+  usageScope       AiModelUsageScope @default(EXPLANATION)
+
+  // API 配置
+  apiUrl           String       // OpenAI: https://api.openai.com/v1, Dify: https://api.dify.ai/v1
+  apiKey           String
+
+  // Dify 专用
+  difyAppId        String?      // Dify App ID (对话应用/工作流)
+  difyUser         String?      // Dify 用户标识
+
+  // OpenAI 兼容
+  proxyUrl         String?
+  enableVision     Boolean      @default(false)
+  temperature      Float?       @default(1.0)
+  topP             Float?       @default(1.0)
+  presencePenalty  Float?       @default(0)
+  frequencyPenalty Float?       @default(0)
+  extraBody        Json?
+
+  // Prompt 配置
+  systemPrompt     String?      @db.Text
+  userPrompt       String?      @db.Text
+  includeQuestion  Boolean      @default(true)
+  includeOptions   Boolean      @default(true)
+
+  // 状态
+  isActive         Boolean      @default(true)
+  priority         Int          @default(0) // 优先级，数字越大优先级越高
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@map("ai_model_groups")
+}
+
+enum AiModelUsageScope {
+  EXPLANATION // 题目解析专用
+  ASSISTANT   // 小助手聊天专用
+  BOTH        // 两者皆可
+}
+
+enum AiProvider {
+  OPENAI         // OpenAI API
+  DIFY           // Dify 平台
+  AZURE_OPENAI   // Azure OpenAI
+}
+
+// 解析表（结构化）
+model Explanation {
+  id           String   @id @default(cuid())
+  questionId   String
+  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  type         ExplanationType @default(AI) // OFFICIAL | USER | AI
+  contentJson  Json     // 结构化解析内容（遵循 AiExplainSchema）
+  lang         String   @default("zh-CN") // zh-CN | en
+
+  // 元数据
+  sourcesHash  String?  // 证据集合哈希（用于去重）
+  templateVer  String   @default("1.0.0") // Prompt模板版本
+  status       ExplanationStatus @default(PUBLISHED) // UNDER_REVIEW | PUBLISHED | RETRACTED
+
+  // 投票统计
+  upvotes      Int      @default(0)
+  downvotes    Int      @default(0)
+  wilsonScore  Float    @default(0) // Wilson score 排序
+
+  // 创建者
+  createdById  String?
+  createdBy    User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // 关联
+  votes        ExplanationVote[]
+
+  @@index([questionId])
+  @@index([type])
+  @@index([status])
+  @@index([wilsonScore])
+  @@map("explanations")
+}
+
+// 解析投票表
+model ExplanationVote {
+  id             String      @id @default(cuid())
+  explanationId  String
+  explanation    Explanation @relation(fields: [explanationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  vote           VoteType    // UP | DOWN | REPORT
+  reportReason   String?     // 举报原因（仅在 vote=REPORT 时填写）
+
+  createdAt      DateTime    @default(now())
+
+  @@unique([explanationId, userId])
+  @@index([explanationId])
+  @@index([userId])
+  @@map("explanation_votes")
+}
+
+// AI任务表
+model AiJob {
+  id          String    @id @default(cuid())
+  questionId  String
+  lang        String    @default("zh-CN")
+
+  status      AiJobStatus @default(QUEUED) // QUEUED | RUNNING | SUCCEEDED | FAILED
+  attempts    Int       @default(0)
+
+  // AI配置
+  provider    String    @default("openai-compatible")
+  model       String    @default("gpt-4")
+
+  // 成本统计
+  costUSD     Float?
+  tokens      Json?     // {prompt: 123, completion: 456}
+
+  error       String?
+
+  // 发起人
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([questionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ai_jobs")
+}
+
+// AI使用日志
+model AiUsageLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  action     String   // 'GENERATE_EXPLANATION' | 'REGENERATE'
+  questionId String?
+
+  costUSD    Float?
+  tokens     Json?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("ai_usage_logs")
+}
+
+// 枚举类型
+enum ExplanationType {
+  OFFICIAL  // 官方解析
+  USER      // 用户贡献
+  AI        // AI生成
+}
+
+enum ExplanationStatus {
+  UNDER_REVIEW  // 审核中
+  PUBLISHED     // 已发布
+  RETRACTED     // 已撤回
+}
+
+enum VoteType {
+  UP      // 点赞
+  DOWN    // 点踩
+  REPORT  // 举报
+}
+
+enum AiJobStatus {
+  QUEUED    // 排队中
+  RUNNING   // 执行中
+  SUCCEEDED // 成功
+  FAILED    // 失败
+}
