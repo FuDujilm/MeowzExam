@@ -38,9 +38,15 @@ function getClientIp(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: '请登录后再使用小助手。' },
+      { status: 401 }
+    )
+  }
   const ip = getClientIp(request)
   const ipKey = `assistant:ip:${ip}`
-  const userKey = session?.user?.email ? `assistant:user:${session.user.email}` : null
+  const userKey = session.user.email ? `assistant:user:${session.user.email}` : null
 
   const ipLimit = hitRateLimit(ipKey, IP_RATE_LIMIT)
   if (!ipLimit.success) {

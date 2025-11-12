@@ -34,7 +34,7 @@ const WELCOME_MESSAGE =
   '你好！我是“小助手”，可以回答关于题库、考试准备和系统使用的相关问题。请问有什么可以帮到你？'
 
 export function AssistantDialog({ className }: { className?: string }) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const { notify } = useNotification()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
@@ -152,6 +152,10 @@ export function AssistantDialog({ className }: { className?: string }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (status === 'loading' || !session?.user) {
+    return null
   }
 
   return (

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ComponentProps } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { MessageCircle, SendHorizonal } from 'lucide-react'
@@ -30,7 +31,12 @@ const CATEGORY_OPTIONS = [
   { value: '其他', label: '其他反馈' },
 ] as const
 
-export function FeedbackDialog({ className }: { className?: string }) {
+type FeedbackDialogProps = {
+  className?: string
+  buttonProps?: ComponentProps<typeof Button>
+}
+
+export function FeedbackDialog({ className, buttonProps }: FeedbackDialogProps) {
   const { data: session } = useSession()
   const { notify } = useNotification()
   const [open, setOpen] = useState(false)
@@ -117,14 +123,25 @@ export function FeedbackDialog({ className }: { className?: string }) {
     }
   }
 
+  const {
+    className: triggerClassName,
+    size: triggerSize,
+    variant: triggerVariant,
+    ...restButtonProps
+  } = buttonProps ?? {}
+
   return (
-    <div className={cn('flex flex-col items-end gap-3', className)}>
+    <div className={className ?? 'flex flex-col items-end gap-3'}>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button
-            className="shadow-lg shadow-indigo-500/20 transition hover:scale-105"
-            size="lg"
-            variant="default"
+            className={cn(
+              'shadow-lg shadow-indigo-500/20 transition hover:scale-105',
+              triggerClassName
+            )}
+            size={triggerSize ?? 'lg'}
+            variant={triggerVariant ?? 'default'}
+            {...restButtonProps}
           >
             <MessageCircle className="mr-2 h-5 w-5" />
             问题反馈

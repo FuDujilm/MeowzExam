@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import type { ProgramInfo } from '@/lib/program-info'
 
 import { useSiteConfig } from './site-config-provider'
+import { FeedbackDialog } from './feedback-dialog'
 
 function hasContent(value: string) {
   return value && value.trim().length > 0
@@ -84,7 +85,7 @@ export function SiteFooter() {
               <div>维护者：{programInfo.metadata.author}</div>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-300">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-300">
             <Link href="/about" className="transition hover:text-white">
               关于本程序
             </Link>
@@ -99,6 +100,14 @@ export function SiteFooter() {
                 联系我们
               </Link>
             ) : null}
+            <FeedbackDialog
+              className="flex"
+              buttonProps={{
+                size: 'sm',
+                variant: 'outline',
+                className: 'border-white/30 bg-white/10 text-white shadow-none hover:bg-white/20 hover:text-white',
+              }}
+            />
           </div>
         </div>
       </div>
