@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -89,12 +91,11 @@ export default function AuditPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <Card>
-          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-2xl font-semibold">审计日志</CardTitle>
+    <AdminPageShell maxWidthClassName="max-w-5xl" contentClassName="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle className="text-2xl font-semibold">审计日志</CardTitle>
               <p className="mt-1 text-sm text-gray-500">
                 记录AI解析与人工解析相关操作，便于追踪和排查问题。
               </p>
@@ -199,7 +200,6 @@ export default function AuditPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-    </div>
+    </AdminPageShell>
   )
 }

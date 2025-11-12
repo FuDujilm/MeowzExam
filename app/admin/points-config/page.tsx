@@ -1,16 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Save } from 'lucide-react'
+
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useNotification } from '@/components/ui/notification-provider'
-import { ChevronLeft, Save } from 'lucide-react'
 
 export default function PointsConfigPage() {
-  const router = useRouter()
   const [config, setConfig] = useState({
     pointsName: '积分',
     answerCorrect: 10,
@@ -89,29 +89,17 @@ export default function PointsConfigPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center">加载中...</div>
-      </div>
+      <AdminPageShell maxWidthClassName="max-w-4xl">
+        <div className="py-10 text-center text-sm text-slate-500">加载中...</div>
+      </AdminPageShell>
     )
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="mb-4"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          返回
-        </Button>
-
+    <AdminPageShell maxWidthClassName="max-w-4xl" contentClassName="space-y-6">
+      <div>
         <h1 className="text-3xl font-bold">积分系统配置</h1>
-        <p className="text-gray-600 mt-2">
-          配置积分代币名称和各类奖励数值
-        </p>
+        <p className="mt-2 text-gray-600">配置积分代币名称和各类奖励数值</p>
       </div>
 
       <Card>
@@ -256,6 +244,6 @@ export default function PointsConfigPage() {
           </ul>
         </CardContent>
       </Card>
-    </div>
+    </AdminPageShell>
   )
 }

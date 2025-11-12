@@ -4,7 +4,7 @@ import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
-import AdminNav from '@/components/admin/AdminNav'
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
 import { ProgramInfoEditor } from '@/components/admin/program-info-editor'
 import { useSiteConfig } from '@/components/site/site-config-provider'
 import { Button } from '@/components/ui/button'
@@ -138,25 +138,24 @@ export default function AdminSiteConfigPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>加载中...</p>
-      </div>
+      <AdminPageShell maxWidthClassName="max-w-5xl">
+        <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">加载中...</div>
+      </AdminPageShell>
     )
   }
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>正在重定向到登录页面...</p>
-      </div>
+      <AdminPageShell maxWidthClassName="max-w-5xl">
+        <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+          正在重定向到登录页面...
+        </div>
+      </AdminPageShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminNav />
-      <div className="px-4 py-8">
-        <div className="mx-auto max-w-5xl space-y-6">
+    <AdminPageShell maxWidthClassName="max-w-5xl" contentClassName="space-y-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">站点信息配置</h1>
@@ -260,8 +259,6 @@ export default function AdminSiteConfigPage() {
           </section>
 
           <ProgramInfoEditor />
-        </div>
-      </div>
-    </div>
+        </AdminPageShell>
   )
 }

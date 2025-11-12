@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useNotification } from '@/components/ui/notification-provider'
 import {
   Select,
@@ -139,12 +141,11 @@ export default function AdminExplanationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <Card>
-          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-2xl font-semibold">人工解析管理</CardTitle>
+    <AdminPageShell maxWidthClassName="max-w-6xl" contentClassName="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle className="text-2xl font-semibold">人工解析管理</CardTitle>
               <p className="mt-1 text-sm text-gray-500">
                 编辑和管理题目的人工解析内容
               </p>
@@ -312,7 +313,6 @@ export default function AdminExplanationsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-    </div>
+    </AdminPageShell>
   )
 }

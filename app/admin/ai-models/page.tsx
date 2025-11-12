@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PlusCircle, Edit, Trash2, Power, PowerOff } from 'lucide-react'
 
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { useNotification } from '@/components/ui/notification-provider'
 
 type UsageScope = 'EXPLANATION' | 'ASSISTANT' | 'BOTH'
@@ -96,13 +97,17 @@ export default function AdminAiModelsPage() {
   }
 
   if (loading) {
-    return <div className="p-8">Loading...</div>
+    return (
+      <AdminPageShell maxWidthClassName="max-w-6xl">
+        <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">Loading...</div>
+      </AdminPageShell>
+    )
   }
 
   return (
-    <div className="container mx-auto max-w-6xl p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">AI Model Management</h1>
+    <AdminPageShell maxWidthClassName="max-w-6xl" contentClassName="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">AI Model Management</h1>
         <Button onClick={() => router.push('/admin/ai-models/new')}>
           <PlusCircle className="mr-2 h-4 w-4" />
           New configuration
@@ -166,11 +171,11 @@ export default function AdminAiModelsPage() {
         ))}
 
         {models.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
+          <div className="rounded-lg border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500 dark:border-slate-800 dark:text-slate-400">
             No configurations found. Click “New configuration” to create one.
           </div>
         ) : null}
       </div>
-    </div>
+    </AdminPageShell>
   )
 }
