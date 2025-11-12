@@ -5,6 +5,8 @@ declare module 'next-auth' {
     user: {
       id: string
       email: string
+      name?: string | null
+      image?: string | null
       callsign?: string | null
       aiQuotaLimit?: number | null
       aiQuotaUsed?: number

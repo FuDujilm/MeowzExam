@@ -63,9 +63,14 @@ export function SiteHeader() {
               <SiteMessageCenter />
               <Link
                 href="/settings"
-                className="text-sm text-gray-600 transition hover:text-blue-600 dark:text-gray-300"
+                className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1 text-sm text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:border-blue-800 dark:hover:bg-blue-950"
               >
-                {session.user.name || session.user.email}
+                <UserAvatar
+                  name={session.user.name}
+                  email={session.user.email}
+                  image={session.user.image}
+                />
+                <span>{session.user.name || session.user.email}</span>
               </Link>
               <Button variant="outline" size="sm" onClick={signOutHandler}>
                 登出
@@ -79,5 +84,42 @@ export function SiteHeader() {
         </div>
       </div>
     </header>
+  )
+}
+
+function UserAvatar({
+  name,
+  email,
+  image,
+}: {
+  name?: string | null
+  email?: string | null
+  image?: string | null
+}) {
+  const fallbackText = (name?.trim() || email?.trim() || '?')[0]?.toUpperCase() || '?'
+  const label = name || email || '用户'
+
+  if (image) {
+    return (
+      <span className="relative block h-8 w-8 overflow-hidden rounded-full border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
+        <Image
+          src={image}
+          alt={`${label}的头像`}
+          fill
+          sizes="32px"
+          className="object-cover"
+          referrerPolicy="no-referrer"
+        />
+      </span>
+    )
+  }
+
+  return (
+    <span
+      aria-hidden
+      className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-sm font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+    >
+      {fallbackText}
+    </span>
   )
 }
