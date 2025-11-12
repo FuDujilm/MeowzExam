@@ -4,6 +4,7 @@ import type { AiModelGroup, AiModelUsageScope } from "@prisma/client"
 import { ZodError } from "zod"
 
 import { prisma } from "@/lib/db"
+import { applyStyleToPrompt } from "@/lib/ai/style"
 import { AiExplainSchema, SYSTEM_PROMPT_XML, buildUserPrompt, type AiExplainOutput, type OptionAnalysis } from "./schema"
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4"
@@ -971,18 +972,23 @@ export async function generateAssistantChatReply({
   systemPrompt,
   temperature,
   maxTokens = 600,
+  stylePrompt,
 }: {
   messages: AssistantChatMessage[]
   systemPrompt?: string
   temperature?: number
   maxTokens?: number
+  stylePrompt?: string | null
 }): Promise<{ reply: string; modelName: string }> {
   const { client, group, model } = await resolveOpenAIRuntime('ASSISTANT')
 
-  const effectiveSystemPrompt =
+  const baseSystemPrompt =
     systemPrompt?.trim() ||
     (group?.systemPrompt && group.systemPrompt.trim().length > 0 ? group.systemPrompt : null) ||
     ASSISTANT_SYSTEM_PROMPT
+
+  const effectiveSystemPrompt =
+    applyStyleToPrompt(baseSystemPrompt, stylePrompt) ?? baseSystemPrompt ?? ASSISTANT_SYSTEM_PROMPT
 
   const sanitizedMessages: ChatCompletionMessageParam[] = [
     {

@@ -92,114 +92,110 @@ export default function AuditPage() {
 
   return (
     <AdminPageShell maxWidthClassName="max-w-5xl" contentClassName="space-y-6">
-      <Card>
+      <Card className="border-slate-200/80 bg-white/90 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/60">
         <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-2xl font-semibold">审计日志</CardTitle>
-              <p className="mt-1 text-sm text-gray-500">
-                记录AI解析与人工解析相关操作，便于追踪和排查问题。
-              </p>
+            <CardTitle className="text-2xl font-semibold text-slate-900 dark:text-slate-50">审计日志</CardTitle>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              记录AI解析与人工解析相关操作，便于追踪和排查问题。
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Select value={actionFilter} onValueChange={setActionFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="筛选操作类型" />
+              </SelectTrigger>
+              <SelectContent>
+                {actionOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button variant="outline" disabled={loading} onClick={() => loadLogs()}>
+              {loading ? '刷新中...' : '刷新'}
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50/80 p-4 text-sm text-red-600 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+              {error}
             </div>
+          )}
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="筛选操作类型" />
-                </SelectTrigger>
-                <SelectContent>
-                  {actionOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button
-                variant="outline"
-                disabled={loading}
-                onClick={() => loadLogs()}
-              >
-                {loading ? '刷新中...' : '刷新'}
-              </Button>
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            {error && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">
-                {error}
-              </div>
-            )}
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+              <thead className="bg-slate-100/70 dark:bg-slate-900/40">
+                <tr>
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    时间
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    操作
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    目标
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    详情
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    操作者
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white/90 dark:divide-slate-800 dark:bg-slate-900/40">
+                {logs.length === 0 && !loading ? (
                   <tr>
-                    <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-gray-500">
-                      时间
-                    </th>
-                    <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-gray-500">
-                      操作
-                    </th>
-                    <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-gray-500">
-                      目标
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
-                      详情
-                    </th>
-                    <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold text-gray-500">
-                      操作者
-                    </th>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                      暂无审计数据。
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
-                  {logs.length === 0 && !loading ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">
-                        暂无审计数据。
-                      </td>
-                    </tr>
-                  ) : (
-                    logs.map(log => {
-                      const actionLabel = ACTION_LABELS[log.action] || log.action
-                      const createdAt = new Date(log.createdAt)
-                      return (
-                        <tr key={log.id} className="hover:bg-gray-50/70">
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
-                            {createdAt.toLocaleString('zh-CN', { hour12: false })}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm">
-                            <Badge variant="secondary">{actionLabel}</Badge>
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
-                            {log.entityType ? `${log.entityType}${log.entityId ? ` #${log.entityId}` : ''}` : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">
-                            {log.details ? (
-                              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded bg-gray-100 p-2 text-xs text-gray-600">
-                                {JSON.stringify(log.details, null, 2)}
-                              </pre>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
-                            {log.user?.email || '系统'}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ) : (
+                  logs.map((log) => {
+                    const actionLabel = ACTION_LABELS[log.action] || log.action
+                    const createdAt = new Date(log.createdAt)
+                    return (
+                      <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                          {createdAt.toLocaleString('zh-CN', { hour12: false })}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm">
+                          <Badge variant="secondary">{actionLabel}</Badge>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                          {log.entityType ? `${log.entityType}${log.entityId ? ` #${log.entityId}` : ''}` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                          {log.details ? (
+                            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded bg-slate-100 p-2 text-xs text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+                              {JSON.stringify(log.details, null, 2)}
+                            </pre>
+                          ) : (
+                            <span className="text-slate-400 dark:text-slate-500">—</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                          {log.user?.email || '系统'}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-            {loading && (
-              <p className="mt-4 text-center text-sm text-gray-500">正在加载审计日志...</p>
-            )}
-          </CardContent>
-        </Card>
+          {loading && (
+            <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">正在加载审计日志...</p>
+          )}
+        </CardContent>
+      </Card>
     </AdminPageShell>
   )
 }

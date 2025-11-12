@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Loader2, MessageSquare, SendHorizonal, Sparkles } from 'lucide-react'
+import { Loader2, PawPrint, RotateCcw, SendHorizonal, Sparkles } from 'lucide-react'
 
 import { useNotification } from '@/components/ui/notification-provider'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -43,10 +42,7 @@ export function AssistantDialog({ className }: { className?: string }) {
   const listRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (!open) {
-      return
-    }
-
+    if (!open) return
     if (messages.length === 0) {
       setMessages([
         {
@@ -59,11 +55,11 @@ export function AssistantDialog({ className }: { className?: string }) {
   }, [open, messages.length])
 
   useEffect(() => {
-    if (!listRef.current) {
-      return
-    }
+    if (!listRef.current) return
     listRef.current.scrollTop = listRef.current.scrollHeight
   }, [messages])
+
+  const remaining = useMemo(() => MAX_MESSAGE_LENGTH - input.length, [input])
 
   const disabled = useMemo(() => {
     const trimmed = input.trim()
@@ -78,15 +74,14 @@ export function AssistantDialog({ className }: { className?: string }) {
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
-    if (!next) {
-      reset()
-    }
+  }
+
+  const handleResetConversation = () => {
+    reset()
   }
 
   const sendMessage = async () => {
-    if (disabled) {
-      return
-    }
+    if (disabled) return
 
     const trimmed = input.trim()
     const userMessage: AssistantMessage = {
@@ -124,7 +119,7 @@ export function AssistantDialog({ className }: { className?: string }) {
 
       if (response.status === 429) {
         const payload = await response.json().catch(() => null)
-        throw new Error(payload?.error ?? '请求过于频繁，请稍后重试。')
+        throw new Error(payload?.error ?? '请求过于频繁，请稍后再试。')
       }
 
       if (!response.ok) {
@@ -140,7 +135,7 @@ export function AssistantDialog({ className }: { className?: string }) {
             id: crypto.randomUUID(),
             role: 'assistant',
             content: payload.reply.trim(),
-          })
+          }),
       )
     } catch (error: any) {
       setMessages((prev) => prev.filter((item) => item.id !== pendingId))
@@ -167,19 +162,34 @@ export function AssistantDialog({ className }: { className?: string }) {
             size="lg"
             variant="secondary"
           >
-            <MessageSquare className="mr-2 h-5 w-5" />
+            <PawPrint className="mr-2 h-5 w-5 text-orange-400" />
             小助手
           </Button>
         </DialogTrigger>
-        <DialogContent className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden">
-          <DialogHeader className="border-b border-slate-200 pb-4">
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-500" />
-              小助手
-            </DialogTitle>
-            <DialogDescription>
-              与 AI 小助手对话，了解题库、备考建议或系统使用方法。请避免提交隐私或敏感信息。
-            </DialogDescription>
+        <DialogContent className="flex max-h-[78vh] w-full max-w-2xl flex-col overflow-hidden">
+          <DialogHeader className="border-b border-slate-200/80 pb-4 dark:border-slate-800/70">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Sparkles className="h-5 w-5 text-purple-500" />
+                  AI 小助手
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                  关闭窗口不会清空对话，若需重新开始请点击「重置对话」。请避免输入隐私或敏感信息。
+                </DialogDescription>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleResetConversation}
+                disabled={messages.length === 0 && input.length === 0}
+                className="text-slate-600 hover:text-purple-600 dark:text-slate-300 dark:hover:text-purple-300"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                重置对话
+              </Button>
+            </div>
           </DialogHeader>
 
           <div
@@ -191,7 +201,7 @@ export function AssistantDialog({ className }: { className?: string }) {
                 key={message.id}
                 className={cn(
                   'flex w-full',
-                  message.role === 'assistant' ? 'justify-start' : 'justify-end'
+                  message.role === 'assistant' ? 'justify-start' : 'justify-end',
                 )}
               >
                 <div
@@ -199,7 +209,7 @@ export function AssistantDialog({ className }: { className?: string }) {
                     'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm',
                     message.role === 'assistant'
                       ? 'bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700'
-                      : 'bg-gradient-to-tr from-indigo-500 to-purple-500 text-white'
+                      : 'bg-gradient-to-tr from-indigo-500 to-purple-500 text-white',
                   )}
                 >
                   {message.pending ? (
@@ -209,7 +219,7 @@ export function AssistantDialog({ className }: { className?: string }) {
                     </span>
                   ) : (
                     message.content.split('\n').map((line, index) => (
-                      <span key={index} className={index > 0 ? 'block mt-1' : undefined}>
+                      <span key={index} className={index > 0 ? 'mt-1 block' : undefined}>
                         {line}
                       </span>
                     ))
@@ -224,39 +234,43 @@ export function AssistantDialog({ className }: { className?: string }) {
             )}
           </div>
 
-          <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+          <div className="border-t border-slate-200/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/50">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <span>以 {session.user?.email ?? '当前账号'} 身份提问</span>
+              <span>{remaining} / {MAX_MESSAGE_LENGTH}</span>
+            </div>
             <Textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              rows={3}
+              rows={4}
               maxLength={MAX_MESSAGE_LENGTH}
-              placeholder="请输入您的问题，例如：A 类考试操作题有哪些高频考点？"
-              className="resize-none"
+              placeholder="请输入您的问题，例如：A 类操作考试有哪些高频考点？"
+              className="resize-none border-slate-200/70 bg-white/90 dark:border-slate-800/70 dark:bg-slate-900/40"
             />
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-              <span>最多 {MAX_MESSAGE_LENGTH} 字</span>
-              {session?.user?.email ? <span>以 {session.user.email} 身份提问</span> : <span>未登录用户</span>}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setInput('')}
+                disabled={loading || input.length === 0}
+              >
+                清空输入
+              </Button>
+              <Button type="button" onClick={sendMessage} disabled={disabled}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    小助手思考中...
+                  </>
+                ) : (
+                  <>
+                    <SendHorizonal className="mr-2 h-4 w-4" />
+                    发送
+                  </>
+                )}
+              </Button>
             </div>
           </div>
-
-          <DialogFooter className="border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-            <Button type="button" variant="outline" onClick={() => setInput('')} disabled={loading || input.length === 0}>
-              清空输入
-            </Button>
-            <Button type="button" onClick={sendMessage} disabled={disabled}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  小助手思考中...
-                </>
-              ) : (
-                <>
-                  <SendHorizonal className="mr-2 h-4 w-4" />
-                  发送
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

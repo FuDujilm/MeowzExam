@@ -26,11 +26,15 @@ export async function GET() {
           enableWrongQuestionWeight: user.settings.enableWrongQuestionWeight,
           theme: user.settings.theme,
           examType: user.settings.examType ?? 'A_CLASS',
+          aiStylePresetId: user.settings.aiStylePresetId,
+          aiStyleCustom: user.settings.aiStyleCustom ?? '',
         }
       : {
           enableWrongQuestionWeight: false,
           theme: 'light',
           examType: 'A_CLASS',
+          aiStylePresetId: null,
+          aiStyleCustom: '',
         }
 
     return NextResponse.json({
@@ -61,7 +65,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { callsign, enableWrongQuestionWeight, theme, examType } = body
+    const {
+      callsign,
+      enableWrongQuestionWeight,
+      theme,
+      examType,
+      aiStylePresetId,
+      aiStyleCustom,
+    } = body
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -83,6 +94,33 @@ export async function POST(request: NextRequest) {
         ? examType
         : 'A_CLASS'
 
+    let resolvedPresetId: string | null = null
+    const trimmedPresetId =
+      typeof aiStylePresetId === 'string' && aiStylePresetId.trim().length > 0
+        ? aiStylePresetId.trim()
+        : null
+
+    if (trimmedPresetId) {
+      const preset = await prisma.aiStylePreset.findFirst({
+        where: { id: trimmedPresetId, isActive: true },
+        select: { id: true },
+      })
+
+      if (!preset) {
+        return NextResponse.json(
+          { error: '选择的提示词风格已失效或不存在' },
+          { status: 400 }
+        )
+      }
+
+      resolvedPresetId = preset.id
+    }
+
+    const customPrompt =
+      typeof aiStyleCustom === 'string'
+        ? aiStyleCustom.trim().slice(0, 1500) || null
+        : null
+
     await prisma.userSettings.upsert({
       where: { userId: user.id },
       create: {
@@ -90,11 +128,15 @@ export async function POST(request: NextRequest) {
         enableWrongQuestionWeight: enableWrongQuestionWeight || false,
         theme: theme || 'light',
         examType: normalizedExamType,
+        aiStylePresetId: resolvedPresetId,
+        aiStyleCustom: customPrompt,
       },
       update: {
         enableWrongQuestionWeight: enableWrongQuestionWeight || false,
         theme: theme || 'light',
         examType: normalizedExamType,
+        aiStylePresetId: resolvedPresetId,
+        aiStyleCustom: customPrompt,
       }
     })
 

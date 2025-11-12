@@ -9,12 +9,26 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useNotification } from '@/components/ui/notification-provider'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import { Download, Save } from 'lucide-react'
 
 interface UserSettings {
   callsign?: string
   enableWrongQuestionWeight: boolean
   theme: string
+  examType?: string
+  aiStylePresetId: string | null
+  aiStyleCustom: string
+}
+
+interface StylePresetOption {
+  id: string
+  name: string
+  description: string | null
+  isDefault: boolean
+  promptPreview: string
 }
 
 export default function SettingsPage() {
@@ -25,9 +39,14 @@ export default function SettingsPage() {
     callsign: '',
     enableWrongQuestionWeight: false,
     theme: 'light',
+    examType: 'A_CLASS',
+    aiStylePresetId: null,
+    aiStyleCustom: '',
   })
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [stylePresets, setStylePresets] = useState<StylePresetOption[]>([])
+  const [styleLoading, setStyleLoading] = useState(false)
   const { notify } = useNotification()
 
   // 加载设置
@@ -39,6 +58,10 @@ export default function SettingsPage() {
     }
   }, [status, router])
 
+  useEffect(() => {
+    loadStylePresets()
+  }, [])
+
   const loadSettings = async () => {
     try {
       const res = await fetch('/api/user/settings')
@@ -48,10 +71,28 @@ export default function SettingsPage() {
           callsign: data.user?.callsign || '',
           enableWrongQuestionWeight: data.settings?.enableWrongQuestionWeight || false,
           theme: data.settings?.theme || 'light',
+          examType: data.settings?.examType || 'A_CLASS',
+          aiStylePresetId: data.settings?.aiStylePresetId ?? null,
+          aiStyleCustom: data.settings?.aiStyleCustom ?? '',
         })
       }
     } catch (error) {
       console.error('Failed to load settings:', error)
+    }
+  }
+
+  const loadStylePresets = async () => {
+    try {
+      setStyleLoading(true)
+      const res = await fetch('/api/ai/style-presets', { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        setStylePresets(Array.isArray(data.presets) ? data.presets : [])
+      }
+    } catch (error) {
+      console.error('Failed to load style presets:', error)
+    } finally {
+      setStyleLoading(false)
     }
   }
 
@@ -62,7 +103,14 @@ export default function SettingsPage() {
       const res = await fetch('/api/user/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify({
+          callsign: settings.callsign,
+          enableWrongQuestionWeight: settings.enableWrongQuestionWeight,
+          theme: settings.theme,
+          examType: settings.examType,
+          aiStylePresetId: settings.aiStylePresetId,
+          aiStyleCustom: settings.aiStyleCustom,
+        }),
       })
 
       if (res.ok) {
@@ -135,15 +183,15 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold">个人设置</h1>
+    <div className="min-h-screen bg-gray-50 py-8 px-4 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-50">
+      <div className="mx-auto max-w-3xl space-y-6">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">个人设置</h1>
 
         {/* 基本信息 */}
-        <Card>
+        <Card className="border-slate-200/80 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70">
           <CardHeader>
-            <CardTitle>基本信息</CardTitle>
-            <CardDescription>设置您的个人信息</CardDescription>
+            <CardTitle className="text-slate-900 dark:text-slate-100">基本信息</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">设置您的个人信息</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -167,7 +215,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, callsign: e.target.value })}
                 className="mt-1"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 填写您的业余电台呼号，方便记录和展示
               </p>
             </div>
@@ -175,16 +223,16 @@ export default function SettingsPage() {
         </Card>
 
         {/* 学习偏好 */}
-        <Card>
+        <Card className="border-slate-200/80 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70">
           <CardHeader>
-            <CardTitle>学习偏好</CardTitle>
-            <CardDescription>自定义您的学习体验</CardDescription>
+            <CardTitle className="text-slate-900 dark:text-slate-100">学习偏好</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">自定义您的学习体验</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="wrong-weight">错题权重增强</Label>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   在随机练习中提高错题出现的概率
                 </p>
               </div>
@@ -203,7 +251,7 @@ export default function SettingsPage() {
                 id="theme"
                 value={settings.theme}
                 onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
-                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="light">明亮</option>
                 <option value="dark">暗黑</option>
@@ -213,17 +261,97 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* 数据管理 */}
-        <Card>
+        {/* AI 小助手风格 */}
+        <Card className="border-slate-200/80 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70">
           <CardHeader>
-            <CardTitle>数据管理</CardTitle>
-            <CardDescription>导出您的练习数据</CardDescription>
+            <CardTitle className="text-slate-900 dark:text-slate-100">AI 小助手风格</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">
+              选择系统风格预设，或输入自定义提示词，让小助手以符合你习惯的语气回答。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>风格预设</Label>
+              {styleLoading ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">风格预设加载中...</p>
+              ) : (
+                <Select
+                  value={settings.aiStylePresetId ?? 'none'}
+                  onValueChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      aiStylePresetId: value === 'none' ? null : value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择风格预设" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">跟随系统默认</SelectItem>
+                    {stylePresets.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        {preset.name}
+                        {preset.isDefault ? '（系统默认）' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {settings.aiStylePresetId && (
+                <div className="rounded-lg border border-slate-200/70 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                  {(() => {
+                    const preset = stylePresets.find((item) => item.id === settings.aiStylePresetId)
+                    if (!preset) return '该预设可能已被管理员禁用。'
+                    return (
+                      <>
+                        <div className="font-medium text-slate-900 dark:text-slate-100">
+                          {preset.name}
+                        </div>
+                        {preset.description ? <p className="mt-1">{preset.description}</p> : null}
+                        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                          提示词预览：{preset.promptPreview}
+                        </p>
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ai-style-custom">自定义提示词</Label>
+              <Textarea
+                id="ai-style-custom"
+                rows={4}
+                maxLength={1500}
+                value={settings.aiStyleCustom}
+                onChange={(event) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    aiStyleCustom: event.target.value,
+                  }))
+                }
+                placeholder="例如：请以温柔、鼓励的语气回答，并在结尾附上 1 条记忆小技巧。"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                该内容会附加到风格预设之后，并由系统合并到提示词中。
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 数据管理 */}
+        <Card className="border-slate-200/80 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70">
+          <CardHeader>
+            <CardTitle className="text-slate-900 dark:text-slate-100">数据管理</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">导出您的练习数据</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium mb-2">导出练习数据</h4>
-                <p className="text-sm text-gray-600 mb-4">
+                <h4 className="mb-2 font-medium text-slate-900 dark:text-slate-100">导出练习数据</h4>
+                <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
                   导出包含您的答题记录、错题本、考试成绩等数据的JSON文件
                 </p>
                 <Button
@@ -259,28 +387,26 @@ export default function SettingsPage() {
         </div>
 
         {/* 统计信息 */}
-        <Card>
+        <Card className="border-slate-200/80 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70">
           <CardHeader>
-            <CardTitle>学习统计</CardTitle>
+            <CardTitle className="text-slate-900 dark:text-slate-100">学习统计</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">0</p>
-                <p className="text-sm text-gray-600">累计答题</p>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-green-600">0</p>
-                <p className="text-sm text-gray-600">答对题数</p>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-red-600">0</p>
-                <p className="text-sm text-gray-600">错题数量</p>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">0</p>
-                <p className="text-sm text-gray-600">模拟考试</p>
-              </div>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[
+                { label: '累计答题', color: 'text-blue-500' },
+                { label: '答对题数', color: 'text-green-500' },
+                { label: '错题数量', color: 'text-red-500' },
+                { label: '模拟考试', color: 'text-purple-500' },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/60"
+                >
+                  <p className={cn('text-2xl font-bold', item.color)}>0</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">{item.label}</p>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

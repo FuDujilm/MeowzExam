@@ -5,12 +5,12 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Users, RefreshCw, Edit, RotateCcw } from 'lucide-react'
 
-import AdminNav from '@/components/admin/AdminNav'
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -70,6 +70,8 @@ export default function AdminUsersPage() {
 
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(false)
+  const [usersError, setUsersError] = useState<string | null>(null)
+  const [usersErrorType, setUsersErrorType] = useState<'permission' | 'auth' | 'generic' | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -106,14 +108,41 @@ export default function AdminUsersPage() {
       try {
         if (!append) {
           setLoading(true)
+          setUsersError(null)
+          setUsersErrorType(null)
         }
 
         const params = buildQuery(pageNumber, keyword)
-        const response = await fetch(`/api/admin/users?${params.toString()}`)
+        const response = await fetch(`/api/admin/users?${params.toString()}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        })
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || '获取用户列表失败')
+          let message = errorData?.error || '获取用户列表失败'
+          let type: typeof usersErrorType = 'generic'
+
+          if (response.status === 401) {
+            message = '登录状态已失效，请重新登录后再试。'
+            type = 'auth'
+            router.push('/login')
+          } else if (response.status === 403) {
+            message = '权限不足：当前账号不在管理员名单中，无法查看用户列表。'
+            type = 'permission'
+          }
+
+          setUsersError(message)
+          setUsersErrorType(type)
+
+          if (response.status !== 403) {
+            notify({
+              variant: 'danger',
+              title: '加载失败',
+              description: message,
+            })
+          }
+          return
         }
 
         const data: UsersResponse = await response.json()
@@ -124,10 +153,13 @@ export default function AdminUsersPage() {
         setHasMore(Boolean(data.meta?.hasMore))
       } catch (error: any) {
         console.error('[admin][users] load failed:', error)
+        const fallback = error?.message || '无法获取用户列表，请稍后再试。'
+        setUsersError(fallback)
+        setUsersErrorType('generic')
         notify({
           variant: 'danger',
           title: '加载失败',
-          description: error?.message || '无法获取用户列表，请稍后再试。',
+          description: fallback,
         })
       } finally {
         if (!append) {
@@ -135,12 +167,15 @@ export default function AdminUsersPage() {
         }
       }
     },
-    [buildQuery, notify]
+    [buildQuery, notify, router]
   )
 
   const loadAdminConfig = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/config')
+      const response = await fetch('/api/admin/config', {
+        cache: 'no-store',
+        credentials: 'include',
+      })
       if (!response.ok) {
         if (response.status === 403) {
           setAdminEmails([])
@@ -238,6 +273,8 @@ export default function AdminUsersPage() {
       const response = await fetch(`/api/admin/users/${editingUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store',
         body: JSON.stringify(body),
       })
 
@@ -275,6 +312,8 @@ export default function AdminUsersPage() {
       const response = await fetch(`/api/admin/users/${user.id}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store',
         body: JSON.stringify({ resetPoints: true, resetQuota: true, reactivate: true }),
       })
 
@@ -314,26 +353,24 @@ export default function AdminUsersPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
-        <p>加载中…</p>
-      </div>
+      <AdminPageShell maxWidthClassName="max-w-6xl">
+        <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">加载中…</div>
+      </AdminPageShell>
     )
   }
 
   if (status === 'unauthenticated' || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
-        <p>正在跳转到登录页面…</p>
-      </div>
+      <AdminPageShell maxWidthClassName="max-w-6xl">
+        <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">正在跳转到登录页面…</div>
+      </AdminPageShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-      <AdminNav />
-      <main className="px-4 pb-12 pt-8 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl space-y-6">
-          <Card className="border-slate-200/70 bg-white/80 shadow-sm ring-1 ring-slate-900/5 dark:border-slate-800/60 dark:bg-slate-900/60 dark:ring-white/5">
+    <AdminPageShell maxWidthClassName="max-w-6xl" contentClassName="space-y-6 pb-16">
+      <>
+        <Card className="border-slate-200/70 bg-white/80 shadow-sm ring-1 ring-slate-900/5 dark:border-slate-800/60 dark:bg-slate-900/60 dark:ring-white/5">
             <CardHeader className="flex flex-col gap-6 border-b border-slate-200/70 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800/60">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-500/15 text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
@@ -381,6 +418,18 @@ export default function AdminUsersPage() {
             </CardHeader>
 
             <CardContent>
+              {usersError ? (
+                <div
+                  className="mb-6 rounded-lg border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+                >
+                  <p>{usersError}</p>
+                  {usersErrorType === 'permission' ? (
+                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-200">
+                      请确认当前登录邮箱已配置在环境变量 <code className="rounded bg-amber-100/80 px-1 text-[11px] text-amber-800 dark:bg-amber-500/20 dark:text-amber-100">ADMIN_EMAILS</code> 中，或联系站点管理员授权。
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {adminConfigLoaded ? (
                 adminEmails.length > 0 ? (
                   <div className="mb-6 grid gap-4 md:grid-cols-2">
@@ -543,11 +592,9 @@ export default function AdminUsersPage() {
               )}
             </CardContent>
           </Card>
-        </div>
-      </main>
 
-      <Dialog open={Boolean(editingUser)} onOpenChange={(open) => (!open ? closeDialog() : undefined)}>
-        <DialogContent className="max-w-lg">
+        <Dialog open={Boolean(editingUser)} onOpenChange={(open) => (!open ? closeDialog() : undefined)}>
+          <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingUser ? `编辑用户：${editingUser.email}` : '编辑用户'}</DialogTitle>
             <DialogDescription>{editingUser ? quotaLabel : ''}</DialogDescription>
@@ -624,7 +671,8 @@ export default function AdminUsersPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-    </div>
+        </Dialog>
+      </>
+    </AdminPageShell>
   )
 }

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
@@ -13,7 +13,7 @@ import {
   Trash2,
 } from 'lucide-react'
 
-import AdminNav from '@/components/admin/AdminNav'
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -465,7 +465,14 @@ export default function OpenAIConfigPage() {
   const renderGroupCard = (group: ModelGroup) => {
     const isPrimary = group.isActive
     return (
-      <Card key={group.id} className={isPrimary ? 'border-blue-400 shadow' : undefined}>
+      <Card
+        key={group.id}
+        className={`bg-white/80 shadow-sm dark:bg-slate-900/60 ${
+          isPrimary
+            ? 'border-blue-400/70 ring-2 ring-blue-200/60 dark:border-blue-500/50 dark:ring-blue-500/20'
+            : 'border-slate-200/80 dark:border-slate-800/60'
+        }`}
+      >
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -521,28 +528,28 @@ export default function OpenAIConfigPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-gray-600">
+        <CardContent className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
           <div className="grid gap-2 md:grid-cols-2">
             <div>
-              <span className="text-gray-500">模型类型：</span>
+              <span className="text-slate-500 dark:text-slate-400">模型类型：</span>
               <strong>{group.modelType}</strong>
             </div>
             <div>
-              <span className="text-gray-500">模型名称：</span>
+              <span className="text-slate-500 dark:text-slate-400">模型名称：</span>
               <strong>{group.modelName}</strong>
             </div>
             <div className="md:col-span-2">
-              <span className="text-gray-500">API 地址：</span>
+              <span className="text-slate-500 dark:text-slate-400">API 地址：</span>
               <strong>{group.apiUrl}</strong>
             </div>
             {group.proxyUrl ? (
               <div className="md:col-span-2">
-                <span className="text-gray-500">代理地址：</span>
+                <span className="text-slate-500 dark:text-slate-400">代理地址：</span>
                 <strong>{group.proxyUrl}</strong>
               </div>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-500">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
             <span>Temperature: {group.temperature ?? '默认'}</span>
             <span>Top P: {group.topP ?? '默认'}</span>
             <span>Presence Penalty: {group.presencePenalty ?? '默认'}</span>
@@ -550,77 +557,81 @@ export default function OpenAIConfigPage() {
             <span>包含题干：{group.includeQuestion ? '是' : '否'}</span>
             <span>包含选项：{group.includeOptions ? '是' : '否'}</span>
           </div>
-          <div className="text-xs text-gray-400">最近更新：{new Date(group.updatedAt).toLocaleString()}</div>
+          <div className="text-xs text-slate-400 dark:text-slate-500">
+            最近更新：{new Date(group.updatedAt).toLocaleString()}
+          </div>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminNav />
-      <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">AI 模型组管理</h1>
-            <p className="mt-1 text-sm text-gray-500">根据使用范围管理题目解析与小助手模型。每个使用范围仅允许一个优先模型组。</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCreateNew} disabled={submitting}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              新建配置
-            </Button>
-            <Button variant="outline" onClick={() => loadGroups()} disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              刷新
-            </Button>
-          </div>
-        </header>
+    <AdminPageShell maxWidthClassName="max-w-6xl" contentClassName="space-y-8 py-8">
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">AI 模型组管理</h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            根据使用范围管理题目解析与小助手模型。每个使用范围仅允许一个优先模型组。
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleCreateNew} disabled={submitting}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            新建配置
+          </Button>
+          <Button variant="outline" onClick={() => loadGroups()} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            刷新
+          </Button>
+        </div>
+      </header>
 
-        {error ? (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="py-6 text-sm text-red-600">{error}</CardContent>
-          </Card>
-        ) : null}
+      {error ? (
+        <Card className="border-red-200 bg-red-50/80 dark:border-red-500/40 dark:bg-red-500/10">
+          <CardContent className="py-6 text-sm text-red-600 dark:text-red-200">{error}</CardContent>
+        </Card>
+      ) : null}
 
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <div className="space-y-6">
-            {SCOPE_ORDER.map((scope) => (
-              <div key={scope} className="space-y-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {USAGE_SCOPE_OPTIONS.find((item) => item.value === scope)?.label}
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    {USAGE_SCOPE_DESCRIPTIONS[scope]}
-                    {scope !== 'BOTH' ? '（仅允许一个优先模型组）' : ''}
-                  </p>
-                </div>
-                {groupedByScope[scope].length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-200 bg-white p-6 text-sm text-gray-500">尚未配置模型组。</div>
-                ) : (
-                  groupedByScope[scope].map(renderGroupCard)
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between text-lg">
-                  {formMode === 'create' ? '新建模型组' : '编辑模型组'}
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>显示高级选项</span>
-                    <Switch checked={showAdvanced} onCheckedChange={setShowAdvanced} />
-                  </div>
-                </CardTitle>
-                <p className="text-sm text-gray-500">
-                  {formMode === 'create'
-                    ? '填写核心信息即可创建模型组，勾选“设为优先模型组”将自动停用同范围的其他模型。'
-                    : '更新配置后立即生效，如需更换 API Key 请重新填写。'}
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="space-y-6">
+          {SCOPE_ORDER.map((scope) => (
+            <div key={scope} className="space-y-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {USAGE_SCOPE_OPTIONS.find((item) => item.value === scope)?.label}
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {USAGE_SCOPE_DESCRIPTIONS[scope]}
+                  {scope !== 'BOTH' ? '（仅允许一个优先模型组）' : ''}
                 </p>
-              </CardHeader>
+              </div>
+              {groupedByScope[scope].length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200/80 bg-white/70 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                  尚未配置模型组。
+                </div>
+              ) : (
+                groupedByScope[scope].map(renderGroupCard)
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <Card className="border-slate-200/80 bg-white/90 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-lg text-slate-900 dark:text-slate-100">
+                {formMode === 'create' ? '新建模型组' : '编辑模型组'}
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span>显示高级选项</span>
+                  <Switch checked={showAdvanced} onCheckedChange={setShowAdvanced} />
+                </div>
+              </CardTitle>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {formMode === 'create'
+                  ? '填写核心信息即可创建模型组，勾选“设为优先模型组”将自动停用同范围的其他模型。'
+                  : '更新配置后立即生效，如需更换 API Key 请重新填写。'}
+              </p>
+            </CardHeader>
               <CardContent>
                 <form className="space-y-5" onSubmit={handleSubmit}>
                   <div className="space-y-2">
@@ -733,7 +744,9 @@ export default function OpenAIConfigPage() {
                             onCheckedChange={(checked) => setFormState((prev) => ({ ...prev, markAsPrimary: checked }))}
                           />
                         </div>
-                        <span className="text-xs font-normal text-gray-500">勾选后将自动停用同使用范围的其他模型。</span>
+                        <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                          勾选后将自动停用同使用范围的其他模型。
+                        </span>
                       </Label>
                     </div>
                   </div>
@@ -853,7 +866,7 @@ export default function OpenAIConfigPage() {
                   ) : null}
 
                   {feedback ? (
-                    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
                       {feedback}
                     </div>
                   ) : null}
@@ -869,9 +882,8 @@ export default function OpenAIConfigPage() {
                 </form>
               </CardContent>
             </Card>
-          </div>
         </div>
       </div>
-    </div>
+    </AdminPageShell>
   )
 }

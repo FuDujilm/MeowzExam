@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { generateAssistantChatReply } from '@/lib/ai/openai'
+import { resolveUserAiStylePrompt } from '@/lib/ai/style'
 import { hitRateLimit } from '@/lib/rate-limit'
 
 const USER_RATE_LIMIT = {
@@ -113,8 +114,10 @@ export async function POST(request: NextRequest) {
   })
 
   try {
+    const stylePrompt = await resolveUserAiStylePrompt(session.user.id)
     const { reply, modelName } = await generateAssistantChatReply({
       messages: sanitised,
+      stylePrompt,
     })
 
     return NextResponse.json({
