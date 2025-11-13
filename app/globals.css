@@ -247,4 +247,31 @@
   .dark .text-yellow-700 {
     color: rgb(253 224 71);
   }
+
+  .markdown-body {
+    line-height: 1.65;
+    word-break: break-word;
+  }
+
+  .markdown-body p {
+    margin-top: 0.4rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .markdown-body ul,
+  .markdown-body ol {
+    margin: 0.4rem 0 0.4rem 1.25rem;
+    padding-left: 1rem;
+  }
+
+  .markdown-body code {
+    padding: 0.15rem 0.35rem;
+    border-radius: 0.35rem;
+    background-color: rgba(15, 23, 42, 0.08);
+    font-size: 0.9em;
+  }
+
+  .dark .markdown-body code {
+    background-color: rgba(248, 250, 252, 0.12);
+  }
 }

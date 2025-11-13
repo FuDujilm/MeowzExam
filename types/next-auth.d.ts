@@ -16,6 +16,7 @@ declare module 'next-auth' {
   }
 
   interface User {
+    callsign?: string | null
     aiQuotaLimit: number | null
     aiQuotaUsed: number
     loginDisabled: boolean

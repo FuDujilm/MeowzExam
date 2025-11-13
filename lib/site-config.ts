@@ -10,6 +10,7 @@ export interface SiteConfig {
   ogImageUrl: string
   headerContent: string
   footerContent: string
+  gravatarMirrorUrl: string
 }
 
 const CONFIG_PATH = path.join(process.cwd(), 'config/site-config.json')
@@ -24,6 +25,7 @@ const defaultConfig: SiteConfig = {
   headerContent:
     '<strong>业余无线电刷题系统</strong><span class="ml-3 text-sm text-indigo-600">提升通过率，从现在开始</span>',
   footerContent: '<p>© {YEAR} 业余无线电刷题系统 · 保留所有权利</p>',
+  gravatarMirrorUrl: 'https://www.gravatar.com/avatar',
 }
 
 async function ensureConfigFile(): Promise<void> {
@@ -79,6 +81,7 @@ export async function updateSiteConfig(partial: Partial<SiteConfig>): Promise<Si
     ogImageUrl: updated.ogImageUrl?.trim() || '',
     headerContent: updated.headerContent?.trim() || defaultConfig.headerContent,
     footerContent: updated.footerContent?.trim() || defaultConfig.footerContent,
+    gravatarMirrorUrl: updated.gravatarMirrorUrl?.trim() || defaultConfig.gravatarMirrorUrl,
   }
 
   await fs.writeFile(CONFIG_PATH, JSON.stringify(normalised, null, 2), 'utf-8')

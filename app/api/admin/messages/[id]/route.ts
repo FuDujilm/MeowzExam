@@ -33,14 +33,14 @@ function parseLevel(value: unknown): 'NORMAL' | 'GENERAL' | 'URGENT' {
   return 'NORMAL'
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const denied = ensureAdmin(session)
   if (denied) {
     return denied
   }
 
-  const id = params?.id
+  const { id } = await context.params
   if (!id) {
     return NextResponse.json({ error: '缺少站内消息 ID' }, { status: 400 })
   }
@@ -126,14 +126,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const denied = ensureAdmin(session)
   if (denied) {
     return denied
   }
 
-  const id = params?.id
+  const { id } = await context.params
   if (!id) {
     return NextResponse.json({ error: '缺少站内消息 ID' }, { status: 400 })
   }

@@ -28,6 +28,7 @@ export async function PUT(request: NextRequest) {
       ogImageUrl: typeof body.ogImageUrl === 'string' ? body.ogImageUrl : undefined,
       headerContent: typeof body.headerContent === 'string' ? body.headerContent : undefined,
       footerContent: typeof body.footerContent === 'string' ? body.footerContent : undefined,
+      gravatarMirrorUrl: typeof body.gravatarMirrorUrl === 'string' ? body.gravatarMirrorUrl : undefined,
     }
 
     const updated = await updateSiteConfig(payload)

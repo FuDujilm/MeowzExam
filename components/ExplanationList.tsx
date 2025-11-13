@@ -181,7 +181,11 @@ export function ExplanationList({
         onClick={() => setShowUserForm(true)}
         size="sm"
         variant={props?.variant ?? 'outline'}
-        className={props?.variant === 'default' ? undefined : 'border-purple-300 text-purple-700 hover:bg-purple-50'}
+        className={
+          props?.variant === 'default'
+            ? undefined
+            : 'border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-500/60 dark:text-purple-200 dark:hover:bg-purple-500/20'
+        }
       >
         <PlusCircle className="mr-1 h-4 w-4" />
         我来贡献解析
@@ -256,9 +260,9 @@ export function ExplanationList({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-        <span className="ml-2 text-sm text-gray-600">加载解析中...</span>
+      <div className="flex items-center justify-center py-8 text-gray-600 dark:text-slate-300">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400 dark:text-slate-500" />
+        <span className="ml-2 text-sm">加载解析中...</span>
       </div>
     )
   }

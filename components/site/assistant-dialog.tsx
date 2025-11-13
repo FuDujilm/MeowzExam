@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Loader2, PawPrint, RotateCcw, SendHorizonal, Sparkles } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 
 import { useNotification } from '@/components/ui/notification-provider'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { getUserDisplayName } from '@/lib/users/display-name'
 
 type AssistantRole = 'user' | 'assistant'
 
@@ -40,6 +42,13 @@ export function AssistantDialog({ className }: { className?: string }) {
   const [messages, setMessages] = useState<AssistantMessage[]>([])
   const [loading, setLoading] = useState(false)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const identityLabel = session?.user
+    ? getUserDisplayName({
+        callsign: session.user.callsign,
+        name: session.user.name,
+        email: session.user.email,
+      })
+    : '当前账号'
 
   useEffect(() => {
     if (!open) return
@@ -153,6 +162,31 @@ export function AssistantDialog({ className }: { className?: string }) {
     return null
   }
 
+  const renderMessageContent = (message: AssistantMessage) => {
+    if (message.pending) {
+      return (
+        <span className="flex items-center gap-2 text-slate-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          正在思考...
+        </span>
+      )
+    }
+
+    if (message.role === 'assistant') {
+      return (
+        <div className="markdown-body text-sm leading-relaxed text-slate-700 dark:text-slate-100">
+          <ReactMarkdown>{message.content}</ReactMarkdown>
+        </div>
+      )
+    }
+
+    return message.content.split('\n').map((line, index) => (
+      <span key={index} className={index > 0 ? 'mt-1 block' : undefined}>
+        {line}
+      </span>
+    ))
+  }
+
   return (
     <div className={cn('flex flex-col items-end gap-3', className)}>
       <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -212,20 +246,9 @@ export function AssistantDialog({ className }: { className?: string }) {
                       : 'bg-gradient-to-tr from-indigo-500 to-purple-500 text-white',
                   )}
                 >
-                  {message.pending ? (
-                    <span className="flex items-center gap-2 text-slate-400">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      正在思考...
-                    </span>
-                  ) : (
-                    message.content.split('\n').map((line, index) => (
-                      <span key={index} className={index > 0 ? 'mt-1 block' : undefined}>
-                        {line}
-                      </span>
-                    ))
-                  )}
+                    {renderMessageContent(message)}
+                  </div>
                 </div>
-              </div>
             ))}
             {messages.length === 0 && (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">
@@ -236,7 +259,7 @@ export function AssistantDialog({ className }: { className?: string }) {
 
           <div className="border-t border-slate-200/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/50">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span>以 {session.user?.email ?? '当前账号'} 身份提问</span>
+              <span>以 {identityLabel} 身份提问</span>
               <span>{remaining} / {MAX_MESSAGE_LENGTH}</span>
             </div>
             <Textarea

@@ -407,10 +407,10 @@ export function ExplanationCard({
                 const isSelected = selectedOptionSet.has(upperOption)
                 const verdictClasses =
                   item.verdict === 'correct'
-                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-200'
-                    : 'bg-red-50 border-red-200 text-red-700 dark:bg-rose-500/15 dark:border-rose-500/40 dark:text-rose-200'
+                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-100'
+                    : 'bg-red-50 border-red-200 text-red-700 dark:bg-rose-500/15 dark:border-rose-500/40 dark:text-rose-100'
                 const selectedClasses = isSelected
-                  ? 'ring-2 ring-blue-300 shadow-sm'
+                  ? 'ring-2 ring-blue-300 shadow-sm dark:ring-blue-500/60'
                   : ''
 
                 return (
@@ -425,11 +425,11 @@ export function ExplanationCard({
                     )}
                     <div className="space-y-1">
                       {optionText ? (
-                        <p className="font-medium text-gray-900 leading-snug">
+                        <p className="font-medium text-gray-900 dark:text-slate-100 leading-snug">
                           {optionText}
                         </p>
                       ) : (
-                        <p className="font-medium text-gray-600 dark:text-gray-300 leading-snug">
+                        <p className="font-medium text-gray-600 dark:text-slate-200 leading-snug">
                           {upperOption}
                         </p>
                       )}
@@ -444,8 +444,8 @@ export function ExplanationCard({
                       <p
                         className={
                           item.verdict === 'correct'
-                            ? 'text-green-700 leading-relaxed'
-                            : 'text-red-700 leading-relaxed'
+                            ? 'text-green-700 leading-relaxed dark:text-emerald-100'
+                            : 'text-red-700 leading-relaxed dark:text-rose-100'
                         }
                       >
                         {item.reason}

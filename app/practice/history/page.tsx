@@ -299,15 +299,15 @@ function HistoryContent() {
 
   if (loading && questions.length === 0) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center">加载中...</div>
+      <div className="container mx-auto max-w-4xl p-4 min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-300">
+        加载中...
       </div>
     )
   }
 
   if (questions.length === 0) {
     return (
-      <div className="container mx-auto p-4 max-w-4xl">
+      <div className="container mx-auto p-4 max-w-4xl text-slate-900 dark:text-slate-100">
         <div className="mb-4">
           <Button
             variant="ghost"
@@ -318,11 +318,9 @@ function HistoryContent() {
             返回
           </Button>
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center text-gray-500">
-              暂无练习记录
-            </div>
+        <Card className="border-slate-200 dark:border-slate-800 dark:bg-slate-900/70">
+          <CardContent className="p-6 text-center text-gray-500 dark:text-slate-400">
+            暂无练习记录
           </CardContent>
         </Card>
       </div>
@@ -330,7 +328,7 @@ function HistoryContent() {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
+    <div className="container mx-auto p-4 max-w-4xl text-slate-900 dark:text-slate-100">
       {/* 头部信息 */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -342,13 +340,13 @@ function HistoryContent() {
             <ChevronLeft className="h-4 w-4 mr-1" />
             返回
           </Button>
-          <Badge variant="outline">已练习题目</Badge>
-          <Badge>{currentQuestion?.externalId}</Badge>
+          <Badge variant="outline" className="dark:text-slate-200 dark:border-slate-700">已练习题目</Badge>
+          <Badge className="dark:bg-slate-800 dark:text-slate-100">{currentQuestion?.externalId}</Badge>
         </div>
 
         {/* 筛选器 */}
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-500" />
+        <div className="flex items-center gap-2 text-gray-600 dark:text-slate-300">
+          <Filter className="h-4 w-4" />
           <Select value={filter} onValueChange={handleFilterChange}>
             <SelectTrigger className="w-[120px]">
               <SelectValue />
@@ -363,16 +361,16 @@ function HistoryContent() {
       </div>
 
       {/* 进度信息 */}
-      <div className="mb-4 bg-white rounded-lg shadow p-4">
+      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow dark:border-slate-800 dark:bg-slate-900/70">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 dark:text-slate-300">
             第 <strong>{currentIndex + 1}</strong> / {questions.length} 题
           </div>
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-green-600">
+            <span className="text-green-600 dark:text-emerald-300">
               答对: <strong>{userQuestion?.correctCount || 0}</strong>次
             </span>
-            <span className="text-red-600">
+            <span className="text-red-600 dark:text-rose-300">
               答错: <strong>{userQuestion?.incorrectCount || 0}</strong>次
             </span>
           </div>
@@ -380,19 +378,19 @@ function HistoryContent() {
       </div>
 
       {/* 题目卡片 */}
-      <Card className="mb-4">
+      <Card className="mb-4 border border-slate-200 dark:border-slate-800 dark:bg-slate-900/70">
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="secondary">{currentQuestion?.category}</Badge>
-                <Badge variant="outline">
+                <Badge variant="secondary" className="dark:text-slate-900 dark:bg-slate-100">{currentQuestion?.category}</Badge>
+                <Badge variant="outline" className="dark:text-slate-200 dark:border-slate-700">
                   {currentQuestion?.questionType === 'single_choice' && '单选题'}
                   {currentQuestion?.questionType === 'multiple_choice' && '多选题'}
                   {currentQuestion?.questionType === 'true_false' && '判断题'}
                 </Badge>
                 {userQuestion?.lastCorrect !== undefined && (
-                  <Badge variant={userQuestion.lastCorrect ? 'default' : 'destructive'}>
+                  <Badge variant={userQuestion.lastCorrect ? 'default' : 'destructive'} className="dark:text-slate-900 dark:bg-slate-100">
                     上次{userQuestion.lastCorrect ? '正确' : '错误'}
                   </Badge>
                 )}
@@ -409,16 +407,16 @@ function HistoryContent() {
               currentQuestion.options.map((option) => (
                 <div
                   key={option.id}
-                  className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer ${
+                  className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                     submitted
                       ? correctAnswers.includes(option.id)
-                        ? 'border-green-500 bg-green-50'
+                        ? 'border-green-500 bg-green-50 dark:border-emerald-400/70 dark:bg-emerald-500/15'
                         : selectedAnswer.includes(option.id)
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-200'
+                        ? 'border-red-500 bg-red-50 dark:border-rose-500/60 dark:bg-rose-500/15'
+                        : 'border-gray-200 dark:border-slate-700'
                       : selectedAnswer.includes(option.id)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-blue-500 bg-blue-50 dark:border-blue-400/60 dark:bg-blue-500/15'
+                      : 'border-gray-200 hover:border-gray-300 dark:border-slate-700 dark:hover:border-slate-500'
                   }`}
                   onClick={() => !submitted && handleOptionChange(option.id)}
                 >
@@ -447,16 +445,16 @@ function HistoryContent() {
                 {currentQuestion?.options.map((option) => (
                   <div
                     key={option.id}
-                    className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer ${
+                    className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                       submitted
                         ? correctAnswers.includes(option.id)
-                          ? 'border-green-500 bg-green-50'
+                          ? 'border-green-500 bg-green-50 dark:border-emerald-400/70 dark:bg-emerald-500/15'
                           : selectedAnswer.includes(option.id)
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-gray-200'
+                          ? 'border-red-500 bg-red-50 dark:border-rose-500/60 dark:bg-rose-500/15'
+                          : 'border-gray-200 dark:border-slate-700'
                         : selectedAnswer.includes(option.id)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 dark:border-blue-400/60 dark:bg-blue-500/15'
+                        : 'border-gray-200 hover:border-gray-300 dark:border-slate-700 dark:hover:border-slate-500'
                     }`}
                     onClick={() => !submitted && handleOptionChange(option.id)}
                   >
@@ -478,7 +476,7 @@ function HistoryContent() {
           {submitted && (
             <div className="mt-4 space-y-3">
               <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                isCorrect ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                isCorrect ? 'bg-green-50 text-green-700 dark:bg-emerald-500/15 dark:text-emerald-200' : 'bg-red-50 text-red-700 dark:bg-rose-500/15 dark:text-rose-200'
               }`}>
                 {isCorrect ? (
                   <>
@@ -548,7 +546,13 @@ function HistoryContent() {
 
 export default function PracticeHistoryPage() {
   return (
-    <Suspense fallback={<div className="container mx-auto p-4 text-center">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="container mx-auto max-w-4xl p-4 text-center text-slate-600 dark:text-slate-300">
+          加载中...
+        </div>
+      }
+    >
       <HistoryContent />
     </Suspense>
   )

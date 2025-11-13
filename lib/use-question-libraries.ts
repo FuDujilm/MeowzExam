@@ -62,11 +62,11 @@ export function useQuestionLibraries() {
         loading: false,
         error: null,
       })
-    } catch (error: any) {
+    } catch (error) {
       setState({
         libraries: [],
         loading: false,
-        error: error?.message || '获取题库列表失败',
+        error: error instanceof Error ? error.message : '获取题库列表失败',
       })
     }
   }

@@ -351,6 +351,74 @@ function ExamContent() {
     }
   }
 
+  const handleExportWrongQuestions = () => {
+    if (!result?.questionResults || typeof window === 'undefined') {
+      notify({
+        variant: 'warning',
+        title: '无法导出',
+        description: '暂无错题数据可导出，请稍后再试。',
+      })
+      return
+    }
+
+    const wrongQuestions = result.questionResults.filter((q: any) => !q.isCorrect)
+    if (!wrongQuestions.length) {
+      notify({
+        variant: 'info',
+        title: '没有错题',
+        description: '本次考试没有需要导出的错题。',
+      })
+      return
+    }
+
+    const sections = wrongQuestions.map((q: any, index: number) => {
+      const optionLines = Array.isArray(q.options)
+        ? q.options
+            .map((option: any) => `  ${option.id}. ${option.text}`)
+            .join('\n')
+        : ''
+      const explanationText = q.explanation?.trim() || q.aiExplanation?.trim() || '暂无解析'
+      return [
+        `题目 ${index + 1}: ${q.title}`,
+        optionLines ? `选项:\n${optionLines}` : null,
+        `你的答案：${q.userAnswer?.length ? q.userAnswer.join(', ') : '未作答'}`,
+        `正确答案：${q.correctAnswers?.join(', ') || '无'}`,
+        `解析：${explanationText}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    })
+
+    const content = sections.join('\n\n------------------------------\n\n')
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const now = new Date()
+    const dateLabel = [
+      now.getFullYear(),
+      (now.getMonth() + 1).toString().padStart(2, '0'),
+      now.getDate().toString().padStart(2, '0'),
+    ].join('-')
+    const timeLabel = `${now.getHours().toString().padStart(2, '0')}${now
+      .getMinutes()
+      .toString()
+      .padStart(2, '0')}`
+    link.href = url
+    link.download = `错题导出_${dateLabel}_${timeLabel}.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 1000)
+
+    notify({
+      variant: 'success',
+      title: '导出成功',
+      description: `已导出 ${wrongQuestions.length} 道错题为 txt 文件。`,
+    })
+  }
+
   // 自动提交（时间到）
   const handleAutoSubmit = async () => {
     if (examSubmitted) return
@@ -373,7 +441,7 @@ function ExamContent() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-slate-600 dark:bg-slate-950 dark:text-slate-200">
         <p>加载中...</p>
       </div>
     )
@@ -383,8 +451,8 @@ function ExamContent() {
   if (!examStarted) {
     if (libraryLoading) {
       return (
-        <div className="min-h-screen bg-gray-50 py-12 px-4">
-          <div className="max-w-2xl mx-auto text-center text-gray-500">
+        <div className="min-h-screen bg-gray-50 py-12 px-4 dark:bg-slate-950">
+          <div className="max-w-2xl mx-auto text-center text-gray-500 dark:text-slate-400">
             正在加载可用题库...
           </div>
         </div>
@@ -393,9 +461,9 @@ function ExamContent() {
 
     if (!libraries.length) {
       return (
-        <div className="min-h-screen bg-gray-50 py-12 px-4">
+        <div className="min-h-screen bg-gray-50 py-12 px-4 dark:bg-slate-950">
           <div className="max-w-2xl mx-auto text-center space-y-4">
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-slate-300">
               当前账号暂无可参加的题库，请联系管理员或稍后再试。
             </p>
             {libraryError && (
@@ -423,7 +491,7 @@ function ExamContent() {
       selectedPreset?.trueFalseCount ?? selectedLibrary?.trueFalseCount ?? 0
 
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="min-h-screen bg-gray-50 py-12 px-4 dark:bg-slate-950">
         <div className="max-w-3xl mx-auto space-y-6">
           <Card>
             <CardHeader>
@@ -434,7 +502,7 @@ function ExamContent() {
             <CardContent className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">选择题库</Label>
+                  <Label className="text-sm font-medium text-gray-700 dark:text-slate-200">选择题库</Label>
                   <Select
                     value={selectedLibraryCode ?? undefined}
                     onValueChange={(value) => setSelectedLibraryCode(value)}
@@ -452,7 +520,7 @@ function ExamContent() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">考试预设</Label>
+                  <Label className="text-sm font-medium text-gray-700 dark:text-slate-200">考试预设</Label>
                   {selectedLibrary?.presets.length ? (
                     <Select
                       value={selectedPreset?.code ?? undefined}
@@ -470,37 +538,37 @@ function ExamContent() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
                       未配置预设，将使用系统默认配置。
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
-                <p className="font-medium text-slate-900">考试信息</p>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200">
+                <p className="font-medium text-slate-900 dark:text-slate-100">考试信息</p>
                 <p className="mt-1">{presetSummary}</p>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-gray-900 dark:text-slate-100">
                       {singleChoiceCount}
                     </p>
-                    <p className="text-xs text-gray-600">单选题数量</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-300">单选题数量</p>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-gray-900 dark:text-slate-100">
                       {multipleChoiceCount}
                     </p>
-                    <p className="text-xs text-gray-600">多选题数量</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-300">多选题数量</p>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-gray-900 dark:text-slate-100">
                       {trueFalseCount}
                     </p>
-                    <p className="text-xs text-gray-600">判断题数量</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-300">判断题数量</p>
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-gray-500">
+                <p className="mt-3 text-xs text-gray-500 dark:text-slate-400">
                   * 考试开始后将自动计时，时间到会自动交卷。
                 </p>
               </div>
@@ -522,10 +590,13 @@ function ExamContent() {
 
   // 考试结果页
   if (examSubmitted && result) {
+    const hasWrongQuestions = result.questionResults?.some((q: any) => !q.isCorrect)
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="min-h-screen bg-gray-50 py-12 px-4 dark:bg-slate-950">
         <div className="max-w-4xl mx-auto">
-          <Card className={result.passed ? 'border-green-500' : 'border-red-500'}>
+          <Card
+            className={`${result.passed ? 'border-green-500' : 'border-red-500'} dark:bg-slate-900/70`}
+          >
             <CardHeader>
               <div className="text-center">
                 {result.passed ? (
@@ -546,15 +617,15 @@ function ExamContent() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-2xl font-bold text-green-600">{result.correctCount}</p>
-                  <p className="text-sm text-gray-600">答对</p>
+                  <p className="text-sm text-gray-600 dark:text-slate-300">答对</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-red-600">{result.wrongCount}</p>
-                  <p className="text-sm text-gray-600">答错</p>
+                  <p className="text-sm text-gray-600 dark:text-slate-300">答错</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-blue-600">{result.passScore}</p>
-                  <p className="text-sm text-gray-600">及格线</p>
+                  <p className="text-sm text-gray-600 dark:text-slate-300">及格线</p>
                 </div>
               </div>
 
@@ -575,33 +646,33 @@ function ExamContent() {
                           正确答案: {q.correctAnswers.join(', ')}
                         </p>
                         {q.explanation ? (
-                          <div className="mb-3 rounded-md bg-white p-3">
-                            <div className="flex items-center gap-2 text-gray-700">
+                          <div className="mb-3 rounded-md border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60">
+                            <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
                               <Lightbulb className="h-4 w-4" />
                               <span className="font-semibold">人工解析</span>
                             </div>
-                            <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
+                            <p className="mt-2 whitespace-pre-line text-sm text-gray-700 dark:text-slate-200">
                               {q.explanation}
                             </p>
                           </div>
                         ) : (
-                          <div className="mb-3 rounded-md bg-white p-3">
-                            <div className="flex items-center gap-2 text-gray-500">
+                          <div className="mb-3 rounded-md border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60">
+                            <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400">
                               <Lightbulb className="h-4 w-4" />
                               <span className="font-semibold">人工解析</span>
                             </div>
-                            <p className="mt-2 text-sm text-gray-500">
+                            <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
                               暂无人工解析，管理员稍后会补充该题解析。
                             </p>
                           </div>
                         )}
 
-                        <div className="rounded-md border border-red-200 bg-white p-3">
-                          <div className="flex flex-wrap items-center gap-2 text-red-600">
+                        <div className="rounded-md border border-red-200 bg-white p-3 dark:border-rose-500/40 dark:bg-rose-500/10">
+                          <div className="flex flex-wrap items-center gap-2 text-red-600 dark:text-rose-200">
                             <Sparkles className="h-4 w-4" />
                             <span className="font-semibold">AI解析</span>
                             {q.aiExplanation && (
-                              <Badge variant="outline" className="border-red-200 text-red-600">
+                              <Badge variant="outline" className="border-red-200 text-red-600 dark:border-rose-400 dark:text-rose-100">
                                 已生成
                               </Badge>
                             )}
@@ -631,7 +702,7 @@ function ExamContent() {
                               )}
                             </Button>
                           </div>
-                          <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
+                          <p className="mt-2 whitespace-pre-line text-sm text-gray-700 dark:text-slate-100">
                             {q.aiExplanation
                               || (aiResultLoading[q.questionId]
                                 ? '正在生成AI解析，请稍候...'
@@ -646,7 +717,15 @@ function ExamContent() {
                   ))}
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  onClick={handleExportWrongQuestions}
+                  variant="outline"
+                  className="flex-1"
+                  disabled={!hasWrongQuestions}
+                >
+                  导出错题（TXT）
+                </Button>
                 <Button
                   onClick={() => router.push('/')}
                   variant="outline"
@@ -675,21 +754,25 @@ function ExamContent() {
   const answeredCount = Object.keys(answers).filter(id => answers[id].length > 0).length
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4">
+    <div className="min-h-screen bg-gray-50 py-6 px-4 dark:bg-slate-950">
       <div className="max-w-4xl mx-auto">
         {/* 顶部信息栏 */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6 flex justify-between items-center">
+        <div className="bg-white rounded-lg border border-slate-100 shadow p-4 mb-6 flex justify-between items-center dark:border-slate-800 dark:bg-slate-900/70">
           <div className="flex gap-6">
-            <span className="text-sm">
+            <span className="text-sm text-slate-700 dark:text-slate-200">
               第 <strong>{currentIndex + 1}</strong> / {questions.length} 题
             </span>
-            <span className="text-sm">
+            <span className="text-sm text-slate-700 dark:text-slate-200">
               已答: <strong>{answeredCount}</strong> 题
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-orange-500" />
-            <span className={`text-lg font-bold ${timeLeft < 300 ? 'text-red-500' : 'text-gray-700'}`}>
+            <span
+              className={`text-lg font-bold ${
+                timeLeft < 300 ? 'text-red-500 dark:text-red-300' : 'text-gray-700 dark:text-slate-200'
+              }`}
+            >
               {formatTime(timeLeft)}
             </span>
           </div>
@@ -700,8 +783,8 @@ function ExamContent() {
           <CardHeader>
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-sm text-gray-500">题号: {currentQuestion.externalId}</span>
-                <span className="ml-4 text-sm text-gray-500">
+                <span className="text-sm text-gray-500 dark:text-slate-400">题号: {currentQuestion.externalId}</span>
+                <span className="ml-4 text-sm text-gray-500 dark:text-slate-400">
                   {currentQuestion.questionType === 'multiple_choice' ? '多选题' : '单选题'}
                 </span>
               </div>
@@ -712,7 +795,7 @@ function ExamContent() {
             </div>
           </CardHeader>
           <CardContent>
-            <h3 className="text-lg font-medium mb-6">{currentQuestion.title}</h3>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-6">{currentQuestion.title}</h3>
 
             {currentQuestion.questionType === 'multiple_choice' ? (
               <div className="space-y-3">
@@ -723,7 +806,9 @@ function ExamContent() {
                     <div
                       key={option.id}
                       className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10'
+                          : 'border-gray-200 hover:border-gray-300 dark:border-slate-700 dark:hover:border-slate-500'
                       }`}
                       onClick={() => handleSelectAnswer(option.id)}
                     >
@@ -748,7 +833,9 @@ function ExamContent() {
                       <div
                         key={option.id}
                         className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10'
+                            : 'border-gray-200 hover:border-gray-300 dark:border-slate-700 dark:hover:border-slate-500'
                         }`}
                         onClick={() => handleSelectAnswer(option.id)}
                       >
@@ -767,7 +854,7 @@ function ExamContent() {
             )}
 
             {currentQuestion.questionType === 'multiple_choice' && (
-              <p className="mt-4 text-sm text-gray-500">* 此题为多选题</p>
+              <p className="mt-4 text-sm text-gray-500 dark:text-slate-400">* 此题为多选题</p>
             )}
           </CardContent>
         </Card>
@@ -806,7 +893,13 @@ function ExamContent() {
 
 export default function ExamPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 text-slate-600 dark:bg-slate-950 dark:text-slate-200">
+          加载中...
+        </div>
+      }
+    >
       <ExamContent />
     </Suspense>
   )

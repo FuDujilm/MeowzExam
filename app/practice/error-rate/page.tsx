@@ -294,20 +294,18 @@ function ErrorRateContent() {
 
   if (loading && !question) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center">加载中...</div>
+      <div className="container mx-auto max-w-4xl p-4 min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-300">
+        加载中...
       </div>
     )
   }
 
   if (!question) {
     return (
-      <div className="container mx-auto p-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center text-gray-500">
-              暂无题目
-            </div>
+      <div className="container mx-auto max-w-4xl p-4">
+        <Card className="border-slate-200 dark:border-slate-800 dark:bg-slate-900/70">
+          <CardContent className="p-6 text-center text-gray-500 dark:text-slate-400">
+            暂无题目
           </CardContent>
         </Card>
       </div>
@@ -315,7 +313,7 @@ function ErrorRateContent() {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
+    <div className="container mx-auto p-4 max-w-4xl text-slate-900 dark:text-slate-100">
       {/* 头部信息 */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -347,24 +345,24 @@ function ErrorRateContent() {
       </div>
 
       {/* 错误率信息卡片 */}
-      <Card className="mb-4 bg-gradient-to-r from-red-50 to-orange-50">
+      <Card className="mb-4 border-transparent bg-gradient-to-r from-red-50 to-orange-50 dark:from-rose-500/15 dark:via-amber-500/10 dark:to-amber-500/15 dark:border-rose-500/20">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">当前题目错误率</p>
-              <p className="text-3xl font-bold text-red-600">
+              <p className="text-sm text-gray-600 dark:text-slate-300 mb-1">当前题目错误率</p>
+              <p className="text-3xl font-bold text-red-600 dark:text-rose-200">
                 {(errorRate * 100).toFixed(0)}%
               </p>
             </div>
             {userQuestion && (
-              <div className="text-right text-sm text-gray-600">
-                <p>答对: <span className="text-green-600 font-medium">{userQuestion.correctCount}</span>次</p>
-                <p>答错: <span className="text-red-600 font-medium">{userQuestion.incorrectCount}</span>次</p>
+              <div className="text-right text-sm text-gray-600 dark:text-slate-200">
+                <p>答对: <span className="text-green-600 dark:text-emerald-300 font-medium">{userQuestion.correctCount}</span>次</p>
+                <p>答错: <span className="text-red-600 dark:text-rose-300 font-medium">{userQuestion.incorrectCount}</span>次</p>
               </div>
             )}
             {!userQuestion && (
-              <div className="text-sm text-gray-600">
-                <Badge variant="destructive">未练习</Badge>
+              <div className="text-sm text-gray-600 dark:text-slate-200">
+                <Badge variant="destructive" className="dark:bg-rose-500/20 dark:text-rose-100 dark:border-rose-400/30">未练习</Badge>
               </div>
             )}
           </div>
@@ -372,7 +370,7 @@ function ErrorRateContent() {
       </Card>
 
       {/* 题目卡片 */}
-      <Card className="mb-4">
+      <Card className="mb-4 border border-slate-200 dark:border-slate-800 dark:bg-slate-900/70">
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -396,16 +394,16 @@ function ErrorRateContent() {
               question.options.map((option) => (
                 <div
                   key={option.id}
-                  className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer ${
+                  className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                     submitted
                       ? correctAnswers.includes(option.id)
-                        ? 'border-green-500 bg-green-50'
+                        ? 'border-green-500 bg-green-50 dark:border-emerald-400 dark:bg-emerald-500/10'
                         : selectedAnswer.includes(option.id)
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-200'
+                        ? 'border-red-500 bg-red-50 dark:border-rose-500 dark:bg-rose-500/10'
+                        : 'border-gray-200 dark:border-slate-700'
                       : selectedAnswer.includes(option.id)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10'
+                      : 'border-gray-200 hover:border-gray-300 dark:border-slate-700 dark:hover:border-slate-500'
                   }`}
                   onClick={() => !submitted && handleOptionChange(option.id)}
                 >
@@ -434,16 +432,16 @@ function ErrorRateContent() {
                 {question.options.map((option) => (
                   <div
                     key={option.id}
-                    className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer ${
+                    className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                       submitted
                         ? correctAnswers.includes(option.id)
-                          ? 'border-green-500 bg-green-50'
+                          ? 'border-green-500 bg-green-50 dark:border-emerald-400 dark:bg-emerald-500/10'
                           : selectedAnswer.includes(option.id)
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-gray-200'
+                          ? 'border-red-500 bg-red-50 dark:border-rose-500 dark:bg-rose-500/10'
+                          : 'border-gray-200 dark:border-slate-700'
                         : selectedAnswer.includes(option.id)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10'
+                        : 'border-gray-200 hover:border-gray-300 dark:border-slate-700 dark:hover:border-slate-500'
                     }`}
                     onClick={() => !submitted && handleOptionChange(option.id)}
                   >
@@ -465,7 +463,9 @@ function ErrorRateContent() {
           {submitted && (
             <div className="mt-4 space-y-3">
               <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                isCorrect ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                isCorrect
+                  ? 'bg-green-50 text-green-700 dark:bg-emerald-500/10 dark:text-emerald-200'
+                  : 'bg-red-50 text-red-700 dark:bg-rose-500/10 dark:text-rose-200'
               }`}>
                 {isCorrect ? (
                   <>
@@ -540,7 +540,13 @@ function ErrorRateContent() {
 
 export default function ErrorRatePage() {
   return (
-    <Suspense fallback={<div className="container mx-auto p-4 text-center">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="container mx-auto max-w-4xl p-4 text-center text-slate-600 dark:text-slate-300">
+          加载中...
+        </div>
+      }
+    >
       <ErrorRateContent />
     </Suspense>
   )

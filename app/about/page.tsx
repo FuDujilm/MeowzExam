@@ -13,6 +13,12 @@ marked.setOptions({
   mangle: false,
 })
 
+type MetadataItem = {
+  label: string
+  value?: string
+  type?: 'email' | 'link'
+}
+
 const DOCUMENT_SECTIONS = [
   { key: 'termsOfService', anchor: 'terms', title: '服务条款' },
   { key: 'privacyPolicy', anchor: 'privacy', title: '隐私政策' },
@@ -67,7 +73,7 @@ export default async function AboutPage() {
     { label: '最后更新', value: info.metadata.lastUpdated },
     { label: '版本号', value: info.version.combined },
     { label: 'Git 提交', value: info.version.gitCommit },
-  ].filter((item) => item.value && item.value.trim().length > 0)
+  ].filter((item): item is MetadataItem & { value: string } => Boolean(item.value && item.value.trim().length > 0))
 
   return (
     <div className="bg-slate-950">

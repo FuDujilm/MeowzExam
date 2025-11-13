@@ -5,13 +5,37 @@ import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 import { createAuditLog } from '@/lib/audit'
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
-function serializeUser(user: any) {
-  const quotaLimit = user.aiQuotaLimit
+type ResettableUser = {
+  id: string
+  email: string
+  name: string | null
+  callsign: string | null
+  aiQuotaLimit: number | null
+  aiQuotaUsed: number | null
+  loginDisabled: boolean | null
+  manualExplanationDisabled: boolean | null
+  totalPoints?: number | null
+  currentStreak?: number | null
+  lastCheckIn?: Date | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+type ResetPayload = Partial<{
+  resetCallsign: boolean
+  resetSettings: boolean
+  resetPoints: boolean
+  resetQuota: boolean
+  reactivate: boolean
+}>
+
+function serializeUser(user: ResettableUser) {
+  const quotaLimit = user.aiQuotaLimit ?? null
   const quotaUsed = user.aiQuotaUsed ?? 0
 
   return {
@@ -32,7 +56,7 @@ function serializeUser(user: any) {
   }
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, context: RouteParams) {
   const adminCheck = await checkAdminPermission()
   if (!adminCheck.success) {
     return NextResponse.json(
@@ -41,7 +65,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     )
   }
 
-  const userId = params.id
+  const { id: userId } = await context.params
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
@@ -60,7 +84,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: '用户不存在' }, { status: 404 })
   }
 
-  let payload: any
+  let payload: ResetPayload | undefined
   try {
     payload = await request.json()
   } catch {
@@ -73,7 +97,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const resetQuota = payload?.resetQuota === false ? false : true
   const reactivate = payload?.reactivate === false ? false : true
 
-  const userUpdateData: any = {}
+  const userUpdateData: Partial<ResettableUser> = {}
   const applied: string[] = []
 
   if (resetPoints) {
@@ -99,7 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     applied.push('callsign')
   }
 
-  const operations: any[] = []
+  const operations: Array<Promise<ResettableUser | null>> = []
 
   if (Object.keys(userUpdateData).length > 0) {
     operations.push(

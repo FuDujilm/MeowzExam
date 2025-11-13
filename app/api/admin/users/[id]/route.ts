@@ -5,12 +5,38 @@ import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 import { createAuditLog } from '@/lib/audit'
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
-function serializeUser(user: any) {
+type UserSummary = {
+  id: string
+  email: string
+  name: string | null
+  callsign: string | null
+  aiQuotaLimit: number | null
+  aiQuotaUsed: number
+  loginDisabled: boolean
+  manualExplanationDisabled: boolean
+  totalPoints: number
+  currentStreak: number
+  lastCheckIn: Date | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+type PartialUserSummary = Partial<Pick<UserSummary, 'callsign' | 'aiQuotaLimit' | 'aiQuotaUsed' | 'loginDisabled' | 'manualExplanationDisabled'>>
+
+type UpdatePayload = Partial<{
+  callsign: string | null
+  aiQuotaLimit: number | null | string
+  aiQuotaUsed: number | null | string
+  loginDisabled: boolean
+  manualExplanationDisabled: boolean
+}>
+
+function serializeUser(user: UserSummary) {
   const quotaLimit = user.aiQuotaLimit
   const quotaUsed = user.aiQuotaUsed ?? 0
 
@@ -32,7 +58,7 @@ function serializeUser(user: any) {
   }
 }
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, context: RouteParams) {
   const adminCheck = await checkAdminPermission()
   if (!adminCheck.success) {
     return NextResponse.json(
@@ -41,8 +67,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     )
   }
 
+  const { id } = await context.params
   const user = await prisma.user.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       id: true,
       email: true,
@@ -65,11 +92,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   }
 
   return NextResponse.json({
-    user: serializeUser(user),
+    user: serializeUser(user as UserSummary),
   })
 }
 
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, context: RouteParams) {
   const adminCheck = await checkAdminPermission()
   if (!adminCheck.success) {
     return NextResponse.json(
@@ -78,7 +105,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     )
   }
 
-  const userId = params.id
+  const { id: userId } = await context.params
 
   const existing = await prisma.user.findUnique({
     where: { id: userId },
@@ -97,15 +124,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: '用户不存在' }, { status: 404 })
   }
 
-  let payload: any
+  let payload: UpdatePayload | undefined
   try {
     payload = await request.json()
   } catch {
     payload = {}
   }
 
-  const data: any = {}
-  const changes: Record<string, { before: any; after: any }> = {}
+  const data: PartialUserSummary = {}
+  const changes: Record<string, { before: unknown; after: unknown }> = {}
 
   if ('callsign' in payload) {
     const raw = typeof payload.callsign === 'string' ? payload.callsign.trim() : ''
@@ -249,6 +276,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   })
 
   return NextResponse.json({
-    user: serializeUser(updated),
+    user: serializeUser(updated as UserSummary),
   })
 }

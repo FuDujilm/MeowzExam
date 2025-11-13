@@ -56,9 +56,9 @@ export function UserExplanationForm({
       // 成功
       setContent('')
       onSuccess?.()
-    } catch (err: any) {
-      console.error('Submit error:', err)
-      setError(err.message || '提交失败，请稍后重试')
+    } catch (error) {
+      console.error('Submit error:', error)
+      setError(error instanceof Error ? error.message : '提交失败，请稍后重试')
     } finally {
       setSubmitting(false)
     }

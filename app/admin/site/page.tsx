@@ -22,6 +22,7 @@ type FormState = {
   ogImageUrl: string
   headerContent: string
   footerContent: string
+  gravatarMirrorUrl: string
 }
 
 function mapConfigToForm(config: SiteConfig): FormState {
@@ -34,6 +35,7 @@ function mapConfigToForm(config: SiteConfig): FormState {
     ogImageUrl: config.ogImageUrl ?? '',
     headerContent: config.headerContent ?? '',
     footerContent: config.footerContent ?? '',
+    gravatarMirrorUrl: config.gravatarMirrorUrl ?? '',
   }
 }
 
@@ -158,8 +160,8 @@ export default function AdminSiteConfigPage() {
     <AdminPageShell maxWidthClassName="max-w-5xl" contentClassName="space-y-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">站点信息配置</h1>
-              <p className="mt-2 text-sm text-gray-600">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">站点信息配置</h1>
+              <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">
                 管理站点的基础信息、品牌展示与 SEO 设置。
               </p>
             </div>
@@ -174,35 +176,35 @@ export default function AdminSiteConfigPage() {
           </div>
 
           {error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
               {error}
             </div>
           ) : null}
 
-          <section className="rounded-lg border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">基础信息</h2>
-            <p className="mb-6 mt-2 text-sm text-gray-500">
+          <section className="rounded-lg border bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">基础信息</h2>
+            <p className="mb-6 mt-2 text-sm text-gray-500 dark:text-slate-300">
               站点标题和简介会展示在头部导航、页面标题等位置。
             </p>
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">站点标题</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200">站点标题</label>
                 <Input value={form.siteTitle} onChange={handleChange('siteTitle')} placeholder="请输入站点标题" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">SEO 关键词</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200">SEO 关键词</label>
                 <Input
                   value={form.seoKeywords}
                   onChange={handleChange('seoKeywords')}
                   placeholder="使用逗号分隔关键词"
                 />
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-400 dark:text-slate-400">
                   当前关键词数量：{form.seoKeywords.split(',').filter((item) => item.trim().length > 0).length}
                 </p>
               </div>
             </div>
             <div className="mt-6 space-y-2">
-              <label className="text-sm font-medium text-gray-700">站点简介</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-slate-200">站点简介</label>
               <Textarea
                 value={form.siteDescription}
                 onChange={handleChange('siteDescription')}
@@ -212,33 +214,51 @@ export default function AdminSiteConfigPage() {
             </div>
           </section>
 
-          <section className="rounded-lg border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">品牌资源</h2>
-            <p className="mb-6 mt-2 text-sm text-gray-500">用于导航栏、浏览器标签等位置的资源链接可使用相对路径或完整 URL。</p>
+          <section className="rounded-lg border bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">品牌资源</h2>
+            <p className="mb-6 mt-2 text-sm text-gray-500 dark:text-slate-300">用于导航栏、浏览器标签等位置的资源链接可使用相对路径或完整 URL。</p>
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Logo 地址</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Logo 地址</label>
                 <Input value={form.logoUrl} onChange={handleChange('logoUrl')} placeholder="例如 /logo.svg" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Favicon 地址</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Favicon 地址</label>
                 <Input value={form.faviconUrl} onChange={handleChange('faviconUrl')} placeholder="例如 /favicon.ico" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">OG 分享图</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200">OG 分享图</label>
                 <Input value={form.ogImageUrl} onChange={handleChange('ogImageUrl')} placeholder="用于社交分享的图片 URL" />
               </div>
             </div>
           </section>
 
-          <section className="rounded-lg border bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">页眉与页脚</h2>
-            <p className="mb-6 mt-2 text-sm text-gray-500">
-              支持 HTML 片段，可嵌入链接或强调文本。页脚中的 <code className="rounded bg-gray-100 px-1">&#123;YEAR&#125;</code> 会自动替换为当前年份。
+          <section className="rounded-lg border bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">头像与 Gravatar</h2>
+            <p className="mb-6 mt-2 text-sm text-gray-500 dark:text-slate-300">
+              用户未上传头像时，将根据邮箱地址自动从 Gravatar 获取头像。可配置镜像站以提升国内访问速度。
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Gravatar 镜像地址</label>
+              <Input
+                value={form.gravatarMirrorUrl}
+                onChange={handleChange('gravatarMirrorUrl')}
+                placeholder="例如 https://gravatar.loli.net/avatar"
+              />
+              <p className="text-xs text-gray-400 dark:text-slate-400">
+                需以 <code className="rounded bg-gray-100 px-1 dark:bg-slate-800/80">/avatar</code> 结尾，系统会自动拼接哈希值。
+              </p>
+            </div>
+          </section>
+
+          <section className="rounded-lg border bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">页眉与页脚</h2>
+            <p className="mb-6 mt-2 text-sm text-gray-500 dark:text-slate-300">
+              支持 HTML 片段，可嵌入链接或强调文本。页脚中的 <code className="rounded bg-gray-100 px-1 dark:bg-slate-800/80">&#123;YEAR&#125;</code> 会自动替换为当前年份。
             </p>
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">页眉内容</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200">页眉内容</label>
                 <Textarea
                   value={form.headerContent}
                   onChange={handleChange('headerContent')}
@@ -247,7 +267,7 @@ export default function AdminSiteConfigPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">页脚内容</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200">页脚内容</label>
                 <Textarea
                   value={form.footerContent}
                   onChange={handleChange('footerContent')}

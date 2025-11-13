@@ -67,6 +67,9 @@ export default function LeaderboardPage() {
     return 'bg-blue-50 text-blue-700 border-blue-200'
   }
 
+  const shouldShowCallsign = (user: LeaderboardUser) =>
+    Boolean(user.callsign && user.callsign !== user.name)
+
   if (loading) {
     return (
       <div className="container mx-auto p-4">
@@ -111,7 +114,7 @@ export default function LeaderboardPage() {
                   {getRankIcon(2)}
                 </div>
                 <CardTitle className="text-lg">{users[1].name}</CardTitle>
-                {users[1].callsign && (
+                {shouldShowCallsign(users[1]) && (
                   <CardDescription>{users[1].callsign}</CardDescription>
                 )}
               </div>
@@ -140,7 +143,7 @@ export default function LeaderboardPage() {
                   {getRankIcon(1)}
                 </div>
                 <CardTitle className="text-xl">{users[0].name}</CardTitle>
-                {users[0].callsign && (
+                {shouldShowCallsign(users[0]) && (
                   <CardDescription className="text-base">{users[0].callsign}</CardDescription>
                 )}
               </div>
@@ -169,7 +172,7 @@ export default function LeaderboardPage() {
                   {getRankIcon(3)}
                 </div>
                 <CardTitle className="text-lg">{users[2].name}</CardTitle>
-                {users[2].callsign && (
+                {shouldShowCallsign(users[2]) && (
                   <CardDescription>{users[2].callsign}</CardDescription>
                 )}
               </div>
@@ -224,7 +227,7 @@ export default function LeaderboardPage() {
                   {/* 用户信息 */}
                   <div className="flex-1">
                     <div className="font-semibold text-lg">{user.name}</div>
-                    {user.callsign && (
+                    {shouldShowCallsign(user) && (
                       <div className="text-sm text-gray-600">{user.callsign}</div>
                     )}
                   </div>

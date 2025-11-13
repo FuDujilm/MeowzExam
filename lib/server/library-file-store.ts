@@ -59,8 +59,8 @@ export async function deleteLibraryFileFromDisk(filePath: string) {
   }
   try {
     await fs.unlink(filePath)
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
+  } catch (error) {
+    if ((error as { code?: string })?.code !== 'ENOENT') {
       throw error
     }
   }

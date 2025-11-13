@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 
+const CALLSIGN_PATTERN = /^[A-Z0-9-]{3,12}$/
+
+function normalizeCallsign(input: unknown): string | null {
+  if (typeof input !== 'string') {
+    return null
+  }
+  const compact = input.replace(/\s+/g, '').toUpperCase()
+  if (!compact) {
+    return null
+  }
+  return compact
+}
+
 /**
  * GET /api/user/settings - 获取用户设置
  */
@@ -82,10 +95,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    const normalizedCallsign = normalizeCallsign(callsign)
+    let nextCallsign: string | null = null
+
+    if (normalizedCallsign) {
+      if (!CALLSIGN_PATTERN.test(normalizedCallsign)) {
+        return NextResponse.json(
+          { error: '呼号格式不正确，请使用 3-12 位字母、数字或短横线' },
+          { status: 400 }
+        )
+      }
+
+      const existingCallsign = await prisma.user.findFirst({
+        where: {
+          callsign: normalizedCallsign,
+          NOT: { id: user.id },
+        },
+        select: { id: true },
+      })
+
+      if (existingCallsign) {
+        return NextResponse.json(
+          { error: '该呼号已被其他用户使用' },
+          { status: 400 }
+        )
+      }
+
+      nextCallsign = normalizedCallsign
+    }
+
     // 更新用户基本信息
     await prisma.user.update({
       where: { id: user.id },
-      data: { callsign: callsign || null }
+      data: { callsign: nextCallsign }
     })
 
     // 更新或创建设置

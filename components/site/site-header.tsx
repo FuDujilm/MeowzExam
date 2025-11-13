@@ -3,9 +3,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
+import { useMemo, useState } from 'react'
 
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Button } from '@/components/ui/button'
+import { getDisplayInitial, getUserDisplayName } from '@/lib/users/display-name'
+import { getGravatarUrl } from '@/lib/users/avatar'
 
 import { SiteMessageCenter } from './site-message-center'
 import { useSiteConfig } from './site-config-provider'
@@ -61,17 +64,28 @@ export function SiteHeader() {
           ) : session?.user ? (
             <>
               <SiteMessageCenter />
-              <Link
-                href="/settings"
-                className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1 text-sm text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:border-blue-800 dark:hover:bg-blue-950"
-              >
-                <UserAvatar
-                  name={session.user.name}
-                  email={session.user.email}
-                  image={session.user.image}
-                />
-                <span>{session.user.name || session.user.email}</span>
-              </Link>
+              {(() => {
+                const displayName = getUserDisplayName({
+                  callsign: session.user.callsign,
+                  name: session.user.name,
+                  email: session.user.email,
+                })
+                return (
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1 text-sm text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:border-blue-800 dark:hover:bg-blue-950"
+                  >
+                    <UserAvatar
+                      name={session.user.name}
+                      email={session.user.email}
+                      callsign={session.user.callsign}
+                      image={session.user.image}
+                      gravatarMirrorUrl={config.gravatarMirrorUrl}
+                    />
+                    <span>{displayName}</span>
+                  </Link>
+                )
+              })()}
               <Button variant="outline" size="sm" onClick={signOutHandler}>
                 登出
               </Button>
@@ -90,25 +104,48 @@ export function SiteHeader() {
 function UserAvatar({
   name,
   email,
+  callsign,
   image,
+  gravatarMirrorUrl,
 }: {
   name?: string | null
   email?: string | null
+  callsign?: string | null
   image?: string | null
+  gravatarMirrorUrl?: string | null
 }) {
-  const fallbackText = (name?.trim() || email?.trim() || '?')[0]?.toUpperCase() || '?'
-  const label = name || email || '用户'
+  const fallbackText = getDisplayInitial({ callsign, name, email })
+  const label = getUserDisplayName({ callsign, name, email })
+  const [gravatarFailed, setGravatarFailed] = useState(false)
 
-  if (image) {
+  const gravatarUrl = useMemo(() => {
+    if (image || gravatarFailed) {
+      return null
+    }
+    return getGravatarUrl(email, gravatarMirrorUrl, { defaultImage: '404' })
+  }, [email, gravatarMirrorUrl, image, gravatarFailed])
+
+  const avatarSrc = image || gravatarUrl
+
+  const handleImageError = () => {
+    if (!image && !gravatarFailed) {
+      setGravatarFailed(true)
+    }
+  }
+
+  if (avatarSrc) {
     return (
       <span className="relative block h-8 w-8 overflow-hidden rounded-full border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
         <Image
-          src={image}
+          src={avatarSrc}
           alt={`${label}的头像`}
-          fill
+          width={32}
+          height={32}
           sizes="32px"
-          className="object-cover"
+          unoptimized
           referrerPolicy="no-referrer"
+          className="h-full w-full rounded-full object-cover"
+          onError={handleImageError}
         />
       </span>
     )

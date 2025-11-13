@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { getUserDisplayName } from '@/lib/users/display-name'
 
 // GET /api/points/leaderboard - 获取积分排行榜
 export async function GET(request: NextRequest) {
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
       users: users.map((user, index) => ({
         rank: offset + index + 1,
         id: user.id,
-        name: user.name || user.email,
+        name: getUserDisplayName(user),
         callsign: user.callsign,
         points: user.totalPoints,
         streak: user.currentStreak,

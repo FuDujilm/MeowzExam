@@ -56,14 +56,14 @@ export default function StatsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center">加载中...</div>
+      <div className="container mx-auto max-w-6xl p-4 min-h-screen flex items-center justify-center text-slate-600 dark:text-slate-300">
+        加载中...
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-6xl">
+    <div className="container mx-auto p-4 max-w-6xl text-slate-900 dark:text-slate-100">
       {/* 头部 */}
       <div className="mb-6">
         <Button
@@ -77,68 +77,68 @@ export default function StatsPage() {
         </Button>
 
         <h1 className="text-3xl font-bold mb-2">详细统计</h1>
-        <p className="text-gray-600">查看您的学习数据和积分记录</p>
+        <p className="text-gray-600 dark:text-slate-300">查看您的学习数据和积分记录</p>
       </div>
 
       {/* 主要统计卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/40 dark:to-slate-900/70 dark:border-blue-500/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-slate-200 flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
               今日答题
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600">
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-200">
               {stats?.todayAnswered || 0}
             </div>
-            <p className="text-xs text-gray-500 mt-1">题</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">题</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100">
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-emerald-950/40 dark:to-slate-900/70 dark:border-emerald-500/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-slate-200 flex items-center gap-2">
               <Target className="h-4 w-4" />
               累计答题
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">
+            <div className="text-3xl font-bold text-green-600 dark:text-emerald-200">
               {stats?.totalAnswered || 0}
             </div>
-            <p className="text-xs text-gray-500 mt-1">题</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">题</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100">
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-amber-900/40 dark:to-slate-900/70 dark:border-amber-500/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-slate-200 flex items-center gap-2">
               <Trophy className="h-4 w-4" />
               当前积分
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
+            <div className="text-3xl font-bold text-yellow-600 dark:text-amber-200">
               {stats?.totalPoints || 0}
             </div>
-            <p className="text-xs text-gray-500 mt-1">{stats?.pointsName || '积分'}</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">{stats?.pointsName || '积分'}</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-pink-50 to-pink-100">
+        <Card className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-rose-950/40 dark:to-slate-900/70 dark:border-rose-500/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-slate-200 flex items-center gap-2">
               <Award className="h-4 w-4" />
               当前排名
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-pink-600">
+            <div className="text-3xl font-bold text-pink-600 dark:text-rose-200">
               #{stats?.currentRank || '-'}
             </div>
-            <p className="text-xs text-gray-500 mt-1">名</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">名</p>
           </CardContent>
         </Card>
       </div>
@@ -153,33 +153,33 @@ export default function StatsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600">累计答题数</span>
-              <span className="text-xl font-bold text-gray-900">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-900/60">
+              <span className="text-sm text-gray-600 dark:text-slate-300">累计答题数</span>
+              <span className="text-xl font-bold text-gray-900 dark:text-slate-100">
                 {stats?.totalAnswered || 0} 题
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600">整体正确率</span>
-              <span className="text-xl font-bold text-green-600">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-900/60">
+              <span className="text-sm text-gray-600 dark:text-slate-300">整体正确率</span>
+              <span className="text-xl font-bold text-green-600 dark:text-emerald-300">
                 {stats?.accuracy || 0}%
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600">模拟考试次数</span>
-              <span className="text-xl font-bold text-orange-600">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-900/60">
+              <span className="text-sm text-gray-600 dark:text-slate-300">模拟考试次数</span>
+              <span className="text-xl font-bold text-orange-600 dark:text-orange-300">
                 {stats?.examCount || 0} 次
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600 flex items-center gap-1">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-900/60">
+              <span className="text-sm text-gray-600 dark:text-slate-300 flex items-center gap-1">
                 <Flame className="h-4 w-4 text-orange-500" />
                 连续签到天数
               </span>
-              <span className="text-xl font-bold text-orange-600">
+              <span className="text-xl font-bold text-orange-600 dark:text-orange-300">
                 {stats?.currentStreak || 0} 天
               </span>
             </div>
@@ -200,11 +200,11 @@ export default function StatsPage() {
                 recentHistory.map((record: any) => (
                   <div
                     key={record.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                    className="flex items-center justify-between p-2 rounded border border-slate-100 bg-gray-50 dark:border-slate-800 dark:bg-slate-900/60"
                   >
                     <div className="flex-1">
                       <p className="text-sm font-medium">{record.reason}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 dark:text-slate-400">
                         {new Date(record.createdAt).toLocaleString('zh-CN')}
                       </p>
                     </div>
@@ -217,7 +217,7 @@ export default function StatsPage() {
                   </div>
                 ))
               ) : (
-                <div className="text-center text-gray-500 py-8">
+                <div className="py-8 text-center text-gray-500 dark:text-slate-400">
                   暂无积分记录
                 </div>
               )}

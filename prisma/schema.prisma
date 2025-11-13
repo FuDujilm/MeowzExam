@@ -21,7 +21,7 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
-  callsign      String?   // 业余无线电呼号（可选）
+  callsign      String?   @unique // 业余无线电呼号（可选）
   aiQuotaLimit  Int?
   aiQuotaUsed   Int       @default(0)
   loginDisabled Boolean   @default(false)
@@ -110,11 +110,30 @@ model UserSettings {
   enableWrongQuestionWeight Boolean @default(false)
   // 主题设置
   theme                     String  @default("light") // "light" | "dark" | "system"
+  examType                  String  @default("A_CLASS") // 当前选择的考试类别
+  aiStylePresetId           String?
+  aiStylePreset             AiStylePreset? @relation(fields: [aiStylePresetId], references: [id], onDelete: SetNull)
+  aiStyleCustom             String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("user_settings")
+}
+
+model AiStylePreset {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  prompt      String
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userSettings UserSettings[]
+
+  @@map("ai_style_presets")
 }
 
 // 题目表

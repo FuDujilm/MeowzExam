@@ -57,12 +57,19 @@ export async function withAdminAuth(
  * 简化的管理员权限检查函数
  * 用于在API路由中快速检查权限
  */
-export async function checkAdminPermission(): Promise<{
+interface CheckAdminPermissionResult {
   success: boolean
-  user?: any
+  user?: {
+    id?: string | null
+    email?: string | null
+    name?: string | null
+    [key: string]: unknown
+  }
   error?: string
   status?: number
-}> {
+}
+
+export async function checkAdminPermission(): Promise<CheckAdminPermissionResult> {
   try {
     const session = await auth()
     

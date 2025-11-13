@@ -3,7 +3,6 @@
 import * as React from 'react'
 import { createPortal } from 'react-dom'
 import {
-  AlertCircle,
   AlertTriangle,
   CheckCircle2,
   Info,
@@ -80,9 +79,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   React.useEffect(() => {
     setMounted(true)
+    const timerMap = timers.current
     return () => {
-      timers.current.forEach((handle) => window.clearTimeout(handle))
-      timers.current.clear()
+      timerMap.forEach((handle) => window.clearTimeout(handle))
+      timerMap.clear()
     }
   }, [])
 
@@ -199,4 +199,3 @@ function NotificationCard({
     </div>
   )
 }
-

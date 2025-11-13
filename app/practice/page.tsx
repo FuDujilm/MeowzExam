@@ -399,20 +399,18 @@ function PracticeContent() {
 
   if (loading && !question) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center">加载中...</div>
+      <div className="container mx-auto max-w-4xl p-4 min-h-[60vh] flex items-center justify-center text-slate-600 dark:text-slate-300">
+        加载中...
       </div>
     )
   }
 
   if (!question) {
     return (
-      <div className="container mx-auto p-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center text-gray-500">
-              暂无题目
-            </div>
+      <div className="container mx-auto p-4 max-w-4xl">
+        <Card className="border-slate-200 dark:border-slate-800 dark:bg-slate-900/70">
+          <CardContent className="p-6 text-center text-gray-500 dark:text-slate-400">
+            暂无题目
           </CardContent>
         </Card>
       </div>
@@ -420,7 +418,7 @@ function PracticeContent() {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
+    <div className="container mx-auto p-4 max-w-4xl text-slate-900 dark:text-slate-100">
       {/* 头部信息 */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -432,8 +430,8 @@ function PracticeContent() {
             <ChevronLeft className="h-4 w-4 mr-1" />
             返回
           </Button>
-          <Badge variant="outline">{getModeName()}</Badge>
-          <Badge>{question.externalId}</Badge>
+          <Badge variant="outline" className="dark:text-slate-200 dark:border-slate-600">{getModeName()}</Badge>
+          <Badge className="dark:bg-slate-800 dark:text-slate-100">{question.externalId}</Badge>
         </div>
         <Button
           variant="ghost"
@@ -449,13 +447,13 @@ function PracticeContent() {
       </div>
 
       {/* 题目卡片 */}
-      <Card className="mb-4">
+      <Card className="mb-4 border border-slate-200 dark:border-slate-800 dark:bg-slate-900/70">
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="secondary">{question.category}</Badge>
-                <Badge variant="outline">
+                <Badge variant="secondary" className="dark:text-slate-900 dark:bg-slate-100">{question.category}</Badge>
+                <Badge variant="outline" className="dark:text-slate-200 dark:border-slate-700">
                   {question.questionType === 'single_choice' && '单选题'}
                   {question.questionType === 'multiple_choice' && '多选题'}
                   {question.questionType === 'true_false' && '判断题'}
@@ -579,7 +577,7 @@ function PracticeContent() {
 
           {/* 答题统计 */}
           {userQuestion && (
-            <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
+            <div className="mt-4 flex items-center gap-4 text-sm text-gray-500 dark:text-slate-300">
               <span>答对: {userQuestion.correctCount}次</span>
               <span>答错: {userQuestion.incorrectCount}次</span>
             </div>
@@ -636,7 +634,13 @@ function PracticeContent() {
 
 export default function PracticePage() {
   return (
-    <Suspense fallback={<div className="container mx-auto p-4 text-center">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="container mx-auto max-w-4xl p-4 text-center text-slate-600 dark:text-slate-300">
+          加载中...
+        </div>
+      }
+    >
       <PracticeContent />
     </Suspense>
   )

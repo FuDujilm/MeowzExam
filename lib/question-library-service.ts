@@ -67,12 +67,14 @@ function buildVisibilityFilter(
   return null
 }
 
-export async function listAccessibleLibraries(options: {
+type ListLibrariesOptions = {
   userId?: string | null
   userEmail?: string | null
-} = {}) {
+}
+
+export async function listAccessibleLibraries(options: ListLibrariesOptions = {}) {
   const isAdmin = options.userEmail ? validateAdminPermission(options.userEmail).isAdmin : false
-  const filters = [] as any[]
+  const filters: Array<Record<string, unknown>> = []
 
   if (isAdmin) {
     filters.push({})

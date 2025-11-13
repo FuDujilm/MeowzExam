@@ -2,6 +2,7 @@ import NextAuth from "next-auth"
 import type { NextAuthConfig } from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db"
+import { getUserDisplayName } from "@/lib/users/display-name"
 
 const oauthBaseUrl =
   process.env.OAUTH_BASE_URL ?? process.env.NEXT_PUBLIC_OAUTH_BASE_URL
@@ -117,6 +118,12 @@ export const config = {
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id
+        session.user.callsign = user.callsign ?? null
+        session.user.name = getUserDisplayName({
+          callsign: user.callsign,
+          name: user.name,
+          email: session.user.email,
+        })
       }
       return session
     },

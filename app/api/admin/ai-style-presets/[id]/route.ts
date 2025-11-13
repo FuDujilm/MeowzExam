@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 
-type Params = {
-  params: {
+type RouteContext = {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function fetchPresetById(id: string) {
@@ -40,7 +40,7 @@ function serializePreset(preset: Awaited<ReturnType<typeof fetchPresetById>> | n
   }
 }
 
-export async function PUT(request: NextRequest, { params }: Params) {
+export async function PUT(request: NextRequest, context: RouteContext) {
   const adminCheck = await checkAdminPermission()
   if (!adminCheck.success) {
     return NextResponse.json(
@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     )
   }
 
-  const presetId = params.id
+  const { id: presetId } = await context.params
   if (!presetId) {
     return NextResponse.json({ error: '缺少预设 ID' }, { status: 400 })
   }
@@ -120,7 +120,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(_request: NextRequest, context: RouteContext) {
   const adminCheck = await checkAdminPermission()
   if (!adminCheck.success) {
     return NextResponse.json(
@@ -129,7 +129,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const presetId = params.id
+  const { id: presetId } = await context.params
   if (!presetId) {
     return NextResponse.json({ error: '缺少预设 ID' }, { status: 400 })
   }

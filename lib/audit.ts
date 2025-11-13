@@ -8,12 +8,14 @@ export type AuditAction =
   | 'QUESTIONS_IMPORTED'
   | 'QUESTIONS_IMPORT_ERROR'
 
+type AuditDetails = Record<string, unknown>
+
 interface CreateAuditLogOptions {
   userId?: string | null
   action: AuditAction
   entityType?: string
   entityId?: string
-  details?: Record<string, any>
+  details?: AuditDetails
 }
 
 /**

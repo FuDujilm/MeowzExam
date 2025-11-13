@@ -110,7 +110,7 @@ const builderOptions = {
 type RawProgramInfo = {
   programInfo: {
     metadata: Record<string, string | undefined>
-    documents: Record<string, any>
+    documents: Record<string, unknown>
   }
 }
 

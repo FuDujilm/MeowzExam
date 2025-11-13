@@ -95,18 +95,22 @@ export async function generateDifyExplanation(
     const validatedData = AiExplainSchema.parse(parsedResult)
     return validatedData
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Dify generation error:', error)
 
-    if (error.name === 'ZodError') {
-      throw new Error(`Dify 返回格式不符合要求: ${error.message}`)
+    if (error instanceof Error) {
+      if ((error as { name?: string }).name === 'ZodError') {
+        throw new Error(`Dify 返回格式不符合要求: ${error.message}`)
+      }
+
+      if (error.message.includes('fetch failed') || error.message.includes('ENOTFOUND')) {
+        throw new Error(`无法连接到 Dify API: ${config.apiUrl}`)
+      }
+
+      throw new Error(`Dify 解析生成失败: ${error.message}`)
     }
 
-    if (error.message.includes('fetch failed') || error.message.includes('ENOTFOUND')) {
-      throw new Error(`无法连接到 Dify API: ${config.apiUrl}`)
-    }
-
-    throw new Error(`Dify 解析生成失败: ${error.message}`)
+    throw new Error('Dify 解析生成失败：未知错误')
   }
 }
 
@@ -167,14 +171,18 @@ export async function generateDifyChatExplanation(
     const validatedData = AiExplainSchema.parse(parsedResult)
     return validatedData
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Dify Chat generation error:', error)
 
-    if (error.name === 'ZodError') {
-      throw new Error(`Dify Chat 返回格式不符合要求: ${error.message}`)
+    if (error instanceof Error) {
+      if ((error as { name?: string }).name === 'ZodError') {
+        throw new Error(`Dify Chat 返回格式不符合要求: ${error.message}`)
+      }
+
+      throw new Error(`Dify Chat 解析生成失败: ${error.message}`)
     }
 
-    throw new Error(`Dify Chat 解析生成失败: ${error.message}`)
+    throw new Error('Dify Chat 解析生成失败：未知错误')
   }
 }
 
