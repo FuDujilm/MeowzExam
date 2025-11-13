@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "public"."QuestionLibraryVisibility" AS ENUM ('ADMIN_ONLY', 'PUBLIC', 'CUSTOM');
 
 -- CreateTable
@@ -27,7 +27,6 @@ CREATE TABLE "public"."question_libraries" (
     CONSTRAINT "question_libraries_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
 CREATE TABLE "public"."question_library_access" (
     "id" TEXT NOT NULL,
     "libraryId" TEXT NOT NULL,

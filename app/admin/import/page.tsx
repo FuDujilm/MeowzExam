@@ -4,21 +4,45 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { AdminPageShell } from '@/components/admin/AdminPageShell'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { useNotification } from '@/components/ui/notification-provider'
+import type { QuestionLibraryFileInfo } from '@/types/question-library'
 import {
   AlertCircle,
   CheckCircle2,
+  Download,
   FileJson,
+  FileText,
   Info,
   Loader2,
+  PencilLine,
+  Plus,
   Shield,
+  Trash2,
   Upload,
 } from 'lucide-react'
 
 interface ExamPresetSummary {
+  id?: string
   code: string
   name: string
+  description?: string | null
   durationMinutes: number
   totalQuestions: number
+  passScore: number
+  singleChoiceCount: number
+  multipleChoiceCount: number
+  trueFalseCount: number
 }
 
 interface LibrarySummary {
@@ -28,6 +52,7 @@ interface LibrarySummary {
   name: string
   shortName: string
   description?: string | null
+  author?: string | null
   region?: string | null
   totalQuestions: number
   singleChoiceCount: number
@@ -39,6 +64,13 @@ interface LibrarySummary {
   presets: ExamPresetSummary[]
   displayTemplate: string
   visibility: string
+  fileCount?: number
+  totals?: {
+    totalQuestions: number
+    singleChoiceCount: number
+    multipleChoiceCount: number
+    trueFalseCount: number
+  }
   updatedAt: string
 }
 
@@ -98,8 +130,49 @@ const EMPTY_STATS: ImportStats = {
   errors: [],
 }
 
+const EMPTY_PRESET_ROW: PresetFormRow = {
+  code: '',
+  name: '',
+  description: '',
+  durationMinutes: '60',
+  totalQuestions: '40',
+  passScore: '30',
+  singleChoiceCount: '32',
+  multipleChoiceCount: '8',
+  trueFalseCount: '0',
+}
+
+type PresetFormRow = {
+  id?: string
+  code: string
+  name: string
+  description: string
+  durationMinutes: string
+  totalQuestions: string
+  passScore: string
+  singleChoiceCount: string
+  multipleChoiceCount: string
+  trueFalseCount: string
+}
+
+function formatBytes(size: number) {
+  if (!Number.isFinite(size) || size <= 0) return '0 B'
+  const units = ['KB', 'MB', 'GB']
+  let value = size
+  let unitIndex = -1
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+  if (unitIndex === -1) {
+    return `${size} B`
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`
+}
+
 export default function AdminQuestionLibraryPage() {
   const { status } = useSession()
+  const { notify } = useNotification()
   const [libraries, setLibraries] = useState<LibrarySummary[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -107,6 +180,16 @@ export default function AdminQuestionLibraryPage() {
   const [file, setFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportOutcome | null>(null)
+  const [presetDialogOpen, setPresetDialogOpen] = useState(false)
+  const [presetDialogLibrary, setPresetDialogLibrary] = useState<LibrarySummary | null>(null)
+  const [presetFormRows, setPresetFormRows] = useState<PresetFormRow[]>([])
+  const [presetSaving, setPresetSaving] = useState(false)
+  const [presetError, setPresetError] = useState<string | null>(null)
+  const [fileDialogOpen, setFileDialogOpen] = useState(false)
+  const [fileDialogLibrary, setFileDialogLibrary] = useState<LibrarySummary | null>(null)
+  const [libraryFiles, setLibraryFiles] = useState<QuestionLibraryFileInfo[]>([])
+  const [fileListLoading, setFileListLoading] = useState(false)
+  const [fileListError, setFileListError] = useState<string | null>(null)
 
   const isSessionLoading = status === 'loading'
 
@@ -180,7 +263,10 @@ export default function AdminQuestionLibraryPage() {
 
     return {
       totalLibraries: libraries.length,
-      totalQuestions: libraries.reduce((acc, lib) => acc + (lib.totalQuestions ?? 0), 0),
+      totalQuestions: libraries.reduce(
+        (acc, lib) => acc + (lib.totalQuestions ?? lib.totals?.totalQuestions ?? 0),
+        0,
+      ),
       lastUpdated: libraries[0]?.updatedAt ?? null,
       visibility: visibilityTotals,
     }
@@ -219,7 +305,12 @@ export default function AdminQuestionLibraryPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          fileName: file?.name,
+          fileSize: file?.size,
+          fileContent: text,
+          payload,
+        }),
       })
 
       const data = await response.json()
@@ -254,6 +345,223 @@ export default function AdminQuestionLibraryPage() {
     }
   }
 
+  const buildPresetRows = (library: LibrarySummary): PresetFormRow[] => {
+    if (library.presets.length === 0) {
+      return [{ ...EMPTY_PRESET_ROW }]
+    }
+    return library.presets.map((preset) => ({
+      id: preset.id,
+      code: preset.code,
+      name: preset.name,
+      description: preset.description ?? '',
+      durationMinutes: String(preset.durationMinutes),
+      totalQuestions: String(preset.totalQuestions),
+      passScore: String(preset.passScore),
+      singleChoiceCount: String(preset.singleChoiceCount),
+      multipleChoiceCount: String(preset.multipleChoiceCount),
+      trueFalseCount: String(preset.trueFalseCount ?? 0),
+    }))
+  }
+
+  const openPresetDialog = (library: LibrarySummary) => {
+    setPresetDialogLibrary(library)
+    setPresetFormRows(buildPresetRows(library))
+    setPresetError(null)
+    setPresetDialogOpen(true)
+  }
+
+  const closePresetDialog = () => {
+    if (presetSaving) return
+    setPresetDialogOpen(false)
+    setPresetDialogLibrary(null)
+    setPresetFormRows([])
+    setPresetError(null)
+  }
+
+  const handlePresetRowChange = (index: number, key: keyof PresetFormRow, value: string) => {
+    setPresetFormRows((rows) =>
+      rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)),
+    )
+  }
+
+  const addPresetRow = () => {
+    setPresetFormRows((rows) => [...rows, { ...EMPTY_PRESET_ROW }])
+  }
+
+  const removePresetRow = (index: number) => {
+    setPresetFormRows((rows) => rows.filter((_, rowIndex) => rowIndex !== index))
+  }
+
+  const handleSavePresets = async () => {
+    if (!presetDialogLibrary) return
+    setPresetSaving(true)
+    setPresetError(null)
+    try {
+      if (!presetFormRows.length) {
+        throw new Error('至少需要一个考试预设。')
+      }
+
+      const normalizeNumber = (
+        value: string,
+        field: string,
+        options: { allowZero?: boolean } = {},
+      ) => {
+        const parsed = Number.parseInt(value, 10)
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          throw new Error(`${field} 必须为非负整数。`)
+        }
+        if (!options.allowZero && parsed === 0) {
+          throw new Error(`${field} 必须大于 0。`)
+        }
+        return parsed
+      }
+
+      const normalized = presetFormRows.map((row, index) => {
+        const code = row.code.trim().toUpperCase()
+        const name = row.name.trim()
+        if (!code) {
+          throw new Error(`第 ${index + 1} 个预设缺少 code。`)
+        }
+        if (!name) {
+          throw new Error(`第 ${index + 1} 个预设缺少名称。`)
+        }
+        return {
+          id: row.id,
+          code,
+          name,
+          description: row.description.trim() || null,
+          durationMinutes: normalizeNumber(row.durationMinutes, '考试时长'),
+          totalQuestions: normalizeNumber(row.totalQuestions, '题目数量'),
+          passScore: normalizeNumber(row.passScore, '及格分'),
+          singleChoiceCount: normalizeNumber(row.singleChoiceCount, '单选题数量'),
+          multipleChoiceCount: normalizeNumber(row.multipleChoiceCount, '多选题数量'),
+          trueFalseCount: normalizeNumber(row.trueFalseCount, '判断题数量', { allowZero: true }),
+        }
+      })
+
+      const response = await fetch(
+        `/api/admin/question-libraries/${presetDialogLibrary.id}/presets`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ presets: normalized }),
+        },
+      )
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || '保存考试预设失败。')
+      }
+      const updatedPresets: ExamPresetSummary[] = data?.presets ?? normalized
+      setLibraries((prev) =>
+        prev.map((library) =>
+          library.id === presetDialogLibrary.id ? { ...library, presets: updatedPresets } : library,
+        ),
+      )
+      notify({
+        variant: 'success',
+        title: '已更新考试预设',
+        description: `题库「${presetDialogLibrary.name}」的考试预设已保存。`,
+      })
+      setPresetDialogOpen(false)
+      setPresetDialogLibrary(null)
+    } catch (error: any) {
+      setPresetError(error?.message ?? '保存考试预设失败。')
+      notify({
+        variant: 'danger',
+        title: '保存失败',
+        description: error?.message ?? '无法保存考试预设，请稍后再试。',
+      })
+    } finally {
+      setPresetSaving(false)
+    }
+  }
+
+  const fetchLibraryFiles = async (libraryId: string) => {
+    try {
+      setFileListLoading(true)
+      setFileListError(null)
+      const response = await fetch(`/api/admin/question-library-files?libraryId=${libraryId}`, {
+        cache: 'no-store',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || '无法获取题库文件。')
+      }
+      const files = Array.isArray(data?.files) ? data.files : []
+      setLibraryFiles(files)
+      setLibraries((prev) =>
+        prev.map((library) =>
+          library.id === libraryId ? { ...library, fileCount: files.length } : library,
+        ),
+      )
+    } catch (error: any) {
+      setLibraryFiles([])
+      const message = error?.message || '无法加载题库文件列表。'
+      setFileListError(message)
+      notify({
+        variant: 'danger',
+        title: '加载文件失败',
+        description: message,
+      })
+    } finally {
+      setFileListLoading(false)
+    }
+  }
+
+  const openFileDialog = async (library: LibrarySummary) => {
+    setFileDialogLibrary(library)
+    setFileDialogOpen(true)
+    await fetchLibraryFiles(library.id)
+  }
+
+  const closeFileDialog = () => {
+    if (fileListLoading) return
+    setFileDialogOpen(false)
+    setFileDialogLibrary(null)
+    setLibraryFiles([])
+    setFileListError(null)
+  }
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!fileDialogLibrary) return
+    const confirmed = window.confirm('确定要删除该文件吗？删除后将无法恢复。')
+    if (!confirmed) return
+    try {
+      const response = await fetch(`/api/admin/question-library-files/${fileId}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.error || '无法删除题库文件。')
+      }
+      setLibraryFiles((prev) => prev.filter((file) => file.id !== fileId))
+      setLibraries((prev) =>
+        prev.map((library) =>
+          library.id === fileDialogLibrary.id
+            ? {
+                ...library,
+                fileCount: Math.max(0, (library.fileCount ?? 1) - 1),
+              }
+            : library,
+        ),
+      )
+      notify({
+        variant: 'success',
+        title: '文件已删除',
+        description: '题库文件已成功删除。',
+      })
+    } catch (error: any) {
+      notify({
+        variant: 'danger',
+        title: '删除失败',
+        description: error?.message ?? '无法删除题库文件，请稍后再试。',
+      })
+    }
+  }
+
   const renderVisibilityBadge = (value: string) => {
     const label = VISIBILITY_LABELS[value] ?? value
     const cls =
@@ -283,7 +591,8 @@ export default function AdminQuestionLibraryPage() {
   }
 
   return (
-    <AdminPageShell maxWidthClassName="max-w-6xl" contentClassName="space-y-8 pb-16 pt-6">
+    <>
+      <AdminPageShell maxWidthClassName="max-w-6xl" contentClassName="space-y-8 pb-16 pt-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">题库管理</h1>
@@ -388,6 +697,7 @@ export default function AdminQuestionLibraryPage() {
                             <th className="px-5 py-3">可见范围</th>
                             <th className="px-5 py-3">考试预设</th>
                             <th className="px-5 py-3">更新时间</th>
+                            <th className="px-5 py-3">文件 / 操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm text-slate-700 dark:divide-slate-800 dark:text-slate-200">
@@ -425,6 +735,31 @@ export default function AdminQuestionLibraryPage() {
                               </td>
                               <td className="px-5 py-4 align-top text-xs text-slate-500 dark:text-slate-400">
                                 {formatDateTime(library.updatedAt)}
+                              </td>
+                              <td className="px-5 py-4 align-top">
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                  已保存文件：{formatNumber(library.fileCount ?? 0)} 个
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openPresetDialog(library)}
+                                    className="inline-flex items-center gap-1"
+                                  >
+                                    <PencilLine className="h-3.5 w-3.5" />
+                                    管理预设
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => openFileDialog(library)}
+                                    className="inline-flex items-center gap-1"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    文件
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -579,6 +914,254 @@ export default function AdminQuestionLibraryPage() {
               </div>
             </aside>
           </div>
-    </AdminPageShell>
+      </AdminPageShell>
+
+      <Dialog open={presetDialogOpen} onOpenChange={(open) => (!open ? closePresetDialog() : null)}>
+      <DialogContent className="max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>管理考试预设</DialogTitle>
+          <DialogDescription>
+            为题库 {presetDialogLibrary?.name ?? ''} 配置考试时长、题量与及格线。保存后立即生效。
+          </DialogDescription>
+        </DialogHeader>
+
+        {presetError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+            {presetError}
+          </div>
+        )}
+
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          {presetFormRows.map((row, index) => (
+            <div
+              key={row.id ?? `${row.code}-${index}`}
+              className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  考试预设 #{index + 1}
+                </p>
+                {presetFormRows.length > 1 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => removePresetRow(index)}
+                    className="text-red-600 hover:text-red-500"
+                  >
+                    删除
+                  </Button>
+                )}
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>预设代码</Label>
+                  <Input
+                    value={row.code}
+                    placeholder="例如：A_STANDARD"
+                    onChange={(event) => handlePresetRowChange(index, 'code', event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>预设名称</Label>
+                  <Input
+                    value={row.name}
+                    placeholder="例如：A类标准考试"
+                    onChange={(event) => handlePresetRowChange(index, 'name', event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>简介</Label>
+                  <Input
+                    value={row.description}
+                    placeholder="可选，说明考试结构或说明"
+                    onChange={(event) =>
+                      handlePresetRowChange(index, 'description', event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>考试时长（分钟）</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={row.durationMinutes}
+                    onChange={(event) =>
+                      handlePresetRowChange(index, 'durationMinutes', event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>题目数量</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={row.totalQuestions}
+                    onChange={(event) =>
+                      handlePresetRowChange(index, 'totalQuestions', event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>及格分数</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={row.passScore}
+                    onChange={(event) =>
+                      handlePresetRowChange(index, 'passScore', event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>单选题数量</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={row.singleChoiceCount}
+                    onChange={(event) =>
+                      handlePresetRowChange(index, 'singleChoiceCount', event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>多选题数量</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={row.multipleChoiceCount}
+                    onChange={(event) =>
+                      handlePresetRowChange(index, 'multipleChoiceCount', event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>判断题数量</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={row.trueFalseCount}
+                    onChange={(event) =>
+                      handlePresetRowChange(index, 'trueFalseCount', event.target.value)
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          <Button variant="ghost" onClick={addPresetRow} className="inline-flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            新增考试预设
+          </Button>
+        </div>
+
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={closePresetDialog}>
+            取消
+          </Button>
+          <Button onClick={handleSavePresets} disabled={presetSaving}>
+            {presetSaving ? '保存中…' : '保存'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+      </Dialog>
+
+      <Dialog open={fileDialogOpen} onOpenChange={(open) => (!open ? closeFileDialog() : null)}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>题库文件管理</DialogTitle>
+          <DialogDescription>
+            查看和下载题库 {fileDialogLibrary?.name ?? ''} 的历史导入文件，或删除不再需要的文件。
+          </DialogDescription>
+        </DialogHeader>
+
+        {fileListError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+            {fileListError}
+          </div>
+        )}
+
+        {fileListLoading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500 dark:text-slate-300">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            正在加载文件…
+          </div>
+        ) : libraryFiles.length === 0 ? (
+          <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-300">
+            暂无文件记录，上传题库后会自动保存备份。
+          </p>
+        ) : (
+          <div className="max-h-[50vh] overflow-y-auto">
+            <table className="min-w-full divide-y divide-slate-100 text-sm dark:divide-slate-800">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900/70 dark:text-slate-300">
+                <tr>
+                  <th className="px-4 py-2">文件名</th>
+                  <th className="px-4 py-2">大小</th>
+                  <th className="px-4 py-2">上传时间</th>
+                  <th className="px-4 py-2">上传者</th>
+                  <th className="px-4 py-2">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {libraryFiles.map((file) => (
+                  <tr key={file.id}>
+                    <td className="px-4 py-2">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">
+                        {file.originalName ?? file.filename}
+                      </div>
+                      <div className="text-xs text-slate-500">{file.filename}</div>
+                    </td>
+                    <td className="px-4 py-2 text-slate-600 dark:text-slate-300">
+                      {formatBytes(file.fileSize)}
+                    </td>
+                    <td className="px-4 py-2 text-slate-600 dark:text-slate-300">
+                      {formatDateTime(file.uploadedAt)}
+                    </td>
+                    <td className="px-4 py-2 text-slate-600 dark:text-slate-300">
+                      {file.uploadedByEmail ?? file.uploadedBy ?? '系统'}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="inline-flex items-center gap-1"
+                          asChild
+                        >
+                          <a
+                            href={`/api/admin/question-library-files/${file.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={file.originalName ?? file.filename}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            下载
+                          </a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="inline-flex items-center gap-1 text-red-600 hover:text-red-500"
+                          onClick={() => handleDeleteFile(file.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          删除
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={closeFileDialog}>
+            关闭
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+      </Dialog>
+    </>
   )
 }

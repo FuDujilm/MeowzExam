@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { getLibraryForUser } from '@/lib/question-library-service'
+
+const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
+
+function normalizeLibraryCode(value: string | null): string | null {
+  return value ? value.trim().toUpperCase() : null
+}
+
+function buildLibraryFilter(libraryCode: string): Prisma.QuestionWhereInput {
+  if (!libraryCode) return {}
+  if (LEGACY_TYPE_CODES.has(libraryCode)) {
+    return {
+      OR: [
+        { libraryCode },
+        {
+          AND: [{ libraryCode: null }, { type: libraryCode as any }],
+        },
+      ],
+    }
+  }
+  return { libraryCode }
+}
 
 // GET /api/practice/history - 获取已练习的题目列表
 export async function GET(request: NextRequest) {
@@ -10,25 +33,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const libraryParam = normalizeLibraryCode(
+      searchParams.get('library') ?? searchParams.get('type'),
+    )
+    const filter = searchParams.get('filter') || 'all' // all, correct, wrong
+
+    if (!libraryParam) {
+      return NextResponse.json({ error: '缺少题库标识' }, { status: 400 })
+    }
+
+    let targetLibraryCode = libraryParam
+    if (!LEGACY_TYPE_CODES.has(libraryParam)) {
+      const library = await getLibraryForUser({
+        code: libraryParam,
+        userId: resolvedUser.id,
+        userEmail: resolvedUser.email,
+      })
+
+      if (!library) {
+        return NextResponse.json(
+          { error: '未找到题库或没有访问权限' },
+          { status: 404 },
+        )
+      }
+      targetLibraryCode = library.code
+    }
+
+    const libraryFilter = buildLibraryFilter(targetLibraryCode)
+
     // 获取用户信息
     const user = await prisma.user.findUnique({
-      where: { email: resolvedUser.email },
+      where: { id: resolvedUser.id },
     })
 
     if (!user) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const type = searchParams.get('type') || 'A_CLASS'
-    const filter = searchParams.get('filter') || 'all' // all, correct, wrong
-
     // 构建查询条件
     const whereConditions: any = {
       userId: user.id,
-      question: {
-        type: type as 'A_CLASS' | 'B_CLASS' | 'C_CLASS'
-      }
+      question: libraryFilter,
     }
 
     // 根据筛选条件添加过滤

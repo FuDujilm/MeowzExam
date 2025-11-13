@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { getLibraryForUser } from '@/lib/question-library-service'
+
+const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
+
+function normalizeLibraryCode(value: string | null): string | null {
+  return value ? value.trim().toUpperCase() : null
+}
+
+function buildLibraryFilter(libraryCode: string): Prisma.QuestionWhereInput {
+  if (!libraryCode) return {}
+  if (LEGACY_TYPE_CODES.has(libraryCode)) {
+    return {
+      OR: [
+        { libraryCode },
+        {
+          AND: [{ libraryCode: null }, { type: libraryCode as any }],
+        },
+      ],
+    }
+  }
+  return { libraryCode }
+}
 
 // GET /api/practice/error-rate - 按错误率获取题目
 export async function GET(request: NextRequest) {
@@ -11,12 +34,37 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const type = searchParams.get('type') || 'A_CLASS'
+    const libraryParam = normalizeLibraryCode(
+      searchParams.get('library') ?? searchParams.get('type'),
+    )
     const currentId = searchParams.get('currentId') // 当前题目ID
+
+    if (!libraryParam) {
+      return NextResponse.json({ error: '缺少题库标识' }, { status: 400 })
+    }
+
+    let targetLibraryCode = libraryParam
+    if (!LEGACY_TYPE_CODES.has(libraryParam)) {
+      const library = await getLibraryForUser({
+        code: libraryParam,
+        userId: resolvedUser.id,
+        userEmail: resolvedUser.email,
+      })
+
+      if (!library) {
+        return NextResponse.json(
+          { error: '未找到题库或没有访问权限' },
+          { status: 404 },
+        )
+      }
+      targetLibraryCode = library.code
+    }
+
+    const libraryFilter = buildLibraryFilter(targetLibraryCode)
 
     // 获取用户信息
     const user = await prisma.user.findUnique({
-      where: { email: resolvedUser.email },
+      where: { id: resolvedUser.id },
     })
 
     if (!user) {
@@ -25,18 +73,14 @@ export async function GET(request: NextRequest) {
 
     // 获取所有该类别的题目
     const allQuestions = await prisma.question.findMany({
-      where: {
-        type: type as 'A_CLASS' | 'B_CLASS' | 'C_CLASS',
-      },
+      where: libraryFilter,
     })
 
     // 获取用户的答题记录
     const userQuestions = await prisma.userQuestion.findMany({
       where: {
         userId: user.id,
-        question: {
-          type: type as 'A_CLASS' | 'B_CLASS' | 'C_CLASS',
-        },
+        question: libraryFilter,
       },
       include: {
         question: true,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,15 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { useNotification } from '@/components/ui/notification-provider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Clock, CheckCircle2, XCircle, Lightbulb, Sparkles, Loader2, RotateCcw } from 'lucide-react'
+import { useQuestionLibraries } from '@/lib/use-question-libraries'
 
 interface Question {
   id: string
@@ -39,8 +47,28 @@ function ExamContent() {
   const router = useRouter()
   const { data: session, status } = useSession()
   const { notify } = useNotification()
+  const {
+    libraries,
+    loading: libraryLoading,
+    error: libraryError,
+    reload: reloadLibraries,
+  } = useQuestionLibraries()
 
-  const type = searchParams.get('type') || 'A_CLASS'
+  const searchParamsKey = searchParams.toString()
+
+  const queryLibraryCode = useMemo(() => {
+    const value =
+      searchParams.get('library') ?? searchParams.get('type') ?? undefined
+    return value ? value.toUpperCase() : null
+  }, [searchParamsKey])
+
+  const queryPresetCode = useMemo(() => {
+    const value = searchParams.get('preset')
+    return value ? value.toUpperCase() : null
+  }, [searchParamsKey])
+
+  const [selectedLibraryCode, setSelectedLibraryCode] = useState<string | null>(null)
+  const [selectedPresetCode, setSelectedPresetCode] = useState<string | null>(null)
 
   const [examId, setExamId] = useState<string | null>(null)
   const [examResultId, setExamResultId] = useState<string | null>(null)
@@ -56,6 +84,63 @@ function ExamContent() {
   const [aiResultLoading, setAiResultLoading] = useState<Record<string, boolean>>({})
   const [aiResultError, setAiResultError] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!libraries.length) return
+    setSelectedLibraryCode((prev) => {
+      if (prev && libraries.some((library) => library.code === prev)) {
+        return prev
+      }
+      const matched =
+        (queryLibraryCode &&
+          libraries.find((library) => library.code === queryLibraryCode)) ||
+        libraries[0]
+      return matched ? matched.code : null
+    })
+  }, [libraries, queryLibraryCode])
+
+  useEffect(() => {
+    if (!selectedLibraryCode) {
+      setSelectedPresetCode(null)
+      return
+    }
+    const currentLibrary = libraries.find((library) => library.code === selectedLibraryCode)
+    if (!currentLibrary) {
+      setSelectedPresetCode(null)
+      return
+    }
+    setSelectedPresetCode((prev) => {
+      if (
+        prev &&
+        currentLibrary.presets.some((preset) => preset.code === prev)
+      ) {
+        return prev
+      }
+      const matched =
+        (queryPresetCode &&
+          currentLibrary.presets.find(
+            (preset) => preset.code.toUpperCase() === queryPresetCode,
+          )) ||
+        currentLibrary.presets[0]
+      return matched ? matched.code : null
+    })
+  }, [libraries, selectedLibraryCode, queryPresetCode])
+
+  const selectedLibrary = useMemo(
+    () => libraries.find((library) => library.code === selectedLibraryCode) ?? null,
+    [libraries, selectedLibraryCode],
+  )
+
+  const selectedPreset = useMemo(() => {
+    if (!selectedLibrary) return null
+    if (!selectedLibrary.presets.length) return null
+    if (!selectedPresetCode) return selectedLibrary.presets[0]
+    return (
+      selectedLibrary.presets.find(
+        (preset) => preset.code === selectedPresetCode,
+      ) ?? selectedLibrary.presets[0]
+    )
+  }, [selectedLibrary, selectedPresetCode])
 
   const currentQuestion = questions[currentIndex]
 
@@ -78,12 +163,24 @@ function ExamContent() {
 
   // 开始考试
   const handleStartExam = async () => {
+    if (!selectedLibraryCode) {
+      notify({
+        variant: 'warning',
+        title: '请选择题库',
+        description: '请先选择你要参加考试的题库。',
+      })
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch('/api/exam/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type })
+        body: JSON.stringify({
+          library: selectedLibraryCode,
+          presetCode: selectedPreset?.code,
+        }),
       })
 
       if (res.ok) {
@@ -284,40 +381,133 @@ function ExamContent() {
 
   // 开始考试前
   if (!examStarted) {
-    const typeNames = {
-      A_CLASS: 'A类',
-      B_CLASS: 'B类',
-      C_CLASS: 'C类',
+    if (libraryLoading) {
+      return (
+        <div className="min-h-screen bg-gray-50 py-12 px-4">
+          <div className="max-w-2xl mx-auto text-center text-gray-500">
+            正在加载可用题库...
+          </div>
+        </div>
+      )
     }
-    const examInfo = {
-      A_CLASS: { questions: 40, duration: 40, pass: 30 },
-      B_CLASS: { questions: 60, duration: 60, pass: 45 },
-      C_CLASS: { questions: 90, duration: 90, pass: 70 },
+
+    if (!libraries.length) {
+      return (
+        <div className="min-h-screen bg-gray-50 py-12 px-4">
+          <div className="max-w-2xl mx-auto text-center space-y-4">
+            <p className="text-gray-600">
+              当前账号暂无可参加的题库，请联系管理员或稍后再试。
+            </p>
+            {libraryError && (
+              <p className="text-sm text-red-500">
+                题库加载失败：{libraryError}
+              </p>
+            )}
+            <Button onClick={reloadLibraries} variant="outline">
+              重新加载
+            </Button>
+          </div>
+        </div>
+      )
     }
-    const info = examInfo[type as keyof typeof examInfo]
+
+    const presetSummary = selectedPreset
+      ? `${selectedPreset.totalQuestions} 题 · ${selectedPreset.durationMinutes} 分钟 · ${selectedPreset.passScore} 分及格`
+      : '该题库尚未配置考试预设，将使用默认配置。'
+
+    const singleChoiceCount =
+      selectedPreset?.singleChoiceCount ?? selectedLibrary?.singleChoiceCount ?? 0
+    const multipleChoiceCount =
+      selectedPreset?.multipleChoiceCount ?? selectedLibrary?.multipleChoiceCount ?? 0
+    const trueFalseCount =
+      selectedPreset?.trueFalseCount ?? selectedLibrary?.trueFalseCount ?? 0
 
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-3xl mx-auto space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">
-                {typeNames[type as keyof typeof typeNames]}操作技术能力验证 - 模拟考试
+                {selectedLibrary?.name ?? '模拟考试'} — 考试配置
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <p><strong>题目数量：</strong>{info.questions} 题</p>
-                <p><strong>考试时长：</strong>{info.duration} 分钟</p>
-                <p><strong>及格分数：</strong>{info.pass} 分</p>
-                <p className="text-sm text-gray-600">
-                  * 考试开始后将自动计时，时间到自动提交
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">选择题库</Label>
+                  <Select
+                    value={selectedLibraryCode ?? undefined}
+                    onValueChange={(value) => setSelectedLibraryCode(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择题库" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {libraries.map((library) => (
+                        <SelectItem key={library.code} value={library.code}>
+                          {library.displayLabel}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">考试预设</Label>
+                  {selectedLibrary?.presets.length ? (
+                    <Select
+                      value={selectedPreset?.code ?? undefined}
+                      onValueChange={(value) => setSelectedPresetCode(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择预设" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedLibrary.presets.map((preset) => (
+                          <SelectItem key={preset.code} value={preset.code}>
+                            {preset.name}（{preset.totalQuestions}题 / {preset.durationMinutes}分钟）
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      未配置预设，将使用系统默认配置。
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+                <p className="font-medium text-slate-900">考试信息</p>
+                <p className="mt-1">{presetSummary}</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {singleChoiceCount}
+                    </p>
+                    <p className="text-xs text-gray-600">单选题数量</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {multipleChoiceCount}
+                    </p>
+                    <p className="text-xs text-gray-600">多选题数量</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {trueFalseCount}
+                    </p>
+                    <p className="text-xs text-gray-600">判断题数量</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-gray-500">
+                  * 考试开始后将自动计时，时间到会自动交卷。
                 </p>
               </div>
 
               <Button
                 onClick={handleStartExam}
-                disabled={loading}
+                disabled={loading || !selectedLibraryCode}
                 className="w-full"
                 size="lg"
               >

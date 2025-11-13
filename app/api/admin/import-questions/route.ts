@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 import { createAuditLog } from '@/lib/audit'
 import { renderLibraryDisplay } from '@/lib/question-library-service'
+import { saveLibraryFile } from '@/lib/server/library-file-store'
 import type {
   ExamPresetDefinition,
   QuestionItem,
@@ -51,6 +52,11 @@ type LibraryWithRelations = Prisma.QuestionLibraryGetPayload<{
             name: true
           }
         }
+      }
+    }
+    _count: {
+      select: {
+        files: true
       }
     }
   }
@@ -394,7 +400,10 @@ function normaliseQuestion(
   }
 }
 
-function serialiseLibrary(library: LibraryWithRelations) {
+function serialiseLibrary(
+  library: LibraryWithRelations,
+  options: { fileCount?: number } = {},
+) {
   return {
     id: library.id,
     uuid: library.uuid,
@@ -410,6 +419,10 @@ function serialiseLibrary(library: LibraryWithRelations) {
     displayTemplate: library.displayTemplate ?? DISPLAY_TEMPLATE_DEFAULT,
     metadata: library.metadata,
     visibility: library.visibility,
+    totalQuestions: library.totalQuestions,
+    singleChoiceCount: library.singleChoiceCount,
+    multipleChoiceCount: library.multipleChoiceCount,
+    trueFalseCount: library.trueFalseCount,
     totals: {
       totalQuestions: library.totalQuestions,
       singleChoiceCount: library.singleChoiceCount,
@@ -418,6 +431,7 @@ function serialiseLibrary(library: LibraryWithRelations) {
     },
     createdAt: library.createdAt.toISOString(),
     updatedAt: library.updatedAt.toISOString(),
+    fileCount: options.fileCount ?? 0,
     displayLabel: renderLibraryDisplay(library),
     presets: library.examPresets.map((preset) => ({
       id: preset.id,
@@ -469,8 +483,16 @@ export async function GET() {
       },
     })
 
+    const fileCounts = await prisma.questionLibraryFile.groupBy({
+      by: ['libraryId'],
+      _count: { _all: true },
+    })
+    const countMap = new Map(fileCounts.map((item) => [item.libraryId, item._count._all]))
+
     return NextResponse.json({
-      libraries: libraries.map(serialiseLibrary),
+      libraries: libraries.map((library) =>
+        serialiseLibrary(library, { fileCount: countMap.get(library.id) ?? 0 }),
+      ),
     })
   } catch (error: any) {
     if (isMigrationError(error)) {
@@ -491,6 +513,38 @@ export async function GET() {
   }
 }
 
+async function persistUploadedLibraryFile(options: {
+  libraryId: string
+  libraryCode: string
+  fileContent: string
+  originalName?: string
+  uploadedBy?: string
+  uploadedByEmail?: string
+}) {
+  try {
+    const stored = await saveLibraryFile({
+      libraryCode: options.libraryCode,
+      fileContent: options.fileContent,
+      originalName: options.originalName,
+    })
+
+    await prisma.questionLibraryFile.create({
+      data: {
+        libraryId: options.libraryId,
+        filename: stored.filename,
+        originalName: options.originalName ?? stored.filename,
+        filepath: stored.filepath,
+        fileSize: stored.fileSize,
+        checksum: stored.checksum,
+        uploadedBy: options.uploadedBy ?? null,
+        uploadedByEmail: options.uploadedByEmail ?? null,
+      },
+    })
+  } catch (error) {
+    console.error('Failed to persist question library file:', error)
+  }
+}
+
 export async function POST(request: NextRequest) {
   let adminUserId: string | undefined
   let adminEmail: string | undefined
@@ -506,13 +560,25 @@ export async function POST(request: NextRequest) {
     adminUserId = adminCheck.user?.id
     adminEmail = adminCheck.user?.email ?? undefined
 
-    const payload = await request.json() as QuestionLibraryImportPayload
+    const body = await request.json()
+    const payload: QuestionLibraryImportPayload | undefined =
+      body && typeof body === 'object' && 'payload' in body
+        ? (body.payload as QuestionLibraryImportPayload)
+        : body
+
     if (!payload || typeof payload !== 'object') {
       return NextResponse.json(
         { error: 'JSON 格式无效，导入失败。' },
         { status: 400 },
       )
     }
+
+    const originalFileName =
+      typeof body?.fileName === 'string' ? body.fileName : undefined
+    const fileContent =
+      typeof body?.fileContent === 'string'
+        ? body.fileContent
+        : JSON.stringify(payload, null, 2)
 
     const { library: header, warnings: headerWarnings } = normaliseLibraryHeader(payload.library)
 
@@ -784,6 +850,9 @@ export async function POST(request: NextRequest) {
 
       return refreshed!
     })
+    const fileCount = await prisma.questionLibraryFile.count({
+      where: { libraryId: transactionResult.id },
+    })
 
     await createAuditLog({
       userId: adminUserId,
@@ -807,13 +876,24 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({
+    const responseBody = {
       success: stats.errors.length === 0,
       message: `题库「${transactionResult.name}」导入完成。`,
       stats,
       warnings,
-      library: serialiseLibrary(transactionResult),
+      library: serialiseLibrary(transactionResult, { fileCount }),
+    }
+
+    await persistUploadedLibraryFile({
+      libraryId: transactionResult.id,
+      libraryCode: transactionResult.code,
+      fileContent,
+      originalName: originalFileName,
+      uploadedBy: adminUserId,
+      uploadedByEmail: adminEmail,
     })
+
+    return NextResponse.json(responseBody)
   } catch (error: any) {
     if (isMigrationError(error)) {
       return NextResponse.json(

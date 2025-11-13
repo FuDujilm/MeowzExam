@@ -70,19 +70,33 @@ export interface QuestionLibraryHeader {
 }
 
 export interface ExamPresetDefinition {
+  id?: string
   code: string
   name: string
-  description?: string
+  description?: string | null
   durationMinutes: number
   totalQuestions: number
   passScore: number
   singleChoiceCount: number
   multipleChoiceCount: number
   trueFalseCount?: number
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown> | null
 }
 
 export interface QuestionLibraryImportPayload {
   library: QuestionLibraryHeader
   questions: QuestionItem[]
+}
+
+export interface QuestionLibraryFileInfo {
+  id: string
+  libraryId: string
+  filename: string
+  originalName?: string | null
+  fileSize: number
+  mimeType?: string | null
+  checksum?: string | null
+  uploadedAt: string
+  uploadedBy?: string | null
+  uploadedByEmail?: string | null
 }

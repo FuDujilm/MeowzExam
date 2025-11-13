@@ -22,6 +22,10 @@ model User {
   emailVerified DateTime?
   image         String?
   callsign      String?   // 业余无线电呼号（可选）
+  aiQuotaLimit  Int?
+  aiQuotaUsed   Int       @default(0)
+  loginDisabled Boolean   @default(false)
+  manualExplanationDisabled Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -197,6 +201,7 @@ model QuestionLibrary {
   questions   Question[]
   examPresets QuestionLibraryExamPreset[]
   access      QuestionLibraryAccess[]
+  files       QuestionLibraryFile[]
   exams       Exam[] @relation("QuestionLibraryExams")
 
   @@index([region])
@@ -244,6 +249,24 @@ model QuestionLibraryAccess {
   @@unique([libraryId, userId])
   @@unique([libraryId, userEmail])
   @@map("question_library_access")
+}
+
+model QuestionLibraryFile {
+  id              String   @id @default(cuid())
+  libraryId       String
+  library         QuestionLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  filename        String
+  originalName    String?
+  filepath        String
+  fileSize        Int
+  mimeType        String?  @default("application/json")
+  checksum        String?
+  uploadedBy      String?
+  uploadedByEmail String?
+  uploadedAt      DateTime @default(now())
+
+  @@index([libraryId, uploadedAt])
+  @@map("question_library_files")
 }
 
 // 用户答题记录表
