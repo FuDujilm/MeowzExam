@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
+import { Prisma } from '@/lib/generated/prisma'
 
 const MAX_PAGE_SIZE = 50
 
@@ -53,9 +54,9 @@ export async function GET(request: NextRequest) {
   const where = query.length > 0
     ? {
         OR: [
-          { email: { contains: query, mode: 'insensitive' } },
-          { name: { contains: query, mode: 'insensitive' } },
-          { callsign: { contains: query, mode: 'insensitive' } },
+          { email: { contains: query, mode: Prisma.QueryMode.insensitive } },
+          { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+          { callsign: { contains: query, mode: Prisma.QueryMode.insensitive } },
         ],
       }
     : undefined

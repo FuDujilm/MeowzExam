@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import type { NextAuthConfig } from "next-auth"
+import type { Adapter } from "next-auth/adapters"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db"
 import { getUserDisplayName } from "@/lib/users/display-name"
@@ -28,7 +29,7 @@ const oauthOrigin = getOrigin(oauthBaseUrl)
 const appOrigin = getOrigin(appBaseUrl)
 
 export const config = {
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prisma) as Adapter,
   trustHost: true,
   providers: [
     {
@@ -84,6 +85,10 @@ export const config = {
           name: profile.name || null,
           email: profile.email || null,
           image: profile.picture || null,
+          aiQuotaLimit: null,
+          aiQuotaUsed: 0,
+          loginDisabled: false,
+          manualExplanationDisabled: false,
         }
       },
       checks: ["state"],

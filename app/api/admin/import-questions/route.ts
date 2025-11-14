@@ -480,6 +480,11 @@ export async function GET() {
             },
           },
         },
+        _count: {
+          select: {
+            files: true,
+          },
+        },
       },
     })
 
@@ -557,7 +562,7 @@ export async function POST(request: NextRequest) {
         { status: adminCheck.status ?? 401 },
       )
     }
-    adminUserId = adminCheck.user?.id
+    adminUserId = adminCheck.user?.id ?? undefined
     adminEmail = adminCheck.user?.email ?? undefined
 
     const body = await request.json()
@@ -696,7 +701,9 @@ export async function POST(request: NextRequest) {
               region: header.region ?? null,
               version: header.version ?? null,
               displayTemplate: header.displayTemplate,
-              metadata: header.metadata,
+              metadata: header.metadata
+                ? (header.metadata as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
               visibility: header.visibility,
             },
           })
@@ -713,7 +720,9 @@ export async function POST(request: NextRequest) {
               region: header.region ?? null,
               version: header.version ?? null,
               displayTemplate: header.displayTemplate,
-              metadata: header.metadata,
+              metadata: header.metadata
+                ? (header.metadata as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
               visibility: header.visibility,
             },
           })
@@ -736,7 +745,9 @@ export async function POST(request: NextRequest) {
             singleChoiceCount: preset.singleChoiceCount,
             multipleChoiceCount: preset.multipleChoiceCount,
             trueFalseCount: preset.trueFalseCount ?? 0,
-            metadata: preset.metadata ?? null,
+            metadata: preset.metadata
+              ? (preset.metadata as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
           })),
         })
       }
@@ -843,6 +854,11 @@ export async function POST(request: NextRequest) {
                   name: true,
                 },
               },
+            },
+          },
+          _count: {
+            select: {
+              files: true,
             },
           },
         },

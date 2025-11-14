@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Session } from 'next-auth'
 
 import { auth } from '@/auth'
 import { isAdminEmail } from '@/lib/auth/admin'
@@ -6,7 +7,7 @@ import { prisma } from '@/lib/db'
 import { emailService } from '@/lib/email'
 import { listNotificationRecipients, serializeAdminSiteMessage } from '@/lib/site-messages'
 
-function ensureAdmin(session: Awaited<ReturnType<typeof auth>>) {
+function ensureAdmin(session: Session | null) {
   if (!session?.user?.email || !isAdminEmail(session.user.email)) {
     return NextResponse.json({ error: '权限不足：需要管理员账号' }, { status: 403 })
   }

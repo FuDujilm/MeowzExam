@@ -31,7 +31,7 @@ export async function GET(
 
   try {
     const fileBuffer = await readLibraryFile(record.filepath)
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(fileBuffer as unknown as BodyInit, {
       headers: {
         'Content-Type': record.mimeType ?? 'application/json',
         'Content-Disposition': `attachment; filename="${encodeURIComponent(

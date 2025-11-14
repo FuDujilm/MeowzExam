@@ -192,7 +192,6 @@ export function serializeAdminSiteMessage(record: SiteMessage & { createdBy?: { 
 export async function listNotificationRecipients(): Promise<string[]> {
   const users = await prisma.user.findMany({
     where: {
-      email: { not: null },
       emailVerified: { not: null },
     },
     select: { email: true },

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { Prisma } from '@/lib/generated/prisma'
+import { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
 import { getLibraryForUser } from '@/lib/question-library-service'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
+const CASE_INSENSITIVE = Prisma.QueryMode.insensitive
 
 function normalizeLibraryCode(value: string | null): string | null {
   return value ? value.trim().toUpperCase() : null
@@ -51,10 +52,10 @@ function buildSearchFilter(rawInput: string | null): Prisma.QuestionWhereInput |
 
   const tokenToCondition = (token: string): Prisma.QuestionWhereInput => ({
     OR: [
-      { title: { contains: token, mode: 'insensitive' } },
-      { externalId: { contains: token, mode: 'insensitive' } },
-      { category: { contains: token, mode: 'insensitive' } },
-      { categoryCode: { contains: token, mode: 'insensitive' } },
+      { title: { contains: token, mode: CASE_INSENSITIVE } },
+      { externalId: { contains: token, mode: CASE_INSENSITIVE } },
+      { category: { contains: token, mode: CASE_INSENSITIVE } },
+      { categoryCode: { contains: token, mode: CASE_INSENSITIVE } },
     ],
   })
 
@@ -122,8 +123,8 @@ export async function GET(request: NextRequest) {
     const categoryFilter = category
       ? {
           OR: [
-            { categoryCode: { contains: category, mode: 'insensitive' } },
-            { category: { contains: category, mode: 'insensitive' } },
+            { categoryCode: { contains: category, mode: CASE_INSENSITIVE } },
+            { category: { contains: category, mode: CASE_INSENSITIVE } },
           ],
         }
       : undefined

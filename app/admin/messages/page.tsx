@@ -210,7 +210,7 @@ export default function AdminMessagesPage() {
   const handleSubmit = async () => {
     if (!hasContent(form.title) || !hasContent(form.content)) {
       notify({
-        variant: 'error',
+        variant: 'danger',
         title: '内容不完整',
         description: '请填写消息标题和内容后再保存。',
       })
@@ -266,7 +266,7 @@ export default function AdminMessagesPage() {
     } catch (err) {
       console.error(err)
       notify({
-        variant: 'error',
+        variant: 'danger',
         title: '保存失败',
         description: err instanceof Error ? err.message : '请稍后重试。',
       })
@@ -298,7 +298,7 @@ export default function AdminMessagesPage() {
     } catch (err) {
       console.error(err)
       notify({
-        variant: 'error',
+        variant: 'danger',
         title: '删除失败',
         description: err instanceof Error ? err.message : '请稍后重试。',
       })

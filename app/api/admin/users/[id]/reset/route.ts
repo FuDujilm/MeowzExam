@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 import { createAuditLog } from '@/lib/audit'
+import { Prisma } from '@/lib/generated/prisma'
 
 type RouteParams = {
   params: Promise<{
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
   const resetQuota = payload?.resetQuota === false ? false : true
   const reactivate = payload?.reactivate === false ? false : true
 
-  const userUpdateData: Partial<ResettableUser> = {}
+  const userUpdateData: Prisma.UserUpdateInput = {}
   const applied: string[] = []
 
   if (resetPoints) {
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     applied.push('callsign')
   }
 
-  const operations: Array<Promise<ResettableUser | null>> = []
+  const operations: Prisma.PrismaPromise<any>[] = []
 
   if (Object.keys(userUpdateData).length > 0) {
     operations.push(
@@ -179,7 +180,11 @@ export async function POST(request: NextRequest, context: RouteParams) {
     )
   }
 
-  const [updatedUser] = await prisma.$transaction(operations)
+  const [userResult] = await prisma.$transaction(operations)
+  const updatedUser = userResult as ResettableUser | null
+  if (!updatedUser) {
+    return NextResponse.json({ error: '用户不存在' }, { status: 404 })
+  }
 
   await createAuditLog({
     userId: adminCheck.user?.id,

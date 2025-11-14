@@ -31,6 +31,8 @@ const CATEGORY_OPTIONS = [
   { value: '其他', label: '其他反馈' },
 ] as const
 
+type CategoryValue = (typeof CATEGORY_OPTIONS)[number]['value']
+
 type FeedbackDialogProps = {
   className?: string
   buttonProps?: ComponentProps<typeof Button>
@@ -42,7 +44,7 @@ export function FeedbackDialog({ className, buttonProps }: FeedbackDialogProps) 
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [subject, setSubject] = useState('')
-  const [category, setCategory] = useState<(typeof CATEGORY_OPTIONS)[number]['value']>('题库问题')
+  const [category, setCategory] = useState<CategoryValue>('题库问题')
   const [message, setMessage] = useState('')
   const [email, setEmail] = useState('')
 
@@ -158,7 +160,7 @@ export function FeedbackDialog({ className, buttonProps }: FeedbackDialogProps) 
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-200">问题分类</label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category} onValueChange={(value) => setCategory(value as CategoryValue)}>
                 <SelectTrigger>
                   <SelectValue placeholder="选择反馈分类" />
                 </SelectTrigger>

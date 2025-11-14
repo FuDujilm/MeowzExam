@@ -8,6 +8,8 @@ import { getLibraryForUser } from '@/lib/question-library-service'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
 
+type QuestionWithOptions = Prisma.QuestionGetPayload<Prisma.QuestionDefaultArgs>
+
 function normalizeLibraryCode(value: string | null): string | null {
   return value ? value.trim().toUpperCase() : null
 }
@@ -37,11 +39,7 @@ function combineWhereConditions(
   return { AND: filtered }
 }
 
-function shuffleOptions(question: Prisma.QuestionGetPayload<{
-  include: {
-    options: false
-  }
-}> & { options: any }) {
+function shuffleOptions(question: QuestionWithOptions) {
   let shuffledOptions = question.options
   const answerMapping: Record<string, string> = {}
 
@@ -107,7 +105,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '用户不存在。' }, { status: 404 })
     }
 
-    let question: any = null
+    let question: QuestionWithOptions | null = null
 
     switch (mode) {
       case 'sequential': {

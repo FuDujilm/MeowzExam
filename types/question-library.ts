@@ -43,6 +43,9 @@ export interface QuestionItem {
   hasImage?: boolean
   imagePath?: string | null
   imageAlt?: string | null
+  sourceId?: string | null
+  pageSection?: string | null
+  originalAnswer?: string | null
   picture?: string | null
   pictureAlt?: string | null
   metadata?: QuestionMetadata

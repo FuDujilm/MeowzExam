@@ -124,9 +124,12 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     return NextResponse.json({ error: '用户不存在' }, { status: 404 })
   }
 
-  let payload: UpdatePayload | undefined
+  let payload: UpdatePayload = {}
   try {
-    payload = await request.json()
+    const json = await request.json()
+    if (json && typeof json === 'object') {
+      payload = json as UpdatePayload
+    }
   } catch {
     payload = {}
   }

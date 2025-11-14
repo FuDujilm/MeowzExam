@@ -9,12 +9,12 @@ const appUrl =
 const oauthBaseUrl =
   process.env.OAUTH_BASE_URL ?? process.env.NEXT_PUBLIC_OAUTH_BASE_URL;
 
-type RemotePattern =
-  NonNullable<NextConfig["images"]> extends { remotePatterns: infer R }
-    ? R extends readonly any[]
-      ? R[number]
-      : never
-    : never;
+type RemotePattern = {
+  protocol?: "http" | "https"
+  hostname: string
+  port?: string
+  pathname: string
+}
 
 const remotePatterns: RemotePattern[] = [];
 

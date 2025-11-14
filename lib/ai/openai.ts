@@ -1,6 +1,6 @@
 import OpenAI from "openai"
 import type { ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam } from "openai/resources/chat/completions"
-import type { AiModelGroup, AiModelUsageScope } from "@prisma/client"
+import type { AiModelGroup, AiModelUsageScope } from "@/lib/generated/prisma"
 import { ZodError } from "zod"
 
 import { prisma } from "@/lib/db"

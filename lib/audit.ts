@@ -7,6 +7,10 @@ export type AuditAction =
   | 'MANUAL_EXPLANATION_UPDATED'
   | 'QUESTIONS_IMPORTED'
   | 'QUESTIONS_IMPORT_ERROR'
+  | 'QUESTION_LIBRARY_IMPORTED'
+  | 'QUESTION_LIBRARY_IMPORT_ERROR'
+  | 'USER_ADMIN_RESET'
+  | 'USER_ADMIN_UPDATED'
 
 type AuditDetails = Record<string, unknown>
 

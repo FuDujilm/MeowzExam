@@ -33,9 +33,10 @@ export function SiteFooter() {
           setProgramInfo(data)
           setError(null)
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (active) {
-          setError(err?.message ?? '程序信息暂不可用')
+          const message = err instanceof Error ? err.message : '程序信息暂不可用'
+          setError(message)
         }
       } finally {
         if (active) {

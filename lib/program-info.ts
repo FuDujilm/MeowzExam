@@ -233,7 +233,7 @@ function sanitiseMetadata(raw: Record<string, string | undefined>): ProgramMetad
 export async function getProgramInfo(): Promise<ProgramInfo> {
   const raw = await readRawProgramInfo()
   const metadata = sanitiseMetadata(raw.programInfo.metadata ?? {})
-  const documentsRaw = raw.programInfo.documents ?? {}
+  const documentsRaw = (raw.programInfo.documents ?? {}) as Record<string, RawDocument>
 
   const terms = normaliseDocument(documentsRaw.termsOfService, 'markdown')
   const privacy = normaliseDocument(documentsRaw.privacyPolicy, 'markdown')
@@ -254,10 +254,13 @@ export async function updateProgramInfo(update: ProgramInfoUpdate): Promise<Prog
   const raw = await readRawProgramInfo()
 
   const metadataRaw = raw.programInfo.metadata ?? {}
-  const documentsRaw = raw.programInfo.documents ?? {}
+  const documentsRaw = (raw.programInfo.documents ?? {}) as Record<string, RawDocument>
 
-  const nextMetadata: Record<string, string> = {
-    ...metadataRaw,
+  const nextMetadata: Record<string, string> = {}
+  for (const [key, value] of Object.entries(metadataRaw)) {
+    if (typeof value === 'string') {
+      nextMetadata[key] = value
+    }
   }
 
   if (update.metadata) {

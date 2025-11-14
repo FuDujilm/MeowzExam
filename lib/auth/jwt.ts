@@ -24,10 +24,13 @@ type DecodedToken = {
 export function verifyToken(token: string): AuthUser | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken
+    if (!decoded?.id || !decoded?.email) {
+      return null
+    }
     return {
       id: decoded.id,
       email: decoded.email,
-      callsign: decoded.callsign,
+      callsign: decoded.callsign ?? undefined,
     }
   } catch (error) {
     return null
