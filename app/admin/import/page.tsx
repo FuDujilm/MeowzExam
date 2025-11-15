@@ -15,8 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { useNotification } from '@/components/ui/notification-provider'
-import type { QuestionLibraryFileInfo } from '@/types/question-library'
+import type {
+  ExamPresetMetadata,
+  QuestionLibraryFileInfo,
+} from '@/types/question-library'
 import {
   AlertCircle,
   CheckCircle2,
@@ -43,6 +48,7 @@ interface ExamPresetSummary {
   singleChoiceCount: number
   multipleChoiceCount: number
   trueFalseCount: number
+  metadata?: ExamPresetMetadata | null
 }
 
 interface LibrarySummary {
@@ -88,6 +94,24 @@ interface ImportOutcome {
   stats: ImportStats
   warnings?: string[]
   library?: LibrarySummary
+}
+
+interface TagSummaryItem {
+  tag: string
+  total: number
+  singleChoiceCount: number
+  multipleChoiceCount: number
+  trueFalseCount: number
+}
+
+interface LibraryTagSummary {
+  tags: TagSummaryItem[]
+  imageSummary: {
+    total: number
+    singleChoiceCount: number
+    multipleChoiceCount: number
+    trueFalseCount: number
+  }
 }
 
 const VISIBILITY_LABELS: Record<string, string> = {
@@ -140,6 +164,18 @@ const EMPTY_PRESET_ROW: PresetFormRow = {
   singleChoiceCount: '32',
   multipleChoiceCount: '8',
   trueFalseCount: '0',
+  strategyMode: 'RANDOM',
+  strategyOrder: 'FIXED',
+  tagRules: [],
+}
+
+type TagRuleFormRow = {
+  id: string
+  label: string
+  tagsInput: string
+  count: string
+  questionType: 'single_choice' | 'multiple_choice' | 'true_false' | 'any'
+  requireImage: boolean
 }
 
 type PresetFormRow = {
@@ -153,6 +189,38 @@ type PresetFormRow = {
   singleChoiceCount: string
   multipleChoiceCount: string
   trueFalseCount: string
+  strategyMode: 'TAG_RULES' | 'RANDOM'
+  strategyOrder: 'FIXED' | 'SHUFFLE'
+  tagRules: TagRuleFormRow[]
+}
+
+const EMPTY_IMAGE_SUMMARY = {
+  total: 0,
+  singleChoiceCount: 0,
+  multipleChoiceCount: 0,
+  trueFalseCount: 0,
+}
+
+function createRuleId() {
+  return `RULE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function createEmptyTagRule(): TagRuleFormRow {
+  return {
+    id: createRuleId(),
+    label: '',
+    tagsInput: '',
+    count: '1',
+    questionType: 'any',
+    requireImage: false,
+  }
+}
+
+function parseTagInput(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 function formatBytes(size: number) {
@@ -185,6 +253,9 @@ export default function AdminQuestionLibraryPage() {
   const [presetFormRows, setPresetFormRows] = useState<PresetFormRow[]>([])
   const [presetSaving, setPresetSaving] = useState(false)
   const [presetError, setPresetError] = useState<string | null>(null)
+  const [tagSummaries, setTagSummaries] = useState<Record<string, LibraryTagSummary>>({})
+  const [tagSummaryLoading, setTagSummaryLoading] = useState(false)
+  const [tagSummaryError, setTagSummaryError] = useState<string | null>(null)
   const [fileDialogOpen, setFileDialogOpen] = useState(false)
   const [fileDialogLibrary, setFileDialogLibrary] = useState<LibrarySummary | null>(null)
   const [libraryFiles, setLibraryFiles] = useState<QuestionLibraryFileInfo[]>([])
@@ -349,18 +420,70 @@ export default function AdminQuestionLibraryPage() {
     if (library.presets.length === 0) {
       return [{ ...EMPTY_PRESET_ROW }]
     }
-    return library.presets.map((preset) => ({
-      id: preset.id,
-      code: preset.code,
-      name: preset.name,
-      description: preset.description ?? '',
-      durationMinutes: String(preset.durationMinutes),
-      totalQuestions: String(preset.totalQuestions),
-      passScore: String(preset.passScore),
-      singleChoiceCount: String(preset.singleChoiceCount),
-      multipleChoiceCount: String(preset.multipleChoiceCount),
-      trueFalseCount: String(preset.trueFalseCount ?? 0),
-    }))
+    return library.presets.map((preset) => {
+      const strategy = preset.metadata?.questionStrategy
+      const tagRules = Array.isArray(strategy?.rules)
+        ? strategy!.rules.map((rule) => ({
+            id: rule.id || createRuleId(),
+            label: rule.label ?? '',
+            tagsInput: Array.isArray(rule.tags) ? rule.tags.join(', ') : '',
+            count: String(rule.count ?? ''),
+            questionType:
+              (rule.questionType as TagRuleFormRow['questionType']) ?? 'any',
+            requireImage: Boolean(rule.requireImage),
+          }))
+        : []
+      const usesTagRules = strategy?.mode === 'TAG_RULES' && tagRules.length > 0
+      return {
+        id: preset.id,
+        code: preset.code,
+        name: preset.name,
+        description: preset.description ?? '',
+        durationMinutes: String(preset.durationMinutes),
+        totalQuestions: String(preset.totalQuestions),
+        passScore: String(preset.passScore),
+        singleChoiceCount: String(preset.singleChoiceCount),
+        multipleChoiceCount: String(preset.multipleChoiceCount),
+        trueFalseCount: String(preset.trueFalseCount ?? 0),
+        strategyMode: usesTagRules ? 'TAG_RULES' : 'RANDOM',
+        strategyOrder: strategy?.order === 'SHUFFLE' ? 'SHUFFLE' : 'FIXED',
+        tagRules,
+      }
+    })
+  }
+
+  const loadTagSummary = async (libraryId: string) => {
+    if (tagSummaries[libraryId]) {
+      setTagSummaryError(null)
+      return
+    }
+    try {
+      setTagSummaryLoading(true)
+      setTagSummaryError(null)
+      const response = await fetch(
+        `/api/admin/question-libraries/${libraryId}/tag-summary`,
+        { cache: 'no-store' },
+      )
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || '无法加载标签统计。')
+      }
+      const summary: LibraryTagSummary = {
+        tags: Array.isArray(data?.tags) ? data.tags : [],
+        imageSummary: data?.imageSummary ?? { ...EMPTY_IMAGE_SUMMARY },
+      }
+      setTagSummaries((prev) => ({ ...prev, [libraryId]: summary }))
+    } catch (error: any) {
+      const message = error?.message || '无法加载标签统计。'
+      setTagSummaryError(message)
+      notify({
+        variant: 'danger',
+        title: '加载标签统计失败',
+        description: message,
+      })
+    } finally {
+      setTagSummaryLoading(false)
+    }
   }
 
   const openPresetDialog = (library: LibrarySummary) => {
@@ -368,6 +491,7 @@ export default function AdminQuestionLibraryPage() {
     setPresetFormRows(buildPresetRows(library))
     setPresetError(null)
     setPresetDialogOpen(true)
+    void loadTagSummary(library.id)
   }
 
   const closePresetDialog = () => {
@@ -376,11 +500,64 @@ export default function AdminQuestionLibraryPage() {
     setPresetDialogLibrary(null)
     setPresetFormRows([])
     setPresetError(null)
+    setTagSummaryError(null)
   }
 
   const handlePresetRowChange = (index: number, key: keyof PresetFormRow, value: string) => {
     setPresetFormRows((rows) =>
       rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)),
+    )
+  }
+
+  const handleStrategyModeChange = (index: number, enabled: boolean) => {
+    setPresetFormRows((rows) =>
+      rows.map((row, rowIndex) => {
+        if (rowIndex !== index) return row
+        const strategyMode = enabled ? 'TAG_RULES' : 'RANDOM'
+        const tagRules = enabled && row.tagRules.length === 0 ? [createEmptyTagRule()] : row.tagRules
+        return { ...row, strategyMode, tagRules }
+      }),
+    )
+  }
+
+  const handleStrategyOrderChange = (index: number, order: 'FIXED' | 'SHUFFLE') => {
+    setPresetFormRows((rows) =>
+      rows.map((row, rowIndex) => (rowIndex === index ? { ...row, strategyOrder: order } : row)),
+    )
+  }
+
+  const handleTagRuleChange = (
+    presetIndex: number,
+    ruleIndex: number,
+    key: keyof TagRuleFormRow,
+    value: string | boolean,
+  ) => {
+    setPresetFormRows((rows) =>
+      rows.map((row, rowIdx) => {
+        if (rowIdx !== presetIndex) return row
+        const updatedRules = row.tagRules.map((rule, idx) =>
+          idx === ruleIndex ? { ...rule, [key]: value } : rule,
+        )
+        return { ...row, tagRules: updatedRules }
+      }),
+    )
+  }
+
+  const addTagRuleRow = (index: number) => {
+    setPresetFormRows((rows) =>
+      rows.map((row, rowIdx) =>
+        rowIdx === index ? { ...row, tagRules: [...row.tagRules, createEmptyTagRule()] } : row,
+      ),
+    )
+  }
+
+  const removeTagRuleRow = (presetIndex: number, ruleIndex: number) => {
+    setPresetFormRows((rows) =>
+      rows.map((row, rowIdx) => {
+        if (rowIdx !== presetIndex) return row
+        const nextRules = row.tagRules.filter((_, idx) => idx !== ruleIndex)
+        return { ...row, tagRules: nextRules }
+      }),
     )
   }
 
@@ -425,17 +602,63 @@ export default function AdminQuestionLibraryPage() {
         if (!name) {
           throw new Error(`第 ${index + 1} 个预设缺少名称。`)
         }
+        const normalizedRules = row.tagRules
+          .map((rule, ruleIndex) => {
+            const countValue = normalizeNumber(
+              rule.count,
+              `第 ${index + 1} 个预设的标签规则 ${ruleIndex + 1} 题量`,
+            )
+            const tags = parseTagInput(rule.tagsInput)
+            const label = rule.label.trim()
+            if (!tags.length && !rule.requireImage) {
+              throw new Error(
+                `第 ${index + 1} 个预设的标签规则 ${ruleIndex + 1} 至少需要设置标签或启用仅图片题。`,
+              )
+            }
+            return {
+              id: rule.id || createRuleId(),
+              label: label || undefined,
+              tags: tags.length ? tags : undefined,
+              count: countValue,
+              questionType: rule.questionType ?? 'any',
+              requireImage: Boolean(rule.requireImage),
+            }
+          })
+          .filter((rule) => rule.count > 0)
+
+        const usesTagRules = row.strategyMode === 'TAG_RULES'
+        if (usesTagRules && normalizedRules.length === 0) {
+          throw new Error(`第 ${index + 1} 个预设启用了标签抽题，但尚未添加规则。`)
+        }
+
+        const totalRuleQuestions = normalizedRules.reduce((sum, rule) => sum + rule.count, 0)
+        const targetTotal = normalizeNumber(row.totalQuestions, '题目数量')
+        if (usesTagRules && totalRuleQuestions > targetTotal) {
+          throw new Error(`第 ${index + 1} 个预设的标签规则题量之和超过总题量。`)
+        }
+
+        const metadata = usesTagRules
+          ? {
+              questionStrategy: {
+                mode: 'TAG_RULES' as const,
+                order: row.strategyOrder === 'SHUFFLE' ? 'SHUFFLE' : 'FIXED',
+                rules: normalizedRules,
+              },
+            }
+          : null
+
         return {
           id: row.id,
           code,
           name,
           description: row.description.trim() || null,
           durationMinutes: normalizeNumber(row.durationMinutes, '考试时长'),
-          totalQuestions: normalizeNumber(row.totalQuestions, '题目数量'),
+          totalQuestions: targetTotal,
           passScore: normalizeNumber(row.passScore, '及格分'),
           singleChoiceCount: normalizeNumber(row.singleChoiceCount, '单选题数量'),
           multipleChoiceCount: normalizeNumber(row.multipleChoiceCount, '多选题数量'),
           trueFalseCount: normalizeNumber(row.trueFalseCount, '判断题数量', { allowZero: true }),
+          metadata,
         }
       })
 
@@ -581,9 +804,14 @@ export default function AdminQuestionLibraryPage() {
         {presets.map((preset) => (
           <span
             key={preset.code}
-            className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+            className="inline-flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
           >
             {preset.name} · {preset.totalQuestions}题/{preset.durationMinutes}分钟
+            {preset.metadata?.questionStrategy?.mode === 'TAG_RULES' && (
+              <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-500/20 dark:text-purple-200">
+                标签抽题
+              </span>
+            )}
           </span>
         ))}
       </div>
@@ -932,122 +1160,304 @@ export default function AdminQuestionLibraryPage() {
         )}
 
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-          {presetFormRows.map((row, index) => (
-            <div
-              key={row.id ?? `${row.code}-${index}`}
-              className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  考试预设 #{index + 1}
-                </p>
-                {presetFormRows.length > 1 && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => removePresetRow(index)}
-                    className="text-red-600 hover:text-red-500"
-                  >
-                    删除
-                  </Button>
-                )}
+          {presetFormRows.map((row, index) => {
+            const activeSummary = presetDialogLibrary
+              ? tagSummaries[presetDialogLibrary.id]
+              : undefined
+            const imageSummary = activeSummary?.imageSummary ?? EMPTY_IMAGE_SUMMARY
+            return (
+              <div
+                key={row.id ?? `${row.code}-${index}`}
+                className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    考试预设 #{index + 1}
+                  </p>
+                  {presetFormRows.length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => removePresetRow(index)}
+                      className="text-red-600 hover:text-red-500"
+                    >
+                      删除
+                    </Button>
+                  )}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>预设代码</Label>
+                    <Input
+                      value={row.code}
+                      placeholder="例如：A_STANDARD"
+                      onChange={(event) => handlePresetRowChange(index, 'code', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>预设名称</Label>
+                    <Input
+                      value={row.name}
+                      placeholder="例如：A类标准考试"
+                      onChange={(event) => handlePresetRowChange(index, 'name', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label>简介</Label>
+                    <Input
+                      value={row.description}
+                      placeholder="可选，说明考试结构或说明"
+                      onChange={(event) =>
+                        handlePresetRowChange(index, 'description', event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>考试时长（分钟）</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={row.durationMinutes}
+                      onChange={(event) =>
+                        handlePresetRowChange(index, 'durationMinutes', event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>题目数量</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={row.totalQuestions}
+                      onChange={(event) =>
+                        handlePresetRowChange(index, 'totalQuestions', event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>及格分数</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={row.passScore}
+                      onChange={(event) =>
+                        handlePresetRowChange(index, 'passScore', event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>单选题数量</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={row.singleChoiceCount}
+                      onChange={(event) =>
+                        handlePresetRowChange(index, 'singleChoiceCount', event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>多选题数量</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={row.multipleChoiceCount}
+                      onChange={(event) =>
+                        handlePresetRowChange(index, 'multipleChoiceCount', event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>判断题数量</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={row.trueFalseCount}
+                      onChange={(event) =>
+                        handlePresetRowChange(index, 'trueFalseCount', event.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-slate-200/80 bg-white/90 p-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-medium">标签抽题与题序</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        为关键标签设定题量与顺序，可将识图题单独抽取或混排。
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span>{row.strategyMode === 'TAG_RULES' ? '已启用' : '未启用'}</span>
+                      <Switch
+                        checked={row.strategyMode === 'TAG_RULES'}
+                        onCheckedChange={(checked) => handleStrategyModeChange(index, checked)}
+                      />
+                    </div>
+                  </div>
+
+                  {row.strategyMode === 'TAG_RULES' && (
+                    <div className="mt-4 space-y-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400">
+                          抽题顺序
+                        </Label>
+                        <Select
+                          value={row.strategyOrder}
+                          onValueChange={(value) =>
+                            handleStrategyOrderChange(
+                              index,
+                              value === 'SHUFFLE' ? 'SHUFFLE' : 'FIXED',
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择顺序" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="FIXED">按规则顺序编排</SelectItem>
+                            <SelectItem value="SHUFFLE">全部混合随机</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {row.tagRules.map((rule, ruleIndex) => {
+                        const datalistId = `${row.id ?? `preset-${index}`}-rule-${rule.id}`
+                        return (
+                          <div
+                            key={rule.id}
+                            className="rounded-lg border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-700 dark:bg-slate-900/40"
+                          >
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="space-y-1.5">
+                                <Label>匹配标签（可用逗号分隔多个）</Label>
+                                <Input
+                                  value={rule.tagsInput}
+                                  list={activeSummary?.tags?.length ? datalistId : undefined}
+                                  placeholder="例如：法律法规, 无线电基础"
+                                  onChange={(event) =>
+                                    handleTagRuleChange(index, ruleIndex, 'tagsInput', event.target.value)
+                                  }
+                                />
+                                {activeSummary?.tags?.length ? (
+                                  <datalist id={datalistId}>
+                                    {activeSummary.tags.slice(0, 50).map((tag) => (
+                                      <option key={`${datalistId}-${tag.tag}`} value={tag.tag}>
+                                        {tag.tag}（{tag.total} 题）
+                                      </option>
+                                    ))}
+                                  </datalist>
+                                ) : null}
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label>显示名称（可选）</Label>
+                                <Input
+                                  value={rule.label}
+                                  placeholder="例如：法律法规"
+                                  onChange={(event) =>
+                                    handleTagRuleChange(index, ruleIndex, 'label', event.target.value)
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-4">
+                              <div className="space-y-1.5">
+                                <Label>题量</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={rule.count}
+                                  onChange={(event) =>
+                                    handleTagRuleChange(index, ruleIndex, 'count', event.target.value)
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label>题型限制</Label>
+                                <Select
+                                  value={rule.questionType}
+                                  onValueChange={(value) =>
+                                    handleTagRuleChange(
+                                      index,
+                                      ruleIndex,
+                                      'questionType',
+                                      value as TagRuleFormRow['questionType'],
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="不限题型" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="any">不限题型</SelectItem>
+                                    <SelectItem value="single_choice">仅单选</SelectItem>
+                                    <SelectItem value="multiple_choice">仅多选</SelectItem>
+                                    <SelectItem value="true_false">仅判断</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label>仅抽识图题</Label>
+                                <div className="flex items-center gap-3 rounded-md border border-slate-200/80 px-3 py-2 dark:border-slate-700">
+                                  <Switch
+                                    checked={rule.requireImage}
+                                    onCheckedChange={(checked) =>
+                                      handleTagRuleChange(index, ruleIndex, 'requireImage', checked)
+                                    }
+                                  />
+                                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                                    仅抽取含图片题目
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-end justify-end">
+                                {row.tagRules.length > 1 && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-600 hover:text-red-500"
+                                    onClick={() => removeTagRuleRow(index, ruleIndex)}
+                                  >
+                                    <Trash2 className="h-4 w-4" /> 删除
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => addTagRuleRow(index)}
+                        className="inline-flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" /> 添加标签规则
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="mt-4 rounded-md border border-dashed border-slate-200/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    {tagSummaryLoading ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> 标签统计加载中…
+                      </span>
+                    ) : tagSummaryError ? (
+                      <span>标签统计加载失败：{tagSummaryError}</span>
+                    ) : activeSummary?.tags?.length ? (
+                      <span>
+                        常见标签：{activeSummary.tags.slice(0, 5).map((tag) => `${tag.tag}（${tag.total}）`).join('、')}。 识图题 {imageSummary.total} 题，其中单选 {imageSummary.singleChoiceCount}、多选 {imageSummary.multipleChoiceCount}、判断 {imageSummary.trueFalseCount}。
+                      </span>
+                    ) : (
+                      <span>暂未检测到标签，导入题库时可为题目附加 tags 字段以启用此功能。</span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>预设代码</Label>
-                  <Input
-                    value={row.code}
-                    placeholder="例如：A_STANDARD"
-                    onChange={(event) => handlePresetRowChange(index, 'code', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>预设名称</Label>
-                  <Input
-                    value={row.name}
-                    placeholder="例如：A类标准考试"
-                    onChange={(event) => handlePresetRowChange(index, 'name', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label>简介</Label>
-                  <Input
-                    value={row.description}
-                    placeholder="可选，说明考试结构或说明"
-                    onChange={(event) =>
-                      handlePresetRowChange(index, 'description', event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>考试时长（分钟）</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={row.durationMinutes}
-                    onChange={(event) =>
-                      handlePresetRowChange(index, 'durationMinutes', event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>题目数量</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={row.totalQuestions}
-                    onChange={(event) =>
-                      handlePresetRowChange(index, 'totalQuestions', event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>及格分数</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={row.passScore}
-                    onChange={(event) =>
-                      handlePresetRowChange(index, 'passScore', event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>单选题数量</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={row.singleChoiceCount}
-                    onChange={(event) =>
-                      handlePresetRowChange(index, 'singleChoiceCount', event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>多选题数量</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={row.multipleChoiceCount}
-                    onChange={(event) =>
-                      handlePresetRowChange(index, 'multipleChoiceCount', event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>判断题数量</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={row.trueFalseCount}
-                    onChange={(event) =>
-                      handlePresetRowChange(index, 'trueFalseCount', event.target.value)
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
           <Button variant="ghost" onClick={addPresetRow} className="inline-flex items-center gap-2">
             <Plus className="h-4 w-4" />
             新增考试预设

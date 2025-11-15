@@ -1,14 +1,21 @@
-import type { SiteMessage, SiteMessageLevel, SiteMessageReceipt } from '@/lib/generated/prisma'
+import type {
+  SiteMessage,
+  SiteMessageAudience,
+  SiteMessageLevel,
+  SiteMessageReceipt,
+} from '@/lib/generated/prisma'
 
+import { isAdminEmail } from '@/lib/auth/admin'
 import { prisma } from '@/lib/db'
 
-export type { SiteMessageLevel }
+export type { SiteMessageAudience, SiteMessageLevel }
 
 export interface SiteMessagePayload {
   id: string
   title: string
   content: string
   level: SiteMessageLevel
+  audience: SiteMessageAudience
   publishedAt: string
   expiresAt: string | null
   emailSentAt: string | null
@@ -40,6 +47,7 @@ export function serializeSiteMessage(
     title: record.title,
     content: record.content,
     level: record.level,
+    audience: record.audience,
     publishedAt: record.publishedAt.toISOString(),
     expiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
     emailSentAt: record.emailSentAt ? record.emailSentAt.toISOString() : null,
@@ -61,13 +69,26 @@ export async function listSiteMessagesForUser(
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 100)
   const includeExpired = Boolean(options.includeExpired)
 
-  const messageConditions = includeExpired
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  })
+  const isAdmin = user?.email ? isAdminEmail(user.email) : false
+
+  const baseConditions = includeExpired
     ? {
         publishedAt: { lte: now },
       }
     : {
         publishedAt: { lte: now },
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      }
+
+  const messageConditions = isAdmin
+    ? baseConditions
+    : {
+        ...baseConditions,
+        audience: 'ALL' as SiteMessageAudience,
       }
 
   const records = await prisma.siteMessage.findMany({
@@ -166,6 +187,7 @@ export interface AdminSiteMessagePayload {
   title: string
   content: string
   level: SiteMessageLevel
+  audience: SiteMessageAudience
   publishedAt: string
   expiresAt: string | null
   emailSentAt: string | null
@@ -180,6 +202,7 @@ export function serializeAdminSiteMessage(record: SiteMessage & { createdBy?: { 
     title: record.title,
     content: record.content,
     level: record.level,
+    audience: record.audience,
     publishedAt: record.publishedAt.toISOString(),
     expiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
     emailSentAt: record.emailSentAt ? record.emailSentAt.toISOString() : null,
@@ -189,7 +212,9 @@ export function serializeAdminSiteMessage(record: SiteMessage & { createdBy?: { 
   }
 }
 
-export async function listNotificationRecipients(): Promise<string[]> {
+export async function listNotificationRecipients(
+  audience: SiteMessageAudience = 'ALL'
+): Promise<string[]> {
   const users = await prisma.user.findMany({
     where: {
       emailVerified: { not: null },
@@ -197,5 +222,9 @@ export async function listNotificationRecipients(): Promise<string[]> {
     select: { email: true },
   })
 
-  return users.map((user) => user.email!).filter((email) => !!email)
+  const emails = users.map((user) => user.email!).filter((email) => !!email)
+  if (audience === 'ADMIN_ONLY') {
+    return emails.filter((email) => isAdminEmail(email))
+  }
+  return emails
 }

@@ -21,6 +21,7 @@ interface UserSettings {
   examType?: string
   aiStylePresetId: string | null
   aiStyleCustom: string
+  examQuestionPreference: 'SYSTEM_PRESET' | 'FULL_RANDOM'
 }
 
 interface StylePresetOption {
@@ -42,6 +43,7 @@ export default function SettingsPage() {
     examType: 'A_CLASS',
     aiStylePresetId: null,
     aiStyleCustom: '',
+    examQuestionPreference: 'SYSTEM_PRESET',
   })
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -74,6 +76,7 @@ export default function SettingsPage() {
           examType: data.settings?.examType || 'A_CLASS',
           aiStylePresetId: data.settings?.aiStylePresetId ?? null,
           aiStyleCustom: data.settings?.aiStyleCustom ?? '',
+          examQuestionPreference: data.settings?.examQuestionPreference || 'SYSTEM_PRESET',
         })
       }
     } catch (error) {
@@ -110,6 +113,7 @@ export default function SettingsPage() {
           examType: settings.examType,
           aiStylePresetId: settings.aiStylePresetId,
           aiStyleCustom: settings.aiStyleCustom,
+          examQuestionPreference: settings.examQuestionPreference,
         }),
       })
 
@@ -257,6 +261,30 @@ export default function SettingsPage() {
                 <option value="dark">暗黑</option>
                 <option value="system">跟随系统</option>
               </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>模拟考试出题偏好</Label>
+              <Select
+                value={settings.examQuestionPreference}
+                onValueChange={(value) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    examQuestionPreference: value as 'SYSTEM_PRESET' | 'FULL_RANDOM',
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择出题方式" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SYSTEM_PRESET">遵循系统预设与标签编排</SelectItem>
+                  <SelectItem value="FULL_RANDOM">完全随机，从题库平均抽题</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                系统预设会遵循管理员配置的标签题量与顺序；完全随机则忽略预设，纯随机抽题。
+              </p>
             </div>
           </CardContent>
         </Card>

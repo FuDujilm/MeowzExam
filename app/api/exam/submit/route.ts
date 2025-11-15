@@ -64,19 +64,48 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const sortedExamQuestions = [...examResult.exam.examQuestions].sort(
+      (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0),
+    )
+
     let correctCount = 0
     let wrongCount = 0
     const questionResults: any[] = []
     const wrongQuestionIds: string[] = []
 
-    for (const examQuestion of examResult.exam.examQuestions) {
+    for (const examQuestion of sortedExamQuestions) {
       const question = examQuestion.question
       const userAnswer = answers[question.id] || []
       const correctAnswers = question.correctAnswers as string[]
 
-      const mapping = answerMappings?.[question.id] || {}
+      const mapping = (answerMappings?.[question.id] || {}) as Record<string, string>
+      const reverseMapping: Record<string, string> = Object.fromEntries(
+        Object.entries(mapping).map(([newId, originalId]) => [originalId, newId]),
+      )
+      const displayCorrectAnswers = correctAnswers.map(
+        (ans) => reverseMapping[ans] || ans,
+      )
       const userAnswerArray = Array.isArray(userAnswer) ? userAnswer : [userAnswer]
       const originalUserAnswer = userAnswerArray.map((ans) => mapping[ans] || ans)
+
+      const originalOptions = Array.isArray(question.options) ? (question.options as any[]) : []
+      const optionLookup = Object.fromEntries(
+        originalOptions.map((opt: any) => [opt.id, { id: opt.id, text: opt.text }]),
+      )
+      const displayOptions =
+        Object.keys(mapping).length > 0
+          ? Object.entries(mapping)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([displayId, originalId]) => ({
+                id: displayId,
+                originalId,
+                text: optionLookup[originalId]?.text ?? optionLookup[displayId]?.text ?? '',
+              }))
+          : originalOptions.map((opt: any) => ({
+              id: opt.id,
+              originalId: opt.id,
+              text: opt.text,
+            }))
 
       const isCorrect =
         correctAnswers.length === originalUserAnswer.length &&
@@ -91,11 +120,21 @@ export async function POST(request: NextRequest) {
 
       questionResults.push({
         questionId: question.id,
+        questionNumber: examQuestion.orderIndex,
         externalId: question.externalId,
         title: question.title,
+        questionType: question.questionType,
+        difficulty: question.difficulty,
+        category: question.category,
+        categoryCode: question.categoryCode,
+        hasImage: question.hasImage,
+        imagePath: question.imagePath,
+        imageAlt: question.imageAlt,
         userAnswer: userAnswerArray,
         originalUserAnswer,
-        correctAnswers,
+        correctAnswers: displayCorrectAnswers,
+        originalCorrectAnswers: correctAnswers,
+        options: displayOptions,
         isCorrect,
         explanation: question.explanation,
         aiExplanation: question.aiExplanation,

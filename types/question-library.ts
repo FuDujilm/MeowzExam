@@ -28,6 +28,26 @@ export interface QuestionMetadata {
 
 export type QuestionKind = 'single_choice' | 'multiple_choice' | 'true_false'
 
+export type ExamPresetTagRule = {
+  id: string
+  label?: string | null
+  tags?: string[]
+  count: number
+  questionType?: QuestionKind | 'any'
+  requireImage?: boolean
+}
+
+export type ExamPresetQuestionStrategy = {
+  mode: 'TAG_RULES' | 'RANDOM'
+  order: 'FIXED' | 'SHUFFLE'
+  rules: ExamPresetTagRule[]
+}
+
+export type ExamPresetMetadata = {
+  questionStrategy?: ExamPresetQuestionStrategy
+  [key: string]: unknown
+}
+
 export interface QuestionItem {
   uuid?: string
   id?: string
@@ -83,7 +103,7 @@ export interface ExamPresetDefinition {
   singleChoiceCount: number
   multipleChoiceCount: number
   trueFalseCount?: number
-  metadata?: Record<string, unknown> | null
+  metadata?: ExamPresetMetadata | null
 }
 
 export interface QuestionLibraryImportPayload {

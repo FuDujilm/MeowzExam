@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
+import { normaliseExamPresetMetadata } from '@/lib/question-library-metadata'
+import type { ExamPresetMetadata } from '@/types/question-library'
 
 type PresetInput = {
   id?: string
@@ -13,6 +16,41 @@ type PresetInput = {
   singleChoiceCount: number
   multipleChoiceCount: number
   trueFalseCount?: number
+  metadata?: ExamPresetMetadata | null
+}
+
+type SerializablePreset = Omit<PresetInput, 'metadata'> & {
+  id: string
+  metadata?:
+    | ExamPresetMetadata
+    | Prisma.JsonValue
+    | Prisma.NullTypes.JsonNull
+    | Prisma.NullTypes.DbNull
+    | Prisma.NullTypes.AnyNull
+    | null
+}
+
+function parsePresetMetadata(
+  metadata: SerializablePreset['metadata'],
+): ExamPresetMetadata | null {
+  if (
+    !metadata ||
+    metadata === Prisma.JsonNull ||
+    metadata === Prisma.DbNull ||
+    metadata === Prisma.AnyNull
+  ) {
+    return null
+  }
+
+  if (typeof metadata !== 'object') {
+    return null
+  }
+
+  if (Array.isArray(metadata)) {
+    return null
+  }
+
+  return metadata as ExamPresetMetadata
 }
 
 function normalizePreset(input: PresetInput, index: number) {
@@ -47,10 +85,11 @@ function normalizePreset(input: PresetInput, index: number) {
     singleChoiceCount: ensurePositive(input.singleChoiceCount, '单选题数量', true),
     multipleChoiceCount: ensurePositive(input.multipleChoiceCount, '多选题数量', true),
     trueFalseCount: ensurePositive(input.trueFalseCount ?? 0, '判断题数量', true),
+    metadata: normaliseExamPresetMetadata(input.metadata),
   }
 }
 
-function serializePreset(preset: PresetInput & { id: string }) {
+function serializePreset(preset: SerializablePreset) {
   return {
     id: preset.id,
     code: preset.code,
@@ -62,6 +101,7 @@ function serializePreset(preset: PresetInput & { id: string }) {
     singleChoiceCount: preset.singleChoiceCount,
     multipleChoiceCount: preset.multipleChoiceCount,
     trueFalseCount: preset.trueFalseCount ?? 0,
+    metadata: parsePresetMetadata(preset.metadata),
   }
 }
 
@@ -116,38 +156,44 @@ export async function PATCH(
       const keepIds = new Set<string>()
       const updatedPresets = []
       for (const preset of normalized) {
-        if (preset.id && existingById.has(preset.id)) {
-          const updated = await tx.questionLibraryExamPreset.update({
-            where: { id: preset.id },
-            data: {
-              code: preset.code,
-              name: preset.name,
-              description: preset.description,
-              durationMinutes: preset.durationMinutes,
-              totalQuestions: preset.totalQuestions,
-              passScore: preset.passScore,
-              singleChoiceCount: preset.singleChoiceCount,
-              multipleChoiceCount: preset.multipleChoiceCount,
-              trueFalseCount: preset.trueFalseCount ?? 0,
-            },
-          })
+          if (preset.id && existingById.has(preset.id)) {
+            const updated = await tx.questionLibraryExamPreset.update({
+              where: { id: preset.id },
+              data: {
+                code: preset.code,
+                name: preset.name,
+                description: preset.description,
+                durationMinutes: preset.durationMinutes,
+                totalQuestions: preset.totalQuestions,
+                passScore: preset.passScore,
+                singleChoiceCount: preset.singleChoiceCount,
+                multipleChoiceCount: preset.multipleChoiceCount,
+                trueFalseCount: preset.trueFalseCount ?? 0,
+                metadata: preset.metadata
+                  ? (preset.metadata as unknown as Prisma.InputJsonValue)
+                  : Prisma.JsonNull,
+              },
+            })
           keepIds.add(updated.id)
           updatedPresets.push(updated)
-        } else {
-          const created = await tx.questionLibraryExamPreset.create({
-            data: {
-              libraryId,
-              code: preset.code,
-              name: preset.name,
-              description: preset.description,
-              durationMinutes: preset.durationMinutes,
-              totalQuestions: preset.totalQuestions,
-              passScore: preset.passScore,
-              singleChoiceCount: preset.singleChoiceCount,
-              multipleChoiceCount: preset.multipleChoiceCount,
-              trueFalseCount: preset.trueFalseCount ?? 0,
-            },
-          })
+          } else {
+            const created = await tx.questionLibraryExamPreset.create({
+              data: {
+                libraryId,
+                code: preset.code,
+                name: preset.name,
+                description: preset.description,
+                durationMinutes: preset.durationMinutes,
+                totalQuestions: preset.totalQuestions,
+                passScore: preset.passScore,
+                singleChoiceCount: preset.singleChoiceCount,
+                multipleChoiceCount: preset.multipleChoiceCount,
+                trueFalseCount: preset.trueFalseCount ?? 0,
+                metadata: preset.metadata
+                  ? (preset.metadata as unknown as Prisma.InputJsonValue)
+                  : Prisma.JsonNull,
+              },
+            })
           keepIds.add(created.id)
           updatedPresets.push(created)
         }

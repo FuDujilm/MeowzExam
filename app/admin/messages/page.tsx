@@ -3,10 +3,10 @@
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, BellRing, Loader2, MailCheck, MessageCircle, Trash } from 'lucide-react'
+import { AlertTriangle, BellRing, Loader2, MailCheck, MessageCircle, ShieldCheck, Users, Trash } from 'lucide-react'
 
 import AdminNav from '@/components/admin/AdminNav'
-import type { AdminSiteMessagePayload, SiteMessageLevel } from '@/lib/site-messages'
+import type { AdminSiteMessagePayload, SiteMessageAudience, SiteMessageLevel } from '@/lib/site-messages'
 import { useNotification } from '@/components/ui/notification-provider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +21,7 @@ interface SiteMessageFormState {
   title: string
   content: string
   level: SiteMessageLevel
+  audience: SiteMessageAudience
   publishedAt: string
   expiresAt: string
   resendEmail: boolean
@@ -52,6 +53,26 @@ const LEVEL_META: Record<
     description: '站内消息 + 邮件 + 强制弹窗确认，用于紧急停机、重大异常等场景。',
     badgeVariant: 'destructive',
     icon: AlertTriangle,
+  },
+}
+
+const AUDIENCE_META: Record<
+  SiteMessageAudience,
+  {
+    label: string
+    description: string
+    icon: typeof Users
+  }
+> = {
+  ALL: {
+    label: '全体用户',
+    description: '所有已注册且邮箱验证通过的用户都会收到此消息。',
+    icon: Users,
+  },
+  ADMIN_ONLY: {
+    label: '仅管理员',
+    description: '只推送给管理员，用于内部通知、反馈处理等。',
+    icon: ShieldCheck,
   },
 }
 
@@ -89,6 +110,7 @@ function mapToForm(message: AdminSiteMessagePayload): SiteMessageFormState {
     title: message.title,
     content: message.content,
     level: message.level,
+    audience: message.audience,
     publishedAt: toInputDate(message.publishedAt),
     expiresAt: toInputDate(message.expiresAt),
     resendEmail: false,
@@ -99,6 +121,7 @@ const EMPTY_FORM: SiteMessageFormState = {
   title: '',
   content: '',
   level: 'NORMAL',
+  audience: 'ALL',
   publishedAt: nowInputValue(),
   expiresAt: '',
   resendEmail: false,
@@ -142,6 +165,7 @@ export default function AdminMessagesPage() {
         hasContent(form.title) ||
         hasContent(form.content) ||
         form.level !== 'NORMAL' ||
+        form.audience !== 'ALL' ||
         hasContent(form.expiresAt)
       )
     }
@@ -153,6 +177,7 @@ export default function AdminMessagesPage() {
       reference.title !== form.title ||
       reference.content !== form.content ||
       reference.level !== form.level ||
+      reference.audience !== form.audience ||
       reference.publishedAt !== form.publishedAt ||
       reference.expiresAt !== form.expiresAt ||
       form.resendEmail
@@ -207,6 +232,13 @@ export default function AdminMessagesPage() {
     }))
   }
 
+  const handleAudienceChange = (value: SiteMessageAudience) => {
+    setForm((prev) => ({
+      ...prev,
+      audience: value,
+    }))
+  }
+
   const handleSubmit = async () => {
     if (!hasContent(form.title) || !hasContent(form.content)) {
       notify({
@@ -223,6 +255,7 @@ export default function AdminMessagesPage() {
         title: form.title.trim(),
         content: form.content.trim(),
         level: form.level,
+        audience: form.audience,
         publishedAt: form.publishedAt || null,
         expiresAt: form.expiresAt || null,
       }
@@ -401,6 +434,43 @@ export default function AdminMessagesPage() {
                   </RadioGroup>
                 </div>
 
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">推送对象</label>
+                  <RadioGroup
+                    value={form.audience}
+                    onValueChange={(value) => handleAudienceChange(value as SiteMessageAudience)}
+                    className="grid gap-3 md:grid-cols-2"
+                  >
+                    {Object.entries(AUDIENCE_META).map(([key, meta]) => {
+                      const Icon = meta.icon
+                      return (
+                        <label
+                          key={key}
+                          className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${
+                            form.audience === key
+                              ? 'border-blue-500 bg-blue-50/60 dark:border-blue-400/80 dark:bg-blue-500/10'
+                              : 'border-gray-200 hover:border-blue-400 dark:border-gray-700 dark:hover:border-blue-400/80'
+                          }`}
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="flex flex-1 flex-col">
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value={key} id={`audience-${key}`} className="mt-0.5" />
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                {meta.label}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{meta.description}</p>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </RadioGroup>
+                  <p className="text-xs text-gray-500">管理员账户始终可以看到所有消息。</p>
+                </div>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-200">生效时间</label>
@@ -424,12 +494,16 @@ export default function AdminMessagesPage() {
 
                 {selectedId ? (
                   <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
-                    <div className="flex flex-col">
+                    <div className="flex flex-col gap-1">
                       <span>
                         创建人：{selectedMessage?.creatorEmail || session?.user?.email || '未知'}
                       </span>
                       <span>
                         最后更新：{formatDisplayDate(selectedMessage?.updatedAt ?? null)}
+                      </span>
+                      <span>
+                        推送对象：
+                        {selectedMessage ? AUDIENCE_META[selectedMessage.audience].label : '未指定'}
                       </span>
                       <span>
                         邮件通知：
@@ -513,6 +587,7 @@ export default function AdminMessagesPage() {
                 ) : (
                   messages.map((message) => {
                     const meta = LEVEL_META[message.level]
+                    const audienceMeta = AUDIENCE_META[message.audience]
                     const isActive = message.id === selectedId
                     return (
                       <button
@@ -524,13 +599,16 @@ export default function AdminMessagesPage() {
                             ? 'border-blue-500 bg-blue-50/70 dark:border-blue-400/80 dark:bg-blue-500/10'
                             : 'border-gray-200 hover:border-blue-400 dark:border-gray-700 dark:hover:border-blue-400/80'
                         }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge variant={meta.badgeVariant}>{meta.label}</Badge>
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                              {message.title}
-                            </span>
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={meta.badgeVariant}>{meta.label}</Badge>
+                              <Badge variant="outline" className="text-[11px]">
+                                {audienceMeta.label}
+                              </Badge>
+                              <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                {message.title}
+                              </span>
                           </div>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
                             {formatDisplayDate(message.publishedAt)}

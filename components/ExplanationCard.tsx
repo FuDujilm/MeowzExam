@@ -163,7 +163,7 @@ export function ExplanationCard({
     return (
       <Card className={`border-2 ${typeColors[type]}`}>
         <CardContent className="pt-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               {typeIcons[type]}
               <span className="font-semibold text-gray-700 dark:text-gray-200">{typeLabels[type]}</span>
@@ -172,7 +172,7 @@ export function ExplanationCard({
               )}
             </div>
             {type !== 'OFFICIAL' && onVote && explanationId && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -248,7 +248,7 @@ export function ExplanationCard({
     return (
       <Card className={`border-2 ${typeColors[type]}`}>
         <CardContent className="pt-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               {typeIcons[type]}
               <span className="font-semibold text-gray-700 dark:text-gray-200">{typeLabels[type]}</span>
@@ -257,7 +257,7 @@ export function ExplanationCard({
               )}
             </div>
             {type !== 'OFFICIAL' && onVote && explanationId && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -332,8 +332,8 @@ export function ExplanationCard({
     <Card className={`border-2 ${typeColors[type]}`}>
       <CardContent className="pt-4 space-y-4">
         {/* 头部 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
             {typeIcons[type]}
             <span className="font-semibold text-gray-700 dark:text-gray-200">{typeLabels[type]}</span>
             {createdBy && (
@@ -346,7 +346,7 @@ export function ExplanationCard({
             )}
           </div>
           {type !== 'OFFICIAL' && onVote && explanationId && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end">
               <Button
                 variant="ghost"
                 size="sm"

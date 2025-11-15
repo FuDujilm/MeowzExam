@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Loader2, PawPrint, RotateCcw, SendHorizonal, Sparkles } from 'lucide-react'
+import { Loader2, RotateCcw, SendHorizonal } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 import { useNotification } from '@/components/ui/notification-provider'
@@ -33,6 +33,18 @@ const MAX_MESSAGE_LENGTH = 1200
 
 const WELCOME_MESSAGE =
   '你好！我是“小助手”，可以回答关于题库、考试准备和系统使用的相关问题。请问有什么可以帮到你？'
+
+const AssistantIcon = ({ className, size = 32 }: { className?: string; size?: number }) => (
+  <img
+    src="/fox.webp"
+    alt="小助手"
+    width={size}
+    height={size}
+    loading="lazy"
+    decoding="async"
+    className={cn('rounded-full object-cover', className)}
+  />
+)
 
 export function AssistantDialog({ className }: { className?: string }) {
   const { data: session, status } = useSession()
@@ -195,9 +207,10 @@ export function AssistantDialog({ className }: { className?: string }) {
             className="shadow-lg shadow-purple-500/20 transition hover:scale-105"
             size="lg"
             variant="secondary"
+            aria-label="打开小助手"
           >
-            <PawPrint className="mr-2 h-5 w-5 text-orange-400" />
-            小助手
+            <AssistantIcon className="h-5 w-5 sm:mr-2" />
+            <span className="hidden sm:inline">小助手</span>
           </Button>
         </DialogTrigger>
         <DialogContent className="flex max-h-[78vh] w-full max-w-2xl flex-col overflow-hidden">
@@ -205,7 +218,7 @@ export function AssistantDialog({ className }: { className?: string }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <DialogTitle className="flex items-center gap-2 text-xl">
-                  <Sparkles className="h-5 w-5 text-purple-500" />
+                  <AssistantIcon className="h-8 w-8" />
                   AI 小助手
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">

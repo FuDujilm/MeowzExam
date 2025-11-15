@@ -288,7 +288,7 @@ export function ExplanationList({
     <div className="space-y-4">
       {/* 操作按钮 */}
       {shouldShowToolbar && (
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2 sm:flex-nowrap">
           {toolbarAIButton}
           {toolbarRegenerateButton}
           {toolbarUserButton}
@@ -310,7 +310,7 @@ export function ExplanationList({
           variant="neutral"
           title="还没有解析内容"
           actions={(
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {renderAIButton({ variant: 'default', label: 'AI 快速生成' })}
               {renderUserButton({ variant: 'outline' })}
             </div>

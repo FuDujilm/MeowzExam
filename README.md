@@ -105,7 +105,6 @@ my-next-app/
 ---
 
 ## 🔐 管理与权限
-- **管理员白名单**：通过 `ADMIN_EMAILS` 控制，可访问 `/admin` 及所有维护接口。
 - **OAuth 登录**：项目默认禁用匿名体验；头像、昵称直接来自 OAuth `userinfo`（详见 `auth.ts`）。
 - **小助手（AI）**：仅登录用户可见，受用户/IP 双重速率限制（`ASSISTANT_RATE_LIMIT_*`）。
 - **站点配置**：通过 `/admin/site` + `/admin/points-config` 动态调整；也可直接编辑数据库配置表。

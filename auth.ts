@@ -4,6 +4,7 @@ import type { Adapter } from "next-auth/adapters"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db"
 import { getUserDisplayName } from "@/lib/users/display-name"
+import "@/lib/network/proxy-fetch"
 
 const oauthBaseUrl =
   process.env.OAUTH_BASE_URL ?? process.env.NEXT_PUBLIC_OAUTH_BASE_URL

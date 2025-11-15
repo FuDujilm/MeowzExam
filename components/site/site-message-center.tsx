@@ -21,6 +21,7 @@ interface SiteMessagePayload {
   title: string
   content: string
   level: SiteMessageLevel
+  audience: 'ALL' | 'ADMIN_ONLY'
   publishedAt: string
   expiresAt: string | null
   emailSentAt: string | null
@@ -250,11 +251,12 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
     return (
       <button
         type="button"
-        className={`relative flex items-center gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm text-gray-500 transition hover:text-blue-600 dark:text-gray-300 ${className ?? ''}`}
+        className={`relative flex items-center gap-0 rounded-md border border-transparent px-3 py-1.5 text-sm text-gray-500 transition hover:text-blue-600 dark:text-gray-300 sm:gap-2 ${className ?? ''}`}
         disabled
+        aria-label="站内消息加载中"
       >
         <Loader2 className="h-4 w-4 animate-spin" />
-        正在加载
+        <span className="hidden sm:inline">正在加载</span>
       </button>
     )
   }
@@ -263,11 +265,12 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
     return (
       <button
         type="button"
-        className={`relative flex items-center gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm text-red-600 transition hover:text-red-500 dark:text-red-400 ${className ?? ''}`}
+        className={`relative flex items-center gap-0 rounded-md border border-transparent px-3 py-1.5 text-sm text-red-600 transition hover:text-red-500 dark:text-red-400 sm:gap-2 ${className ?? ''}`}
         onClick={() => fetchMessages('refresh')}
+        aria-label="站内消息异常，请刷新"
       >
         <AlertTriangle className="h-4 w-4" />
-        站内消息异常
+        <span className="hidden sm:inline">站内消息异常</span>
       </button>
     )
   }
@@ -277,10 +280,11 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`relative flex items-center gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-blue-50 hover:text-blue-600 dark:text-gray-200 dark:hover:bg-blue-500/10 dark:hover:text-blue-200 ${className ?? ''}`}
+        className={`relative flex items-center gap-0 rounded-md border border-transparent px-3 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-blue-50 hover:text-blue-600 dark:text-gray-200 dark:hover:bg-blue-500/10 dark:hover:text-blue-200 sm:gap-2 ${className ?? ''}`}
+        aria-label="查看站内消息"
       >
-        <Bell className="h-4 w-4" />
-        站内消息
+        <Bell className="h-4 w-4 sm:mr-0" />
+        <span className="hidden sm:inline">站内消息</span>
         {unreadCount > 0 ? (
           <span className="absolute right-2 top-1 h-2 w-2 rounded-full bg-red-500" />
         ) : null}

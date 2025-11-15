@@ -586,21 +586,23 @@ function PracticeContent() {
       </Card>
 
       {/* 操作按钮 */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Button
           variant="outline"
           onClick={() => router.push('/practice/modes')}
+          className="w-full sm:w-auto"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
           选择模式
         </Button>
 
-        <div className="flex gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
           {/* 上一题按钮 */}
           <Button
             variant="outline"
             onClick={handlePrev}
             disabled={loading || currentHistoryIndex <= 0}
+            className="flex-1 min-w-[120px] sm:flex-none sm:w-auto"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             上一题
@@ -612,16 +614,25 @@ function PracticeContent() {
                 variant="outline"
                 onClick={handleNext}
                 disabled={loading}
+                className="flex-1 min-w-[120px] sm:flex-none sm:w-auto"
               >
                 跳过
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
-              <Button onClick={handleSubmit} disabled={loading || selectedAnswer.length === 0}>
+              <Button
+                onClick={handleSubmit}
+                disabled={loading || selectedAnswer.length === 0}
+                className="w-full text-base sm:w-auto sm:min-w-[180px] sm:text-sm"
+              >
                 提交答案
               </Button>
             </>
           ) : (
-            <Button onClick={handleNext} disabled={loading}>
+            <Button
+              onClick={handleNext}
+              disabled={loading}
+              className="w-full sm:w-auto sm:min-w-[160px]"
+            >
               下一题
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>

@@ -34,6 +34,10 @@ function parseLevel(value: unknown): 'NORMAL' | 'GENERAL' | 'URGENT' {
   return 'NORMAL'
 }
 
+function parseAudience(value: unknown): 'ALL' | 'ADMIN_ONLY' {
+  return value === 'ADMIN_ONLY' ? 'ADMIN_ONLY' : 'ALL'
+}
+
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const denied = ensureAdmin(session)
@@ -59,6 +63,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const title = typeof body?.title === 'string' ? body.title.trim() : existing.title
     const content = typeof body?.content === 'string' ? body.content.trim() : existing.content
     const level = parseLevel(body?.level ?? existing.level)
+    const audience = parseAudience(body?.audience ?? existing.audience)
     const publishedAt = parseDate(body?.publishedAt) ?? existing.publishedAt
     const expiresAt = body?.expiresAt === null ? null : parseDate(body?.expiresAt) ?? existing.expiresAt
     const resendEmail = Boolean(body?.resendEmail) && level !== 'NORMAL'
@@ -81,6 +86,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         title,
         content,
         level,
+        audience,
         publishedAt,
         expiresAt,
       },
@@ -88,7 +94,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
     if (resendEmail) {
       try {
-        const recipients = await listNotificationRecipients()
+        const recipients = await listNotificationRecipients(audience)
         const successCount = await emailService.sendSiteMessageNotification({
           recipients,
           title,

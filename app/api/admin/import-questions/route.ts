@@ -6,6 +6,7 @@ import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 import { createAuditLog } from '@/lib/audit'
 import { renderLibraryDisplay } from '@/lib/question-library-service'
 import { saveLibraryFile } from '@/lib/server/library-file-store'
+import { normaliseExamPresetMetadata } from '@/lib/question-library-metadata'
 import type {
   ExamPresetDefinition,
   QuestionItem,
@@ -177,7 +178,7 @@ function normalisePreset(input: ExamPresetDefinition, index: number): ExamPreset
     singleChoiceCount,
     multipleChoiceCount,
     trueFalseCount,
-    metadata: input.metadata,
+    metadata: normaliseExamPresetMetadata(input.metadata),
   }
 }
 

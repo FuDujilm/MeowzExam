@@ -34,6 +34,10 @@ function parseLevel(value: unknown): 'NORMAL' | 'GENERAL' | 'URGENT' {
   return 'NORMAL'
 }
 
+function parseAudience(value: unknown): 'ALL' | 'ADMIN_ONLY' {
+  return value === 'ADMIN_ONLY' ? 'ADMIN_ONLY' : 'ALL'
+}
+
 export async function GET() {
   const session = await auth()
   const denied = ensureAdmin(session)
@@ -76,6 +80,7 @@ export async function POST(request: NextRequest) {
     const title = typeof body?.title === 'string' ? body.title.trim() : ''
     const content = typeof body?.content === 'string' ? body.content.trim() : ''
     const level = parseLevel(body?.level)
+    const audience = parseAudience(body?.audience)
     const publishedAt = parseDate(body?.publishedAt) ?? new Date()
     const expiresAt = parseDate(body?.expiresAt)
 
@@ -96,6 +101,7 @@ export async function POST(request: NextRequest) {
         title,
         content,
         level,
+        audience,
         publishedAt,
         expiresAt,
         createdById: session?.user?.id ?? null,
@@ -104,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     if (level !== 'NORMAL') {
       try {
-        const recipients = await listNotificationRecipients()
+        const recipients = await listNotificationRecipients(audience)
         const successCount = await emailService.sendSiteMessageNotification({
           recipients,
           title,

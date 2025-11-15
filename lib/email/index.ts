@@ -83,17 +83,34 @@ class EmailService {
     this.isDevelopment = process.env.SMTP_MODE === 'development' || process.env.NODE_ENV === 'development'
 
     if (!this.isDevelopment) {
-      const config: EmailConfig = {
-        host: process.env.SMTP_HOST || 'smtp.exmail.qq.com',
-        port: parseInt(process.env.SMTP_PORT || '465'),
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER || '',
-          pass: process.env.SMTP_PASS || '',
-        },
-      }
-      this.transporter = nodemailer.createTransport(config)
+      this.transporter = this.createTransporter()
     }
+  }
+
+  private createTransporter(): nodemailer.Transporter {
+    const host = process.env.SMTP_HOST || 'smtp.exmail.qq.com'
+    const port = Number.parseInt(process.env.SMTP_PORT || '465', 10)
+    const secure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465
+    const user = process.env.SMTP_USER || ''
+    const pass = process.env.SMTP_PASS || ''
+
+    if (!user || !pass) {
+      throw new Error('SMTP 用户名或密码未配置，无法发送邮件。')
+    }
+
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    } satisfies EmailConfig)
+  }
+
+  private ensureTransporter(): nodemailer.Transporter {
+    if (!this.transporter) {
+      this.transporter = this.createTransporter()
+    }
+    return this.transporter
   }
 
   async sendVerificationCode(email: string, code: string): Promise<boolean> {
@@ -306,6 +323,83 @@ class EmailService {
     }
 
     return successCount
+  }
+
+  async sendTestEmail({
+    recipient,
+    subject,
+    content,
+    forceRealSend = false,
+  }: {
+    recipient: string
+    subject: string
+    content: string
+    forceRealSend?: boolean
+  }): Promise<{
+    success: true
+    mode: 'development' | 'production'
+    preview?: { to: string; subject: string; content: string }
+    forced: boolean
+  }> {
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@amateur-radio-exam.com'
+    const modeLabel = this.isDevelopment
+      ? forceRealSend
+        ? 'development（强制真实发送）'
+        : 'development（仅打印日志）'
+      : 'production（真实发送）'
+    const sanitizedContent = escapeHtml(content).replace(/\n/g, '<br />')
+    const html = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #f3f4f6; padding: 24px;">
+        <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 15px 45px rgba(30, 64, 175, 0.08);">
+          <div style="padding: 24px 32px; background: #111827; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 22px;">SMTP 测试邮件</h1>
+            <p style="margin: 8px 0 0; font-size: 13px; opacity: 0.85;">来自业余无线电刷题系统后台</p>
+          </div>
+          <div style="padding: 24px 32px; font-size: 15px; line-height: 1.7; color: #1f2937;">
+            ${sanitizedContent}
+          </div>
+          <div style="padding: 18px 32px; background: #f9fafb; color: #6b7280; font-size: 12px; line-height: 1.6;">
+            <div>测试时间：${new Date().toLocaleString()}</div>
+            <div>SMTP 模式：${modeLabel}</div>
+            <div>发件地址：${escapeHtml(fromAddress)}</div>
+          </div>
+        </div>
+      </div>
+    `
+
+    if (this.isDevelopment && !forceRealSend) {
+      console.log('\n' + '='.repeat(80))
+      console.log('📧 [EMAIL SERVICE] SMTP TEST (development mode)')
+      console.log('Recipient:', recipient)
+      console.log('Subject:', subject)
+      console.log('Content:', content)
+      console.log('='.repeat(80) + '\n')
+      return {
+        success: true,
+        mode: 'development',
+        preview: {
+          to: recipient,
+          subject,
+          content,
+        },
+        forced: false,
+      }
+    }
+
+    const transporter = this.ensureTransporter()
+
+    await transporter.sendMail({
+      from: fromAddress,
+      to: recipient,
+      subject,
+      html,
+    })
+
+    return {
+      success: true,
+      mode: 'production',
+      forced: this.isDevelopment && forceRealSend,
+    }
   }
 
   async verifyConnection(): Promise<boolean> {

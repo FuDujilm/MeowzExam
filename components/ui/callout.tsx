@@ -92,8 +92,8 @@ export function Callout({
           preset.background,
         )}
       />
-      <div className="flex flex-col gap-4 p-5">
-        <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
+        <div className="flex flex-1 items-start gap-4">
           <div
             className={cn(
               "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-inner",
@@ -118,8 +118,12 @@ export function Callout({
               </div>
             )}
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
+        {actions && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            {actions}
+          </div>
+        )}
       </div>
     </div>
   )

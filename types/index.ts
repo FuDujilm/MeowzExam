@@ -81,6 +81,7 @@ export interface SiteMessage {
   title: string
   content: string
   level: SiteMessageLevel
+  audience: SiteMessageAudience
   publishedAt: Date
   expiresAt?: Date | null
   emailSentAt?: Date | null
@@ -92,6 +93,11 @@ export enum SiteMessageLevel {
   NORMAL = 'NORMAL',
   GENERAL = 'GENERAL',
   URGENT = 'URGENT'
+}
+
+export enum SiteMessageAudience {
+  ALL = 'ALL',
+  ADMIN_ONLY = 'ADMIN_ONLY'
 }
 
 export interface AuthUser {

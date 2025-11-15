@@ -261,8 +261,8 @@ export default function QuestionsPage() {
       <div className="mb-6 space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">题库预览</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-50">题库预览</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
               浏览当前选定题库的题目，支持模糊搜索；预览模式默认将 A 选项视为正确答案。
             </p>
           </div>
@@ -272,7 +272,7 @@ export default function QuestionsPage() {
           </Button>
         </div>
 
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="flex flex-1 items-center gap-2">
               <Select
@@ -321,12 +321,12 @@ export default function QuestionsPage() {
               </Button>
             </div>
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-500 dark:text-slate-400">
             {!libraryLoading && libraries.length === 0 && (
               <span>当前账号暂无可访问的题库，请联系管理员开通权限。</span>
             )}
             {libraryError && (
-              <span className="text-red-500">
+              <span className="text-red-500 dark:text-rose-300">
                 题库加载失败：{libraryError}，请点击“刷新列表”重试。
               </span>
             )}
@@ -336,43 +336,43 @@ export default function QuestionsPage() {
 
       {!selectedLibraryCode && !libraryLoading ? (
         <Card>
-          <CardContent className="p-8 text-center text-sm text-gray-500">
+          <CardContent className="p-8 text-center text-sm text-gray-500 dark:text-slate-400">
             当前账号尚未分配题库，请联系管理员或尝试刷新列表。
           </CardContent>
         </Card>
       ) : (
         <>
           {selectedLibrary && (
-            <Card className="mb-6 border-blue-200 bg-blue-50/80">
+            <Card className="mb-6 border-blue-200 bg-blue-50/80 dark:border-blue-500/40 dark:bg-blue-950/30">
               <CardContent className="space-y-4 p-5">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-blue-600">
+                    <p className="text-xs uppercase tracking-wide text-blue-600 dark:text-blue-300">
                       当前题库
                     </p>
-                    <h2 className="text-2xl font-semibold text-gray-900">
+                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-50">
                       {selectedLibrary.name}
                     </h2>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-slate-200">
                       {selectedLibrary.description || '该题库尚未提供简介。'}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
-                      <Badge variant="outline" className="text-xs">
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-slate-200">
+                      <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                         {VISIBILITY_LABELS[selectedLibrary.visibility] ||
                           selectedLibrary.visibility}
                       </Badge>
                       {selectedLibrary.region && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                           地区：{selectedLibrary.region}
                         </Badge>
                       )}
                       {selectedLibrary.version && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                           版本：{selectedLibrary.version}
                         </Badge>
                       )}
                       {selectedLibrary.sourceType && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                           类型：{selectedLibrary.sourceType}
                         </Badge>
                       )}
@@ -387,16 +387,16 @@ export default function QuestionsPage() {
                     ].map((stat) => (
                       <div
                         key={stat.label}
-                        className="rounded-lg border border-white/60 bg-white/60 p-3"
+                        className="rounded-lg border border-white/60 bg-white/60 p-3 dark:border-slate-800 dark:bg-slate-900/60"
                       >
-                        <p className="text-xs text-gray-500">{stat.label}</p>
-                        <p className="text-lg font-semibold text-gray-900">{stat.value}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-300">{stat.label}</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-slate-50">{stat.value}</p>
                       </div>
                     ))}
                   </div>
                 </div>
                 {presetSummary && (
-                  <div className="rounded-lg border border-blue-100 bg-white/70 p-3 text-xs text-blue-900">
+                  <div className="rounded-lg border border-blue-100 bg-white/70 p-3 text-xs text-blue-900 dark:border-blue-500/40 dark:bg-slate-900/60 dark:text-blue-100">
                     可用考试预设：{presetSummary}
                   </div>
                 )}
@@ -405,10 +405,10 @@ export default function QuestionsPage() {
           )}
 
           {loading ? (
-            <div className="py-16 text-center text-sm text-gray-500">题目加载中...</div>
+            <div className="py-16 text-center text-sm text-gray-500 dark:text-slate-400">题目加载中...</div>
           ) : questions.length === 0 ? (
             <Card>
-              <CardContent className="p-6 text-center text-sm text-gray-500">
+              <CardContent className="p-6 text-center text-sm text-gray-500 dark:text-slate-400">
                 暂无题目，请尝试调整搜索条件。
               </CardContent>
             </Card>
@@ -426,47 +426,47 @@ export default function QuestionsPage() {
                   const options = Array.isArray(question.options) ? question.options : []
 
                   return (
-                    <Card key={question.id} className="border border-slate-200">
+                    <Card key={question.id} className="border border-slate-200 dark:border-slate-800 dark:bg-slate-900/60">
                       <CardContent className="space-y-3 p-4">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <Badge variant="outline" className="font-semibold">
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                            <Badge variant="outline" className="font-semibold dark:border-slate-700 dark:text-slate-100">
                               {question.externalId}
                             </Badge>
                             {(question.libraryShortName || question.libraryCode) && (
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge variant="secondary" className="text-xs dark:bg-slate-800 dark:text-slate-100">
                                 {question.libraryShortName || question.libraryCode}
                               </Badge>
                             )}
                           </div>
-                          <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                          <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-slate-400">
                             {question.category && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                                 {question.category}
                               </Badge>
                             )}
                             {question.subSection && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                                 章节 {question.subSection}
                               </Badge>
                             )}
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                               {questionTypeLabel}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                               难度：{difficultyLabel}
                             </Badge>
                             {question.hasImage && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs dark:border-slate-700 dark:text-slate-200">
                                 含图
                               </Badge>
                             )}
                           </div>
                         </div>
-                        <p className="text-sm leading-6 text-gray-900">{question.title}</p>
+                        <p className="text-sm leading-6 text-gray-900 dark:text-slate-50">{question.title}</p>
                         <div className="space-y-2">
                           {options.length === 0 ? (
-                            <p className="text-xs text-gray-400">该题暂无选项数据。</p>
+                            <p className="text-xs text-gray-400 dark:text-slate-500">该题暂无选项数据。</p>
                           ) : (
                             options.map((option) => {
                               const isCorrect =
@@ -477,21 +477,21 @@ export default function QuestionsPage() {
                                   key={`${question.id}-${option.id}`}
                                   className={`rounded-md border p-3 text-sm ${
                                     isCorrect
-                                      ? 'border-green-200 bg-green-50 text-green-900'
-                                      : 'border-slate-200 bg-white text-gray-800'
+                                      ? 'border-green-200 bg-green-50 text-green-900 dark:border-green-400/50 dark:bg-green-500/20 dark:text-green-100'
+                                      : 'border-slate-200 bg-white text-gray-800 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-3">
-                                    <div className="font-semibold text-gray-900">
+                                    <div className="font-semibold text-gray-900 dark:text-slate-50">
                                       {option.id || '选项'}.
                                     </div>
                                     {isCorrect && (
-                                      <Badge variant="secondary" className="text-[11px]">
+                                      <Badge variant="secondary" className="text-[11px] dark:bg-green-500/90 dark:text-slate-900">
                                         预览正确
                                       </Badge>
                                     )}
                                   </div>
-                                  <p className="mt-1 text-[13px] leading-5 text-gray-700">
+                                  <p className="mt-1 text-[13px] leading-5 text-gray-700 dark:text-slate-200">
                                     {option.text || '（尚未提供内容）'}
                                   </p>
                                 </div>
@@ -505,13 +505,13 @@ export default function QuestionsPage() {
                               <Badge
                                 key={`${question.id}-${tag}`}
                                 variant="outline"
-                                className="text-[11px] font-normal text-gray-600"
+                                className="text-[11px] font-normal text-gray-600 dark:border-slate-700 dark:text-slate-200"
                               >
                                 #{tag}
                               </Badge>
                             ))}
                             {tagList.length > 4 && (
-                              <span className="text-[11px] text-gray-400">
+                              <span className="text-[11px] text-gray-400 dark:text-slate-500">
                                 +{tagList.length - 4}
                               </span>
                             )}
@@ -535,7 +535,7 @@ export default function QuestionsPage() {
                 })}
               </div>
 
-              <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 text-sm text-gray-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   共 {pagination.total} 题，
                   {pagination.totalPages > 0 ? (
@@ -572,4 +572,3 @@ export default function QuestionsPage() {
     </div>
   )
 }
-

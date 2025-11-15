@@ -41,6 +41,7 @@ export async function GET() {
           examType: user.settings.examType ?? 'A_CLASS',
           aiStylePresetId: user.settings.aiStylePresetId,
           aiStyleCustom: user.settings.aiStyleCustom ?? '',
+          examQuestionPreference: user.settings.examQuestionPreference ?? 'SYSTEM_PRESET',
         }
       : {
           enableWrongQuestionWeight: false,
@@ -48,6 +49,7 @@ export async function GET() {
           examType: 'A_CLASS',
           aiStylePresetId: null,
           aiStyleCustom: '',
+          examQuestionPreference: 'SYSTEM_PRESET' as const,
         }
 
     return NextResponse.json({
@@ -85,6 +87,7 @@ export async function POST(request: NextRequest) {
       examType,
       aiStylePresetId,
       aiStyleCustom,
+      examQuestionPreference,
     } = body
 
     const user = await prisma.user.findUnique({
@@ -163,6 +166,11 @@ export async function POST(request: NextRequest) {
         ? aiStyleCustom.trim().slice(0, 1500) || null
         : null
 
+    const normalizedPreference =
+      typeof examQuestionPreference === 'string' && examQuestionPreference === 'FULL_RANDOM'
+        ? 'FULL_RANDOM'
+        : 'SYSTEM_PRESET'
+
     await prisma.userSettings.upsert({
       where: { userId: user.id },
       create: {
@@ -172,6 +180,7 @@ export async function POST(request: NextRequest) {
         examType: normalizedExamType,
         aiStylePresetId: resolvedPresetId,
         aiStyleCustom: customPrompt,
+        examQuestionPreference: normalizedPreference,
       },
       update: {
         enableWrongQuestionWeight: enableWrongQuestionWeight || false,
@@ -179,6 +188,7 @@ export async function POST(request: NextRequest) {
         examType: normalizedExamType,
         aiStylePresetId: resolvedPresetId,
         aiStyleCustom: customPrompt,
+        examQuestionPreference: normalizedPreference,
       }
     })
 

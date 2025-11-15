@@ -99,6 +99,49 @@ export interface AIExplanationResult {
   groupId: string | null
 }
 
+interface AiTraceContext {
+  id: string
+}
+
+function logAiTrace(trace: AiTraceContext | null | undefined, stage: string, detail?: unknown) {
+  if (!trace) return
+
+  if (detail === undefined) {
+    console.info(`[AI][Chain][${trace.id}] ${stage}`)
+  } else {
+    console.info(`[AI][Chain][${trace.id}] ${stage}`, detail)
+  }
+}
+
+let aiTraceSequence = 0
+
+function previewText(value: string, maxLength = 200): string {
+  if (!value) return ''
+  return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value
+}
+
+function createAiTraceContext(request: AIExplanationRequest): AiTraceContext {
+  aiTraceSequence = (aiTraceSequence + 1) % 10000
+  const traceId = `ai-${Date.now().toString(36)}-${aiTraceSequence.toString().padStart(4, '0')}`
+  const trace: AiTraceContext = { id: traceId }
+
+  const optionsPreview = request.options.slice(0, 4).map(option => ({
+    id: option.id,
+    text: previewText(option.text, 80),
+  }))
+
+  logAiTrace(trace, 'request_received', {
+    questionTitle: previewText(request.questionTitle, 160),
+    optionCount: request.options.length,
+    optionsPreview,
+    correctAnswers: request.correctAnswers,
+    syllabusPath: request.syllabusPath ?? null,
+    evidenceCount: request.evidence?.length ?? 0,
+  })
+
+  return trace
+}
+
 async function getActiveModelGroup(requiredScope: ModelUsageScope = 'EXPLANATION'): Promise<AiModelGroup | null> {
   const preferredName = process.env.AI_MODEL_GROUP_NAME?.trim()
   if (preferredName) {
@@ -172,18 +215,24 @@ const OPENAI_STATUS_MESSAGES: Record<number, string> = {
 function handleOpenAIError(error: unknown): never {
   if (error && typeof error === "object" && "status" in (error as Record<string, unknown>)) {
     const statusValue = (error as Record<string, unknown>).status
-    const status = typeof statusValue === "number" ? statusValue : Number(statusValue)
+    const parsedStatus =
+      typeof statusValue === "number"
+        ? statusValue
+        : typeof statusValue === "string"
+        ? Number(statusValue)
+        : NaN
 
     const baseMessage = error instanceof Error
       ? error.message
       : String((error as Record<string, unknown>).message ?? "")
 
-    const mapped = Number.isFinite(status) ? OPENAI_STATUS_MESSAGES[status] : undefined
+    const mapped = Number.isFinite(parsedStatus) ? OPENAI_STATUS_MESSAGES[parsedStatus] : undefined
     const detail = mapped
       ? `${mapped}${baseMessage ? `（${baseMessage}）` : ""}`
       : (baseMessage || "未知错误")
 
-    throw new Error(`AI 服务错误(${status}): ${detail}`)
+    const statusDisplay = Number.isFinite(parsedStatus) ? parsedStatus : "unknown"
+    throw new Error(`AI 服务错误(${statusDisplay}): ${detail}`)
   }
 
   if (error instanceof Error) {
@@ -604,12 +653,20 @@ async function requestStructuredExplanation(
   group: AiModelGroup | null,
   model: string,
   request: AIExplanationRequest,
-  options: { forceDefaultPrompt?: boolean; retryCount?: number; maxTokensOverride?: number }
+  options: {
+    forceDefaultPrompt?: boolean
+    retryCount?: number
+    maxTokensOverride?: number
+    attempt?: number
+    trace?: AiTraceContext
+  }
 ): Promise<AiExplainOutput> {
   const {
     forceDefaultPrompt = false,
     retryCount = 0,
     maxTokensOverride,
+    attempt = 1,
+    trace,
   } = options
 
   const systemPrompt = group?.systemPrompt && group.systemPrompt.trim().length > 0
@@ -625,6 +682,14 @@ async function requestStructuredExplanation(
     includeQuestion: group?.includeQuestion ?? true,
     includeOptions: group?.includeOptions ?? true,
     template: forceDefaultPrompt ? null : group?.userPrompt,
+  })
+
+  logAiTrace(trace, 'prompt_prepared', {
+    attempt,
+    includeQuestion: group?.includeQuestion ?? true,
+    includeOptions: group?.includeOptions ?? true,
+    forceDefaultPrompt,
+    userPromptPreview: previewText(userPrompt, 400),
   })
 
   const payload: ChatPayload = {
@@ -664,6 +729,16 @@ async function requestStructuredExplanation(
 
   mergeExtraBody(payload, group?.extraBody)
 
+  logAiTrace(trace, 'payload_ready', {
+    attempt,
+    model,
+    temperature: payload.temperature,
+    topP: payload.top_p ?? null,
+    presencePenalty: payload.presence_penalty ?? null,
+    frequencyPenalty: payload.frequency_penalty ?? null,
+    maxTokens: payload.max_tokens,
+  })
+
   debugLog("request", {
     baseURL: extractBaseUrl(client),
     model,
@@ -676,11 +751,28 @@ async function requestStructuredExplanation(
 
   let completion: Awaited<ReturnType<typeof client.chat.completions.create>>
   try {
+    logAiTrace(trace, 'llm_request', {
+      attempt,
+      baseURL: extractBaseUrl(client),
+      model,
+      maxTokens: payload.max_tokens,
+    })
     completion = await client.chat.completions.create(payload)
   } catch (error) {
+    logAiTrace(trace, 'llm_request_failed', {
+      attempt,
+      message: error instanceof Error ? error.message : String(error),
+    })
     handleOpenAIError(error)
   }
   const content = completion.choices[0]?.message?.content?.trim()
+
+  logAiTrace(trace, 'llm_response', {
+    attempt,
+    finishReason: completion.choices[0]?.finish_reason ?? null,
+    usage: completion.usage ?? null,
+    preview: previewText(content ?? '', 200),
+  })
 
   debugLog("response", {
     model,
@@ -693,6 +785,11 @@ async function requestStructuredExplanation(
   const finishReason = (completion.choices[0]?.finish_reason ?? null) as string | null
 
   if (finishReason === "length") {
+    logAiTrace(trace, 'response_truncated', {
+      attempt,
+      retryRemaining: retryCount,
+      maxTokens: payload.max_tokens,
+    })
     debugLog("response_truncated", {
       retryCount,
       forceDefaultPrompt,
@@ -708,6 +805,8 @@ async function requestStructuredExplanation(
         forceDefaultPrompt: true,
         retryCount: retryCount - 1,
         maxTokensOverride: nextMaxTokens,
+        attempt: attempt + 1,
+        trace,
       })
     }
 
@@ -715,11 +814,18 @@ async function requestStructuredExplanation(
   }
 
   if (!content) {
+    logAiTrace(trace, 'response_empty', { attempt })
     throw new Error("AI 返回为空")
   }
 
   const sanitized = cleanXmlContent(content)
   const trimmed = sanitized.trim()
+
+  logAiTrace(trace, 'content_detected', {
+    attempt,
+    format: trimmed.startsWith('<') ? 'xml' : 'json',
+    length: trimmed.length,
+  })
 
   let normalizedData: Record<string, unknown>
 
@@ -729,11 +835,31 @@ async function requestStructuredExplanation(
       preview: trimmed.slice(0, 200),
     })
 
+    logAiTrace(trace, 'xml_detected', {
+      attempt,
+      preview: previewText(trimmed, 200),
+    })
+
     try {
       const parsedXml = parseXmlExplanation(trimmed, request)
       normalizedData = normalizeStructuredResponse(parsedXml)
+
+      const xmlSummary = (parsedXml as { summary?: unknown }).summary
+      const xmlAnswers = (parsedXml as { answer?: unknown }).answer
+
+      logAiTrace(trace, 'xml_parsed', {
+        attempt,
+        summaryLength: typeof xmlSummary === 'string' ? xmlSummary.length : 0,
+        answerCount: Array.isArray(xmlAnswers) ? xmlAnswers.length : 0,
+      })
     } catch (parseError) {
       const message = parseError instanceof Error ? parseError.message : String(parseError)
+
+      logAiTrace(trace, 'xml_parse_failed', {
+        attempt,
+        message,
+        willRetry: retryCount > 0 && finishReason === 'length',
+      })
 
       if (retryCount > 0 && finishReason === 'length') {
         const nextMaxTokens = typeof maxTokensOverride === "number"
@@ -746,6 +872,8 @@ async function requestStructuredExplanation(
           forceDefaultPrompt: true,
           retryCount: retryCount - 1,
           maxTokensOverride: nextMaxTokens,
+          attempt: attempt + 1,
+          trace,
         })
       }
 
@@ -759,6 +887,11 @@ async function requestStructuredExplanation(
       preview: trimmed.slice(0, 200),
     })
 
+    logAiTrace(trace, 'json_detected', {
+      attempt,
+      preview: previewText(trimmed, 200),
+    })
+
     let parsedJson: unknown
 
     try {
@@ -767,6 +900,11 @@ async function requestStructuredExplanation(
       const isLikelyTruncated = finishReason === 'length' || !trimmed.endsWith('}')
 
       if (retryCount > 0 && isLikelyTruncated) {
+        logAiTrace(trace, 'json_parse_failed', {
+          attempt,
+          message: parseError instanceof Error ? parseError.message : String(parseError),
+          willRetry: true,
+        })
         const nextMaxTokens = typeof maxTokensOverride === "number"
           ? Math.min(maxTokensOverride + 512, 4000)
           : 2000
@@ -777,6 +915,8 @@ async function requestStructuredExplanation(
           forceDefaultPrompt: true,
           retryCount: retryCount - 1,
           maxTokensOverride: nextMaxTokens,
+          attempt: attempt + 1,
+          trace,
         })
       }
 
@@ -785,6 +925,11 @@ async function requestStructuredExplanation(
       if (repaired !== trimmed) {
         parsedJson = JSON.parse(repaired)
       } else {
+        logAiTrace(trace, 'json_parse_failed', {
+          attempt,
+          message: parseError instanceof Error ? parseError.message : String(parseError),
+          willRetry: false,
+        })
         throw parseError instanceof Error
           ? parseError
           : new Error(`无法解析 AI 返回的 JSON：${String(parseError)}`)
@@ -792,10 +937,26 @@ async function requestStructuredExplanation(
     }
 
     normalizedData = normalizeStructuredResponse(parsedJson)
+
+    const normalizedSummary = (normalizedData as { summary?: unknown }).summary
+    const normalizedAnswers = (normalizedData as { answer?: unknown }).answer
+
+    logAiTrace(trace, 'json_parsed', {
+      attempt,
+      summaryLength: typeof normalizedSummary === 'string' ? normalizedSummary.length : 0,
+      answerCount: Array.isArray(normalizedAnswers) ? normalizedAnswers.length : 0,
+    })
   }
 
   try {
-    return AiExplainSchema.parse(normalizedData)
+    const parsed = AiExplainSchema.parse(normalizedData)
+    logAiTrace(trace, 'schema_validated', {
+      attempt,
+      summaryPreview: previewText(parsed.summary, 120),
+      answerCount: parsed.answer.length,
+      optionAnalysis: parsed.optionAnalysis.length,
+    })
+    return parsed
   } catch (error) {
     if (error instanceof ZodError) {
       const fallback = buildFallbackStructuredResponse(normalizedData, request)
@@ -816,7 +977,19 @@ async function requestStructuredExplanation(
         sanitized,
       })
 
-      return AiExplainSchema.parse(fallback)
+      logAiTrace(trace, 'schema_validation_failed', {
+        attempt,
+        issueCount: error.issues?.length ?? 0,
+      })
+
+      const fallbackParsed = AiExplainSchema.parse(fallback)
+      logAiTrace(trace, 'fallback_schema_validated', {
+        attempt,
+        summaryPreview: previewText(fallbackParsed.summary, 120),
+        answerCount: fallbackParsed.answer.length,
+        optionAnalysis: fallbackParsed.optionAnalysis.length,
+      })
+      return fallbackParsed
     }
 
     throw error
@@ -826,13 +999,29 @@ async function requestStructuredExplanation(
 export async function generateAIExplanation(
   request: AIExplanationRequest
 ): Promise<AIExplanationResult> {
+  const trace = createAiTraceContext(request)
+
   try {
     const { client, group, model } = await resolveOpenAIRuntime('EXPLANATION')
+
+    logAiTrace(trace, 'runtime_ready', {
+      model,
+      groupId: group?.id ?? null,
+      baseURL: extractBaseUrl(client),
+    })
 
     try {
       const structuredExplanation = await requestStructuredExplanation(client, group, model, request, {
         forceDefaultPrompt: false,
         retryCount: 1,
+        attempt: 1,
+        trace,
+      })
+
+      logAiTrace(trace, 'completed', {
+        model,
+        groupId: group?.id ?? null,
+        summaryPreview: previewText(structuredExplanation.summary, 120),
       })
 
       return {
@@ -846,10 +1035,21 @@ export async function generateAIExplanation(
 
       if (shouldFallback) {
         debugLog("structured_validation_failed", structuredError.message)
+        logAiTrace(trace, 'schema_validation_failed_retry', {
+          message: structuredError.message,
+        })
 
         const fallbackExplanation = await requestStructuredExplanation(client, group, model, request, {
           forceDefaultPrompt: true,
           retryCount: 1,
+          attempt: 1,
+          trace,
+        })
+
+        logAiTrace(trace, 'completed', {
+          model,
+          groupId: group?.id ?? null,
+          summaryPreview: previewText(fallbackExplanation.summary, 120),
         })
 
         return {
@@ -864,6 +1064,9 @@ export async function generateAIExplanation(
     }
   } catch (error) {
     console.error("Generate AI explanation error:", error)
+    logAiTrace(trace, 'failed', {
+      message: error instanceof Error ? error.message : String(error),
+    })
 
     if (error instanceof Error && error.name === "ZodError") {
       throw new Error(`AI 返回格式不符合要求: ${error.message}`)
@@ -971,14 +1174,16 @@ export async function generateAssistantChatReply({
   messages,
   systemPrompt,
   temperature,
-  maxTokens = 600,
+  maxTokens = 1200,
   stylePrompt,
+  retryCount = 1,
 }: {
   messages: AssistantChatMessage[]
   systemPrompt?: string
   temperature?: number
   maxTokens?: number
   stylePrompt?: string | null
+  retryCount?: number
 }): Promise<{ reply: string; modelName: string }> {
   const { client, group, model } = await resolveOpenAIRuntime('ASSISTANT')
 
@@ -1040,13 +1245,32 @@ export async function generateAssistantChatReply({
   }
 
   const reply = completion.choices[0]?.message?.content?.trim()
+  const finishReason = (completion.choices[0]?.finish_reason ?? null) as string | null
 
   debugLog("assistant-chat-response", {
     model,
     groupId: group?.id ?? null,
-    finishReason: completion.choices[0]?.finish_reason ?? null,
+    finishReason,
     usage: completion.usage ?? null,
   })
+
+  if (finishReason === "length" && retryCount > 0) {
+    const nextMaxTokens = Math.min(maxTokens + 600, 3200)
+
+    debugLog("assistant-chat-retry", {
+      previousMaxTokens: maxTokens,
+      nextMaxTokens,
+    })
+
+    return generateAssistantChatReply({
+      messages,
+      systemPrompt,
+      temperature,
+      maxTokens: nextMaxTokens,
+      stylePrompt,
+      retryCount: retryCount - 1,
+    })
+  }
 
   if (!reply) {
     throw new Error("小助手未返回任何内容，请稍后再试。")

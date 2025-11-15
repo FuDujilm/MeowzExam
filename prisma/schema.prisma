@@ -114,6 +114,7 @@ model UserSettings {
   aiStylePresetId           String?
   aiStylePreset             AiStylePreset? @relation(fields: [aiStylePresetId], references: [id], onDelete: SetNull)
   aiStyleCustom             String?
+  examQuestionPreference    String  @default("SYSTEM_PRESET") // "SYSTEM_PRESET" | "FULL_RANDOM"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -391,6 +392,7 @@ model SiteMessage {
   title       String
   content     String           @db.Text
   level       SiteMessageLevel @default(NORMAL)
+  audience    SiteMessageAudience @default(ALL)
   publishedAt DateTime         @default(now())
   expiresAt   DateTime?
   emailSentAt DateTime?
@@ -441,6 +443,11 @@ enum SiteMessageLevel {
   NORMAL   // 普通消息，仅站内提示
   GENERAL  // 一般消息，站内提示 + 邮件
   URGENT   // 紧急消息，站内提示 + 邮件 + 强制弹窗
+}
+
+enum SiteMessageAudience {
+  ALL
+  ADMIN_ONLY
 }
 
 enum ModelType {
