@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Bot,
+  Cloud,
   Cpu,
   FileUp,
   Globe,
@@ -32,6 +33,7 @@ type AdminNavItem = {
 const adminNavItems: AdminNavItem[] = [
   { label: '总览', href: '/admin', icon: LayoutDashboard },
   { label: '题库导入', href: '/admin/import', icon: FileUp },
+  { label: 'R2 存储', href: '/admin/r2', icon: Cloud },
   { label: '管理员配置', href: '/admin/config', icon: ShieldCheck },
   { label: '站点设置', href: '/admin/site', icon: Globe },
   { label: 'SMTP 测试', href: '/admin/smtp-test', icon: MailCheck },

@@ -91,6 +91,9 @@ interface Question {
   }>
   category: string
   difficulty: string
+  hasImage?: boolean
+  imagePath?: string | null
+  imageAlt?: string | null
 }
 
 interface ExamConfig {
@@ -1263,6 +1266,19 @@ function ExamContent() {
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 break-words whitespace-pre-line">
                     {question.title}
                   </h3>
+                  {question.hasImage && question.imagePath ? (
+                    <div className="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/60">
+                      <img
+                        src={question.imagePath}
+                        alt={question.imageAlt || question.title}
+                        className="mx-auto max-h-64 w-full rounded-md object-contain"
+                        loading="lazy"
+                      />
+                      {question.imageAlt ? (
+                        <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">{question.imageAlt}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {question.questionType === 'multiple_choice' ? (
                     <div className="space-y-3">
                       {question.options.map((option: any) => {

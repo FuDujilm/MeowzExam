@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { AdminPageShell } from '@/components/admin/AdminPageShell'
@@ -261,6 +261,16 @@ export default function AdminQuestionLibraryPage() {
   const [libraryFiles, setLibraryFiles] = useState<QuestionLibraryFileInfo[]>([])
   const [fileListLoading, setFileListLoading] = useState(false)
   const [fileListError, setFileListError] = useState<string | null>(null)
+  const [fileUpload, setFileUpload] = useState<File | null>(null)
+  const [fileUploadName, setFileUploadName] = useState('')
+  const [fileUploadSaving, setFileUploadSaving] = useState(false)
+  const [fileUploadError, setFileUploadError] = useState<string | null>(null)
+  const fileUploadInputRef = useRef<HTMLInputElement | null>(null)
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
+  const [renameTarget, setRenameTarget] = useState<QuestionLibraryFileInfo | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renameSaving, setRenameSaving] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   const isSessionLoading = status === 'loading'
 
@@ -746,6 +756,142 @@ export default function AdminQuestionLibraryPage() {
     setFileDialogLibrary(null)
     setLibraryFiles([])
     setFileListError(null)
+    resetFileUploadForm()
+    if (!renameSaving) {
+      setRenameDialogOpen(false)
+      setRenameTarget(null)
+      setRenameValue('')
+      setRenameError(null)
+    }
+  }
+
+  const handleSelectUploadFile = (event: ChangeEvent<HTMLInputElement>) => {
+    setFileUploadError(null)
+    const selected = event.target.files?.[0]
+    setFileUpload(selected ?? null)
+    if (selected && !fileUploadName) {
+      setFileUploadName(selected.name)
+    }
+  }
+
+  const resetFileUploadForm = () => {
+    setFileUpload(null)
+    setFileUploadName('')
+    setFileUploadError(null)
+    if (fileUploadInputRef.current) {
+      fileUploadInputRef.current.value = ''
+    }
+  }
+
+  const handleUploadLibraryFile = async () => {
+    if (!fileDialogLibrary) {
+      setFileUploadError('请先选择要管理的题库。')
+      return
+    }
+    if (!fileUpload) {
+      setFileUploadError('请选择要上传的 JSON 文件。')
+      return
+    }
+
+    try {
+      setFileUploadSaving(true)
+      setFileUploadError(null)
+      const formData = new FormData()
+      formData.set('libraryId', fileDialogLibrary.id)
+      formData.set('file', fileUpload)
+      if (fileUploadName.trim()) {
+        formData.set('originalName', fileUploadName.trim())
+      }
+
+      const response = await fetch('/api/admin/question-library-files', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await response.json()
+      if (!response.ok || !data?.file) {
+        throw new Error(data?.error || '上传文件失败。')
+      }
+      setLibraryFiles((prev) => [data.file as QuestionLibraryFileInfo, ...prev])
+      setLibraries((prev) =>
+        prev.map((library) =>
+          library.id === fileDialogLibrary.id
+            ? { ...library, fileCount: (library.fileCount ?? 0) + 1 }
+            : library,
+        ),
+      )
+      notify({
+        variant: 'success',
+        title: '上传成功',
+        description: '题库文件已保存，可随时下载或回滚。',
+      })
+      resetFileUploadForm()
+    } catch (error: any) {
+      const message = error?.message ?? '上传文件失败，请稍后重试。'
+      setFileUploadError(message)
+      notify({
+        variant: 'danger',
+        title: '上传失败',
+        description: message,
+      })
+    } finally {
+      setFileUploadSaving(false)
+    }
+  }
+
+  const openRenameDialog = (file: QuestionLibraryFileInfo) => {
+    setRenameTarget(file)
+    setRenameValue(file.originalName ?? file.filename)
+    setRenameError(null)
+    setRenameDialogOpen(true)
+  }
+
+  const closeRenameDialog = () => {
+    if (renameSaving) return
+    setRenameDialogOpen(false)
+    setRenameTarget(null)
+    setRenameValue('')
+    setRenameError(null)
+  }
+
+  const handleRenameFile = async () => {
+    if (!renameTarget) return
+    const nextName = renameValue.trim()
+    if (!nextName) {
+      setRenameError('请输入新的文件名称。')
+      return
+    }
+
+    try {
+      setRenameSaving(true)
+      setRenameError(null)
+      const response = await fetch(`/api/admin/question-library-files/${renameTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalName: nextName }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.file) {
+        throw new Error(data?.error || '更新文件名失败。')
+      }
+      setLibraryFiles((prev) =>
+        prev.map((file) => (file.id === renameTarget.id ? (data.file as QuestionLibraryFileInfo) : file)),
+      )
+      notify({
+        variant: 'success',
+        title: '已更新文件名称',
+      })
+      closeRenameDialog()
+    } catch (error: any) {
+      const message = error?.message ?? '更新文件名称失败，请稍后再试。'
+      setRenameError(message)
+      notify({
+        variant: 'danger',
+        title: '更新失败',
+        description: message,
+      })
+    } finally {
+      setRenameSaving(false)
+    }
   }
 
   const handleDeleteFile = async (fileId: string) => {
@@ -791,7 +937,9 @@ export default function AdminQuestionLibraryPage() {
       visibilityBadgeClass[value] ??
       'bg-slate-100 text-slate-600 ring-slate-300/60 dark:bg-slate-700/40 dark:text-slate-200 dark:ring-slate-600/50'
     return (
-      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${cls}`}>
+      <span
+        className={`inline-flex min-w-[110px] items-center justify-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset whitespace-nowrap ${cls}`}
+      >
         {label}
       </span>
     )
@@ -800,7 +948,7 @@ export default function AdminQuestionLibraryPage() {
   const renderPresetSummary = (presets: ExamPresetSummary[]) => {
     if (!presets.length) return <span className="text-xs text-slate-500">未配置预设</span>
     return (
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex max-w-[360px] flex-wrap gap-1.5">
         {presets.map((preset) => (
           <span
             key={preset.code}
@@ -919,19 +1067,19 @@ export default function AdminQuestionLibraryPage() {
                       <table className="min-w-full divide-y divide-slate-100 dark:divide-slate-800">
                         <thead className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-900/80 dark:text-slate-300">
                           <tr>
-                            <th className="px-5 py-3">题库信息</th>
-                            <th className="px-5 py-3">地区 / 缩写</th>
-                            <th className="px-5 py-3">题量统计</th>
-                            <th className="px-5 py-3">可见范围</th>
-                            <th className="px-5 py-3">考试预设</th>
-                            <th className="px-5 py-3">更新时间</th>
-                            <th className="px-5 py-3">文件 / 操作</th>
+                            <th className="px-5 py-3 min-w-[260px]">题库信息</th>
+                            <th className="px-5 py-3 min-w-[150px] whitespace-nowrap">地区 / 缩写</th>
+                            <th className="px-5 py-3 min-w-[180px] whitespace-nowrap">题量统计</th>
+                            <th className="px-5 py-3 min-w-[140px] whitespace-nowrap">可见范围</th>
+                            <th className="px-5 py-3 min-w-[240px]">考试预设</th>
+                            <th className="px-5 py-3 min-w-[150px] whitespace-nowrap">更新时间</th>
+                            <th className="px-5 py-3 min-w-[220px] whitespace-nowrap">文件 / 操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm text-slate-700 dark:divide-slate-800 dark:text-slate-200">
                           {libraries.map((library) => (
                             <tr key={library.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/60">
-                              <td className="px-5 py-4 align-top">
+                              <td className="px-5 py-4 align-top min-w-[260px]">
                                 <div className="font-medium text-slate-900 dark:text-slate-100">{library.name}</div>
                                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{library.displayLabel}</div>
                                 {library.description && (
@@ -943,32 +1091,32 @@ export default function AdminQuestionLibraryPage() {
                                   <div>UUID：{library.uuid}</div>
                                 </dl>
                               </td>
-                              <td className="px-5 py-4 align-top">
-                                <div className="font-medium text-slate-900 dark:text-slate-100">{library.region ?? '未指定'}</div>
-                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">缩写：{library.shortName}</div>
-                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">代码：{library.code}</div>
+                              <td className="px-5 py-4 align-top min-w-[150px] space-y-1">
+                                <div className="font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">{library.region ?? '未指定'}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">缩写：{library.shortName}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">代码：{library.code}</div>
                               </td>
-                              <td className="px-5 py-4 align-top">
+                              <td className="px-5 py-4 align-top min-w-[180px] space-y-1">
                                 <div className="font-medium text-slate-900 dark:text-slate-100">{formatNumber(library.totalQuestions)}</div>
                                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                   单选 {formatNumber(library.singleChoiceCount)} · 多选 {formatNumber(library.multipleChoiceCount)}
                                   {library.trueFalseCount ? ` · 判断 ${formatNumber(library.trueFalseCount)}` : null}
                                 </div>
                               </td>
-                              <td className="px-5 py-4 align-top">
+                              <td className="px-5 py-4 align-top min-w-[140px]">
                                 {renderVisibilityBadge(library.visibility)}
                               </td>
-                              <td className="px-5 py-4 align-top">
+                              <td className="px-5 py-4 align-top min-w-[240px]">
                                 {renderPresetSummary(library.presets)}
                               </td>
-                              <td className="px-5 py-4 align-top text-xs text-slate-500 dark:text-slate-400">
+                              <td className="px-5 py-4 align-top text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[150px]">
                                 {formatDateTime(library.updatedAt)}
                               </td>
-                              <td className="px-5 py-4 align-top">
+                              <td className="px-5 py-4 align-top min-w-[220px] space-y-2">
                                 <div className="text-xs text-slate-500 dark:text-slate-400">
                                   已保存文件：{formatNumber(library.fileCount ?? 0)} 个
                                 </div>
-                                <div className="mt-2 flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-2">
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -1484,6 +1632,67 @@ export default function AdminQuestionLibraryPage() {
           </DialogDescription>
         </DialogHeader>
 
+        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">上传新的题库 JSON</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">文件仅用于备份与回滚，不会自动导入题目。</p>
+            </div>
+            {fileUpload && (
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                {fileUpload.name} · {formatBytes(fileUpload.size)}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+            <input
+              ref={fileUploadInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleSelectUploadFile}
+              disabled={fileUploadSaving}
+              className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-200 dark:focus:border-slate-500 dark:focus:ring-slate-600 dark:disabled:bg-slate-800/60"
+            />
+            <Input
+              placeholder="自定义文件名（可选）"
+              value={fileUploadName}
+              onChange={(event) => setFileUploadName(event.target.value)}
+              disabled={fileUploadSaving}
+            />
+          </div>
+          {fileUploadError && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-300">{fileUploadError}</p>
+          )}
+          <div className="mt-3 flex items-center justify-end gap-3">
+            {fileUpload ? (
+              <button
+                type="button"
+                onClick={resetFileUploadForm}
+                className="text-xs text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline dark:text-slate-300 dark:hover:text-white"
+                disabled={fileUploadSaving}
+              >
+                清除选择
+              </button>
+            ) : null}
+            <Button
+              size="sm"
+              onClick={handleUploadLibraryFile}
+              disabled={!fileUpload || fileUploadSaving}
+              className="inline-flex items-center gap-1"
+            >
+              {fileUploadSaving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> 上传中…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3.5 w-3.5" /> 上传并保存
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
         {fileListError && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
             {fileListError}
@@ -1550,6 +1759,14 @@ export default function AdminQuestionLibraryPage() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="inline-flex items-center gap-1"
+                          onClick={() => openRenameDialog(file)}
+                        >
+                          <PencilLine className="h-3.5 w-3.5" /> 重命名
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="inline-flex items-center gap-1 text-red-600 hover:text-red-500"
                           onClick={() => handleDeleteFile(file.id)}
                         >
@@ -1571,6 +1788,36 @@ export default function AdminQuestionLibraryPage() {
           </Button>
         </DialogFooter>
       </DialogContent>
+      </Dialog>
+
+      <Dialog open={renameDialogOpen} onOpenChange={(open) => (!open ? closeRenameDialog() : null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>重命名文件</DialogTitle>
+            <DialogDescription>请输入新的文件名称，方便区分不同版本。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="rename-file-input">文件名称</Label>
+            <Input
+              id="rename-file-input"
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.target.value)}
+              disabled={renameSaving}
+              placeholder={renameTarget?.filename}
+            />
+            {renameError && (
+              <p className="text-xs text-red-600 dark:text-red-300">{renameError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeRenameDialog} disabled={renameSaving}>
+              取消
+            </Button>
+            <Button onClick={handleRenameFile} disabled={renameSaving}>
+              {renameSaving ? '保存中…' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </>
   )

@@ -666,21 +666,13 @@ export async function POST(request: NextRequest) {
     })
     const existingUuids = new Set(existingQuestions.map((item) => item.uuid))
 
-    const transactionResult = await prisma.$transaction(async (tx) => {
+    const { libraryRecord } = await prisma.$transaction(async (tx) => {
       const existingLibrary =
         await tx.questionLibrary.findUnique({
           where: { uuid: header.uuid },
-          include: {
-            examPresets: true,
-            access: true,
-          },
         }) ??
         await tx.questionLibrary.findUnique({
           where: { code: header.code },
-          include: {
-            examPresets: true,
-            access: true,
-          },
         })
 
       if (existingLibrary && existingLibrary.uuid !== header.uuid) {
@@ -778,95 +770,100 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      for (const question of normalisedQuestions) {
-        try {
-          const data = {
-            externalId: question.externalId,
-            type: 'GENERIC' as const,
-            questionType: question.questionType,
-            difficulty: question.difficulty,
-            category: question.category,
-            categoryCode: question.categoryCode,
-            subSection: question.subSection,
-            title: question.title,
-            options: question.options,
-            correctAnswers: question.correctAnswers,
-            explanation: question.explanation,
-            tags: question.tags as unknown as Prisma.InputJsonValue,
-            hasImage: question.hasImage,
-            imagePath: question.imagePath,
-            imageAlt: question.imageAlt,
-            sourceId: question.sourceId,
-            pageSection: question.pageSection,
-            originalAnswer: question.originalAnswer,
-            libraryId: libraryRecord.id,
-            libraryUuid: libraryRecord.uuid,
-            libraryCode: libraryRecord.code,
-          }
-
-          if (existingUuids.has(question.uuid)) {
-            await tx.question.update({
-              where: { uuid: question.uuid },
-              data,
-            })
-            stats.updated += 1
-          } else {
-            await tx.question.create({
-              data: {
-                uuid: question.uuid,
-                ...data,
-              },
-            })
-            stats.imported += 1
-            existingUuids.add(question.uuid)
-          }
-
-          libraryStats.total += 1
-          if (question.questionType === 'single_choice') libraryStats.singleChoice += 1
-          if (question.questionType === 'multiple_choice') libraryStats.multipleChoice += 1
-          if (question.questionType === 'true_false') libraryStats.trueFalse += 1
-        } catch (error: any) {
-          stats.skipped += 1
-          const message = error?.message ?? '未知错误'
-          stats.errors.push(`题目 ${question.uuid} 导入失败：${message}`)
-        }
-      }
-
-      await tx.questionLibrary.update({
-        where: { id: libraryRecord.id },
-        data: {
-          totalQuestions: libraryStats.total,
-          singleChoiceCount: libraryStats.singleChoice,
-          multipleChoiceCount: libraryStats.multipleChoice,
-          trueFalseCount: libraryStats.trueFalse,
-        },
-      })
-
-      const refreshed = await tx.questionLibrary.findUnique({
-        where: { id: libraryRecord.id },
-        include: {
-          examPresets: { orderBy: [{ createdAt: 'asc' }] },
-          access: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  email: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              files: true,
-            },
-          },
-        },
-      })
-
-      return refreshed!
+      return { libraryRecord }
     })
+
+    for (const question of normalisedQuestions) {
+      try {
+        const data = {
+          externalId: question.externalId,
+          type: 'GENERIC' as const,
+          questionType: question.questionType,
+          difficulty: question.difficulty,
+          category: question.category,
+          categoryCode: question.categoryCode,
+          subSection: question.subSection,
+          title: question.title,
+          options: question.options,
+          correctAnswers: question.correctAnswers,
+          explanation: question.explanation,
+          tags: question.tags as unknown as Prisma.InputJsonValue,
+          hasImage: question.hasImage,
+          imagePath: question.imagePath,
+          imageAlt: question.imageAlt,
+          sourceId: question.sourceId,
+          pageSection: question.pageSection,
+          originalAnswer: question.originalAnswer,
+          libraryId: libraryRecord.id,
+          libraryUuid: libraryRecord.uuid,
+          libraryCode: libraryRecord.code,
+        }
+
+        if (existingUuids.has(question.uuid)) {
+          await prisma.question.update({
+            where: { uuid: question.uuid },
+            data,
+          })
+          stats.updated += 1
+        } else {
+          await prisma.question.create({
+            data: {
+              uuid: question.uuid,
+              ...data,
+            },
+          })
+          stats.imported += 1
+          existingUuids.add(question.uuid)
+        }
+
+        libraryStats.total += 1
+        if (question.questionType === 'single_choice') libraryStats.singleChoice += 1
+        if (question.questionType === 'multiple_choice') libraryStats.multipleChoice += 1
+        if (question.questionType === 'true_false') libraryStats.trueFalse += 1
+      } catch (error: any) {
+        stats.skipped += 1
+        const message = error?.message ?? '未知错误'
+        stats.errors.push(`题目 ${question.uuid} 导入失败：${message}`)
+      }
+    }
+
+    await prisma.questionLibrary.update({
+      where: { id: libraryRecord.id },
+      data: {
+        totalQuestions: libraryStats.total,
+        singleChoiceCount: libraryStats.singleChoice,
+        multipleChoiceCount: libraryStats.multipleChoice,
+        trueFalseCount: libraryStats.trueFalse,
+      },
+    })
+
+    const transactionResult = await prisma.questionLibrary.findUnique({
+      where: { id: libraryRecord.id },
+      include: {
+        examPresets: { orderBy: [{ createdAt: 'asc' }] },
+        access: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            files: true,
+          },
+        },
+      },
+    })
+
+    if (!transactionResult) {
+      throw new Error('题库记录丢失，导入失败。')
+    }
+
     const fileCount = await prisma.questionLibraryFile.count({
       where: { libraryId: transactionResult.id },
     })

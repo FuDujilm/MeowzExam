@@ -34,6 +34,8 @@ interface Question {
   subSection?: string | null
   title: string
   hasImage: boolean
+  imagePath?: string | null
+  imageAlt?: string | null
   tags: string[]
   libraryCode?: string | null
   libraryName?: string | null
@@ -247,7 +249,7 @@ export default function QuestionsPage() {
       mode: 'sequential',
       type: selectedLibraryCode,
       library: selectedLibraryCode,
-      currentId: questionId,
+      questionId,
     })
     router.push(`/practice?${params.toString()}`)
   }
@@ -464,6 +466,19 @@ export default function QuestionsPage() {
                           </div>
                         </div>
                         <p className="text-sm leading-6 text-gray-900 dark:text-slate-50">{question.title}</p>
+                        {question.hasImage && question.imagePath ? (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/60">
+                            <img
+                              src={question.imagePath}
+                              alt={question.imageAlt || question.title}
+                              className="mx-auto max-h-60 w-full rounded-md object-contain"
+                              loading="lazy"
+                            />
+                            {question.imageAlt ? (
+                              <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">{question.imageAlt}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="space-y-2">
                           {options.length === 0 ? (
                             <p className="text-xs text-gray-400 dark:text-slate-500">该题暂无选项数据。</p>

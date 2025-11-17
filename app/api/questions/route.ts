@@ -156,6 +156,7 @@ export async function GET(request: NextRequest) {
         title: true,
         hasImage: true,
         imagePath: true,
+        imageAlt: true,
         tags: true,
         createdAt: true,
         libraryCode: true,

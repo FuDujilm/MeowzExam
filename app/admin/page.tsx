@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Bot,
   ChevronRight,
+  Cloud,
   Cpu,
   FileUp,
   Globe,
@@ -165,6 +166,13 @@ const adminSections: AdminSection[] = [
         description: '导入新题库版本并校验数据。',
         icon: FileUp,
         accent: 'blue',
+      },
+      {
+        href: '/admin/r2',
+        label: '题库图片',
+        description: '上传题库配图并获取 R2 链接。',
+        icon: Cloud,
+        accent: 'sky',
       },
       {
         href: '/admin/points-config',

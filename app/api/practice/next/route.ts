@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
       searchParams.get('library') ?? searchParams.get('type'),
     )
     const currentId = searchParams.get('currentId')
+    const targetQuestionId = searchParams.get('questionId')
 
     if (!libraryCodeParam) {
       return NextResponse.json(
@@ -107,7 +108,18 @@ export async function GET(request: NextRequest) {
 
     let question: QuestionWithOptions | null = null
 
-    switch (mode) {
+    if (targetQuestionId) {
+      question = await prisma.question.findFirst({
+        where: combineWhereConditions(libraryFilter, { id: targetQuestionId }),
+      })
+      if (!question) {
+        return NextResponse.json(
+          { error: '未找到指定题目，请刷新后重试。' },
+          { status: 404 },
+        )
+      }
+    } else {
+      switch (mode) {
       case 'sequential': {
         const correctQuestions = await prisma.userQuestion.findMany({
           where: {
@@ -265,6 +277,7 @@ export async function GET(request: NextRequest) {
           { error: '不支持的练习模式。' },
           { status: 400 },
         )
+    }
     }
 
     if (!question) {

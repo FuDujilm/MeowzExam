@@ -51,6 +51,22 @@ ADMIN_EMAILS="admin@example.com,second@example.com"
 ```
 更多变量（如题库导入策略、AI 速率限制、站点装饰配置）可参考 `config/` 与 `.env.example`（若存在）。
 
+### Cloudflare R2（可选）
+若题库包含自托管配图，可将对象保存在 Cloudflare R2 并在后台 `/admin/r2` 管理。按需补充以下环境变量：
+
+```
+# Cloudflare R2 Storage
+CF_R2_ACCOUNT_ID="xxxxxxxxxxxxxxxxxxxx"
+CF_R2_ACCESS_KEY_ID="XXXXXXXXXXXXXXXXXXXX"
+CF_R2_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+CF_R2_BUCKET_NAME="exam-assets"
+CF_R2_PUBLIC_BASE_URL="https://cdn.example.com"   # 绑定在 R2 上的公开域名
+CF_R2_BASE_PREFIX="question-images"             # 可选，默认为 question-images
+CF_R2_DISABLE_PROXY="false"                     # 若运行环境强制代理，可设为 true 直连
+```
+
+配置完成后，即可在后台上传配图并获取可直接写入题库 JSON 的公开 URL。
+
 ### 3. 迁移数据库
 ```bash
 pnpm exec prisma migrate dev

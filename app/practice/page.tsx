@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -39,6 +39,7 @@ interface Question {
   aiExplanation?: string
   hasImage: boolean
   imagePath?: string
+  imageAlt?: string | null
 }
 
 interface UserQuestion {
@@ -53,6 +54,7 @@ function PracticeContent() {
 
   const mode = searchParams.get('mode') || 'sequential'
   const type = searchParams.get('type') || 'A_CLASS'
+  const initialQuestionIdRef = useRef<string | null>(searchParams.get('questionId'))
   
   const [question, setQuestion] = useState<Question | null>(null)
   const [userQuestion, setUserQuestion] = useState<UserQuestion | null>(null)
@@ -81,14 +83,21 @@ function PracticeContent() {
   }
 
   // 加载题目
-  const loadQuestion = async (currentId?: string, direction: 'next' | 'prev' = 'next') => {
+const loadQuestion = async (
+    currentId?: string,
+    direction: 'next' | 'prev' | 'jump' = 'next',
+    targetQuestionId?: string | null,
+  ) => {
     try {
       setLoading(true)
       const params = new URLSearchParams({
         mode,
         type,
       })
-      if (currentId) {
+
+      if (targetQuestionId) {
+        params.append('questionId', targetQuestionId)
+      } else if (currentId) {
         params.append('currentId', currentId)
       }
 
@@ -144,6 +153,9 @@ function PracticeContent() {
         const newHistory = [...questionHistory.slice(0, currentHistoryIndex + 1), data.question.id]
         setQuestionHistory(newHistory)
         setCurrentHistoryIndex(newHistory.length - 1)
+      } else if (direction === 'jump' && data.question) {
+        setQuestionHistory([data.question.id])
+        setCurrentHistoryIndex(0)
       }
     } catch (error) {
       console.error('加载题目失败:', error)
@@ -159,7 +171,9 @@ function PracticeContent() {
 
   // 初始加载
   useEffect(() => {
-    loadQuestion()
+    const jumpId = initialQuestionIdRef.current
+    loadQuestion(undefined, jumpId ? 'jump' : 'next', jumpId ?? undefined)
+    initialQuestionIdRef.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, type])
 
@@ -464,6 +478,19 @@ function PracticeContent() {
           </div>
         </CardHeader>
         <CardContent>
+          {question.hasImage && question.imagePath ? (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/60">
+              <img
+                src={question.imagePath}
+                alt={question.imageAlt || question.title}
+                className="mx-auto max-h-64 w-full rounded-md object-contain"
+                loading="lazy"
+              />
+              {question.imageAlt ? (
+                <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">{question.imageAlt}</p>
+              ) : null}
+            </div>
+          ) : null}
           {/* 选项 */}
           <div className="space-y-3">
             {question.questionType === 'multiple_choice' ? (

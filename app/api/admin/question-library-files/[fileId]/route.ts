@@ -6,6 +6,21 @@ import {
   readLibraryFile,
 } from '@/lib/server/library-file-store'
 
+function serializeRecord(record: any) {
+  return {
+    id: record.id,
+    libraryId: record.libraryId,
+    filename: record.filename,
+    originalName: record.originalName,
+    fileSize: record.fileSize,
+    mimeType: record.mimeType,
+    checksum: record.checksum,
+    uploadedAt: record.uploadedAt?.toISOString?.() ?? record.uploadedAt,
+    uploadedBy: record.uploadedBy,
+    uploadedByEmail: record.uploadedByEmail,
+  }
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ fileId: string }> },
@@ -82,6 +97,44 @@ export async function DELETE(
     console.error('Delete library file error:', error)
     return NextResponse.json(
       { error: error?.message ?? '删除文件失败。' },
+      { status: 500 },
+    )
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ fileId: string }> },
+) {
+  const { fileId } = await params
+  const adminCheck = await checkAdminPermission()
+  if (!adminCheck.success) {
+    return NextResponse.json(
+      { error: adminCheck.error },
+      { status: adminCheck.status ?? 401 },
+    )
+  }
+
+  const body = await request.json().catch(() => null)
+  const nextName = typeof body?.originalName === 'string' ? body.originalName.trim() : ''
+  if (!nextName) {
+    return NextResponse.json({ error: '请输入新的文件名称。' }, { status: 400 })
+  }
+
+  try {
+    const updated = await prisma.questionLibraryFile.update({
+      where: { id: fileId },
+      data: { originalName: nextName },
+    })
+
+    return NextResponse.json({ success: true, file: serializeRecord(updated) })
+  } catch (error: any) {
+    if (error?.code === 'P2025') {
+      return NextResponse.json({ error: '文件不存在。' }, { status: 404 })
+    }
+    console.error('Rename library file error:', error)
+    return NextResponse.json(
+      { error: error?.message ?? '更新文件信息失败。' },
       { status: 500 },
     )
   }

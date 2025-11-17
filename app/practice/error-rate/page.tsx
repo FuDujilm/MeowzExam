@@ -39,6 +39,7 @@ interface Question {
   aiExplanation?: string
   hasImage: boolean
   imagePath?: string
+  imageAlt?: string | null
   answerMapping?: Record<string, string>
 }
 
@@ -387,6 +388,19 @@ function ErrorRateContent() {
           </div>
         </CardHeader>
         <CardContent>
+          {question.hasImage && question.imagePath ? (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/60">
+              <img
+                src={question.imagePath}
+                alt={question.imageAlt || question.title}
+                className="mx-auto max-h-64 w-full rounded-md object-contain"
+                loading="lazy"
+              />
+              {question.imageAlt ? (
+                <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">{question.imageAlt}</p>
+              ) : null}
+            </div>
+          ) : null}
           {/* 选项 */}
           <div className="space-y-3">
             {question.questionType === 'multiple_choice' ? (
