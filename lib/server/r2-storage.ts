@@ -275,20 +275,33 @@ function parseListObjectsResponse(env: R2ResolvedEnvironment, xml: string): R2Li
     : []
 
   const objects: R2ObjectSummary[] = contents
-    .map((item: any) => {
-      const key = typeof item.Key === 'string' ? item.Key : ''
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return null
+      }
+
+      const entry = item as Record<string, unknown>
+      const key = typeof entry.Key === 'string' ? entry.Key : ''
       if (!key) return null
-      const size = Number.parseInt(item.Size, 10)
-      const etagRaw = typeof item.ETag === 'string' ? item.ETag : null
+
+      const sizeRaw = typeof entry.Size === 'number'
+        ? entry.Size
+        : typeof entry.Size === 'string'
+          ? Number.parseInt(entry.Size, 10)
+          : Number.NaN
+
+      const lastModifiedValue = typeof entry.LastModified === 'string' ? entry.LastModified : null
+      const etagRaw = typeof entry.ETag === 'string' ? entry.ETag : null
+
       return {
         key,
-        size: Number.isNaN(size) ? 0 : size,
-        lastModified: normaliseDate(item.LastModified ?? null),
+        size: Number.isNaN(sizeRaw) ? 0 : sizeRaw,
+        lastModified: normaliseDate(lastModifiedValue),
         etag: etagRaw ? etagRaw.replace(/"/g, '') : null,
         publicUrl: buildPublicUrl(env, key),
       }
     })
-    .filter(Boolean) as R2ObjectSummary[]
+    .filter((item): item is R2ObjectSummary => Boolean(item))
 
   return {
     objects,
@@ -380,8 +393,7 @@ async function sendR2Request(env: R2ResolvedEnvironment, options: R2RequestOptio
 
     if (proxyUrl) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { ProxyAgent } = require('undici')
+        const { ProxyAgent } = await import('undici')
         fetchOptions.dispatcher = new ProxyAgent(proxyUrl)
       } catch (error) {
         console.warn('[r2] ProxyAgent 加载失败，继续使用默认网络', error)

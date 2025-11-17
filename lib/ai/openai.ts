@@ -66,7 +66,7 @@ function isValidHttpUrl(value: string): boolean {
   try {
     const url = new URL(value)
     return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch (_error) {
+  } catch {
     return false
   }
 }

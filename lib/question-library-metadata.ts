@@ -10,26 +10,40 @@ type RawQuestionStrategy = {
   rules?: unknown
 }
 
-function normaliseTagRule(raw: any, index: number): ExamPresetTagRule {
-  const id = typeof raw?.id === 'string' && raw.id.trim() ? raw.id.trim() : `RULE_${index + 1}`
-  const label = typeof raw?.label === 'string' ? raw.label.trim() : null
+function toRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
 
-  const count = Number.parseInt(raw?.count, 10)
+function normaliseTagRule(raw: unknown, index: number): ExamPresetTagRule {
+  const source = toRecord(raw)
+  const id = typeof source.id === 'string' && source.id.trim() ? source.id.trim() : `RULE_${index + 1}`
+  const label = typeof source.label === 'string' ? source.label.trim() : null
+
+  const parsedCount = typeof source.count === 'number'
+    ? source.count
+    : typeof source.count === 'string'
+      ? Number.parseInt(source.count, 10)
+      : Number.NaN
+  const count = Number.isFinite(parsedCount) ? Math.trunc(parsedCount) : Number.NaN
+
   if (!Number.isFinite(count) || count <= 0) {
     throw new Error(`标签抽题规则「${label || id}」的题量必须为正整数。`)
   }
 
-  const tagsInput = Array.isArray(raw?.tags)
-    ? raw.tags
-    : typeof raw?.tag === 'string'
-      ? [raw.tag]
+  const tagsInput = Array.isArray(source.tags)
+    ? source.tags
+    : typeof source.tag === 'string'
+      ? [source.tag]
       : []
 
   const tags = tagsInput
     .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
     .filter(Boolean)
 
-  const questionTypeRaw = typeof raw?.questionType === 'string' ? raw.questionType : 'any'
+  const questionTypeRaw = typeof source.questionType === 'string' ? source.questionType : 'any'
   const questionType = ['single_choice', 'multiple_choice', 'true_false'].includes(questionTypeRaw)
     ? (questionTypeRaw as ExamPresetTagRule['questionType'])
     : 'any'
@@ -40,22 +54,24 @@ function normaliseTagRule(raw: any, index: number): ExamPresetTagRule {
     tags: tags.length ? tags : undefined,
     count,
     questionType,
-    requireImage: Boolean(raw?.requireImage),
+    requireImage: Boolean(source.requireImage),
   }
 }
 
-function normaliseQuestionStrategy(raw: RawQuestionStrategy | null): ExamPresetQuestionStrategy | null {
+function normaliseQuestionStrategy(raw: unknown): ExamPresetQuestionStrategy | null {
   if (!raw || typeof raw !== 'object') {
     return null
   }
 
-  const modeRaw = typeof raw.mode === 'string' ? raw.mode.toUpperCase() : 'TAG_RULES'
+  const source = raw as RawQuestionStrategy
+
+  const modeRaw = typeof source.mode === 'string' ? source.mode.toUpperCase() : 'TAG_RULES'
   const mode: ExamPresetQuestionStrategy['mode'] = modeRaw === 'RANDOM' ? 'RANDOM' : 'TAG_RULES'
 
-  const orderRaw = typeof raw.order === 'string' ? raw.order.toUpperCase() : 'FIXED'
+  const orderRaw = typeof source.order === 'string' ? source.order.toUpperCase() : 'FIXED'
   const order: ExamPresetQuestionStrategy['order'] = orderRaw === 'SHUFFLE' ? 'SHUFFLE' : 'FIXED'
 
-  const rulesInput = Array.isArray(raw.rules) ? raw.rules : []
+  const rulesInput = Array.isArray(source.rules) ? source.rules : []
   const rules = rulesInput.map((rule, index) => normaliseTagRule(rule, index))
 
   if (mode === 'TAG_RULES' && rules.length === 0) {
@@ -75,12 +91,10 @@ export function normaliseExamPresetMetadata(input: unknown): ExamPresetMetadata 
   }
 
   const metadata: ExamPresetMetadata = {}
-  const rawStrategy =
-    (input as any).questionStrategy ??
-    (input as any).question_strategy ??
-    null
+  const source = input as { questionStrategy?: unknown; question_strategy?: unknown }
+  const rawStrategy = source.questionStrategy ?? source.question_strategy ?? null
 
-  const strategy = normaliseQuestionStrategy(rawStrategy as RawQuestionStrategy | null)
+  const strategy = normaliseQuestionStrategy(rawStrategy)
   if (strategy) {
     metadata.questionStrategy = strategy
   }

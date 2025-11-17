@@ -32,7 +32,7 @@ export function verifyToken(token: string): AuthUser | null {
       email: decoded.email,
       callsign: decoded.callsign ?? undefined,
     }
-  } catch (error) {
+  } catch {
     return null
   }
 }
