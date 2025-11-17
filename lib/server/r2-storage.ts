@@ -268,7 +268,7 @@ function parseListObjectsResponse(env: R2ResolvedEnvironment, xml: string): R2Li
   if (!result) {
     throw new R2RequestError('无法解析 R2 返回结果', { details: xml })
   }
-  const contents = Array.isArray(result.Contents)
+  const contents: unknown[] = Array.isArray(result.Contents)
     ? result.Contents
     : result.Contents
     ? [result.Contents]
