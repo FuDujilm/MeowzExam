@@ -237,6 +237,19 @@
 | GET  | `/api/site-config`    | 无         | 获取站点配置（标题、描述、Logo 等）|
 | PUT  | `/api/site-config`    | 管理员     | 更新站点配置                       |
 
+### 4.10 题库与考试预设
+
+| 方法 | 路径                       | 鉴权   | 描述                                                   |
+| ---- | -------------------------- | ------ | ------------------------------------------------------ |
+| GET  | `/api/question-libraries`  | Bearer | 列出当前账户可访问的题库及考试预设（未登录仅返回公开库） |
+
+**响应字段说明**
+- `libraries[]`: 每个对象包含 `id/uuid/code/name/shortName/description/region/sourceType/version/visibility/displayLabel/displayTemplate/updatedAt`
+- `totalQuestions` 与 `singleChoiceCount`/`multipleChoiceCount`/`trueFalseCount`: 题目数量统计
+- `presets[]`: 各题库内置考试配置，字段 `id/code/name/description/durationMinutes/totalQuestions/passScore/...Count`，可直接用于 `POST /api/exam/start`
+
+客户端可缓存该列表以驱动题库切换、考试类型选择界面。
+
 ## 5. 管理端接口
 
 以下接口仅供内部管理工具使用，移动端如需调用需确保账号在 `ADMIN_EMAILS` 中，并携带有效 Session/JWT。
@@ -296,6 +309,47 @@
 | PUT  | `/api/admin/points-config`             | 更新积分配置                                             |
 
 所有用户操作均会写入审计日志（`aiQuota`、`loginDisabled`、`manualExplanationDisabled` 等字段变更会记录前后值）。
+
+### 5.6 题库预设与标签统计
+
+| 方法 | 路径                                                     | 描述                                                         |
+| ---- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| PATCH| `/api/admin/question-libraries/{libraryId}/presets`      | 以数组形式整体替换题库的考试预设；字段含 `code/name/durationMinutes/totalQuestions/passScore/...Count/metadata` |
+| GET  | `/api/admin/question-libraries/{libraryId}/tag-summary`  | 聚合指定题库的标签使用次数与按题型统计，额外返回 `imageSummary` |
+
+`metadata` 字段遵循 `ExamPresetMetadata` 结构，可携带抽题策略等信息；接口会校验题量与 `code` 唯一性并返回最新预设列表。
+
+### 5.7 题库文件归档
+
+| 方法 | 路径                                            | 描述                                                                 |
+| ---- | ----------------------------------------------- | -------------------------------------------------------------------- |
+| GET  | `/api/admin/question-library-files?libraryId=...` | 根据题库 ID 查看已上传的 JSON 备份，返回 `filename/originalName/fileSize/checksum/...` |
+| POST | `/api/admin/question-library-files`             | 通过 `multipart/form-data` 上传 JSON 备份，字段 `libraryId`+`file`+`originalName?`，最大 8MB |
+| GET  | `/api/admin/question-library-files/{fileId}`    | 下载指定文件内容（附 `Content-Disposition`）                        |
+| PATCH| `/api/admin/question-library-files/{fileId}`    | 更新文件展示名称 `{ originalName }`                                  |
+| DELETE | `/api/admin/question-library-files/{fileId}`  | 删除记录并清理磁盘上的备份文件                                      |
+
+上传接口会先验证 JSON 格式；成功后返回 `file` 对象，可用于构建题库导入记录。
+
+### 5.8 R2 存储与资源管理
+
+| 方法 | 路径                         | 描述                                                                 |
+| ---- | ---------------------------- | -------------------------------------------------------------------- |
+| GET  | `/api/admin/r2/status`       | 返回 Cloudflare R2 的配置完整性、示例公共地址等信息                 |
+| GET  | `/api/admin/r2/objects`      | 根据 `prefix/limit/token` 列出对象，返回 `objects[]`, `hasMore`, `continuationToken` |
+| POST | `/api/admin/r2/objects`      | 通过 `multipart/form-data` 上传任意文件，字段 `file` + `folder?` + `filename?` |
+| DELETE | `/api/admin/r2/object`     | 删除对象；可在请求体 `{ key }` 或查询串 `?key=` 中提供对象键         |
+
+列表和上传接口会在 R2 未配置时返回 `success: false` 与缺失项，错误响应包含 `code`、`details`，便于在管理端提示。
+
+### 5.9 SMTP 配置测试
+
+| 方法 | 路径                   | 描述                                                               |
+| ---- | ---------------------- | ------------------------------------------------------------------ |
+| GET  | `/api/admin/smtp-test` | 查看当前 SMTP 配置摘要、缺失环境变量及 `connectionVerified` 状态   |
+| POST | `/api/admin/smtp-test` | 发送测试邮件，body `{ recipient, subject?, message?, forceRealSend? }` |
+
+测试接口会校验邮箱格式，在开发模式下默认返回 Nodemailer 预览链接，传入 `forceRealSend: true` 可强制真实发送。响应包含请求时间、目标邮箱以及实际使用的 SMTP 模式，方便排查部署问题。
 
 ## 6. 限流与费用策略
 

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { AiExplainSchema, calculateWilsonScore } from '@/lib/ai/schema'
 import { createAuditLog } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/questions/[id]/explanations
  * 用户提交解析

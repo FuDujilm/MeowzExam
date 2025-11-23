@@ -17,7 +17,6 @@ import { Download, Save } from 'lucide-react'
 interface UserSettings {
   callsign?: string
   enableWrongQuestionWeight: boolean
-  theme: string
   examType?: string
   aiStylePresetId: string | null
   aiStyleCustom: string
@@ -39,7 +38,6 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings>({
     callsign: '',
     enableWrongQuestionWeight: false,
-    theme: 'light',
     examType: 'A_CLASS',
     aiStylePresetId: null,
     aiStyleCustom: '',
@@ -72,7 +70,6 @@ export default function SettingsPage() {
         setSettings({
           callsign: data.user?.callsign || '',
           enableWrongQuestionWeight: data.settings?.enableWrongQuestionWeight || false,
-          theme: data.settings?.theme || 'light',
           examType: data.settings?.examType || 'A_CLASS',
           aiStylePresetId: data.settings?.aiStylePresetId ?? null,
           aiStyleCustom: data.settings?.aiStyleCustom ?? '',
@@ -109,7 +106,6 @@ export default function SettingsPage() {
         body: JSON.stringify({
           callsign: settings.callsign,
           enableWrongQuestionWeight: settings.enableWrongQuestionWeight,
-          theme: settings.theme,
           examType: settings.examType,
           aiStylePresetId: settings.aiStylePresetId,
           aiStyleCustom: settings.aiStyleCustom,
@@ -247,20 +243,6 @@ export default function SettingsPage() {
                   setSettings({ ...settings, enableWrongQuestionWeight: checked })
                 }
               />
-            </div>
-
-            <div>
-              <Label htmlFor="theme">主题</Label>
-              <select
-                id="theme"
-                value={settings.theme}
-                onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
-                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              >
-                <option value="light">明亮</option>
-                <option value="dark">暗黑</option>
-                <option value="system">跟随系统</option>
-              </select>
             </div>
 
             <div className="space-y-1.5">

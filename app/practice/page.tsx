@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useEffect, Suspense, useRef } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -54,7 +54,7 @@ function PracticeContent() {
 
   const mode = searchParams.get('mode') || 'sequential'
   const type = searchParams.get('type') || 'A_CLASS'
-  const initialQuestionIdRef = useRef<string | null>(searchParams.get('questionId'))
+  const questionIdParam = searchParams.get('questionId')
   
   const [question, setQuestion] = useState<Question | null>(null)
   const [userQuestion, setUserQuestion] = useState<UserQuestion | null>(null)
@@ -169,13 +169,12 @@ const loadQuestion = async (
     }
   }
 
-  // 初始加载
+  // 初始加载 & 根据地址栏 questionId 跳转
   useEffect(() => {
-    const jumpId = initialQuestionIdRef.current
-    loadQuestion(undefined, jumpId ? 'jump' : 'next', jumpId ?? undefined)
-    initialQuestionIdRef.current = null
+    const jumpId = questionIdParam ?? undefined
+    loadQuestion(undefined, jumpId ? 'jump' : 'next', jumpId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, type])
+  }, [mode, type, questionIdParam])
 
   // 提交答案
   const handleSubmit = async () => {
@@ -431,8 +430,11 @@ const loadQuestion = async (
     )
   }
 
+  const isHistoryPrevDisabled = loading || currentHistoryIndex <= 0
+
   return (
-    <div className="container mx-auto p-4 max-w-4xl text-slate-900 dark:text-slate-100">
+    <>
+      <div className="container mx-auto p-4 pb-36 max-w-4xl text-slate-900 dark:text-slate-100">
       {/* 头部信息 */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -612,61 +614,66 @@ const loadQuestion = async (
         </CardContent>
       </Card>
 
-      {/* 操作按钮 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Button
-          variant="outline"
-          onClick={() => router.push('/practice/modes')}
-          className="w-full sm:w-auto"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          选择模式
-        </Button>
+      </div>
 
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
-          {/* 上一题按钮 */}
-          <Button
-            variant="outline"
-            onClick={handlePrev}
-            disabled={loading || currentHistoryIndex <= 0}
-            className="flex-1 min-w-[120px] sm:flex-none sm:w-auto"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            上一题
-          </Button>
+      {/* 悬浮操作条 */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4 sm:pb-6">
+        <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-900/90">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/practice/modes')}
+              className="w-full sm:w-auto"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              选择模式
+            </Button>
 
-          {!submitted ? (
-            <>
+            <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
               <Button
                 variant="outline"
-                onClick={handleNext}
-                disabled={loading}
+                onClick={handlePrev}
+                disabled={isHistoryPrevDisabled}
                 className="flex-1 min-w-[120px] sm:flex-none sm:w-auto"
               >
-                跳过
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                上一题
               </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={loading || selectedAnswer.length === 0}
-                className="w-full text-base sm:w-auto sm:min-w-[180px] sm:text-sm"
-              >
-                提交答案
-              </Button>
-            </>
-          ) : (
-            <Button
-              onClick={handleNext}
-              disabled={loading}
-              className="w-full sm:w-auto sm:min-w-[160px]"
-            >
-              下一题
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
+
+              {!submitted ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleNext}
+                    disabled={loading}
+                    className="flex-1 min-w-[120px] sm:flex-none sm:w-auto"
+                  >
+                    跳过
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={loading || selectedAnswer.length === 0}
+                    className="w-full text-base sm:w-auto sm:min-w-[180px] sm:text-sm"
+                  >
+                    提交答案
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={handleNext}
+                  disabled={loading}
+                  className="w-full sm:w-auto sm:min-w-[160px]"
+                >
+                  下一题
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 

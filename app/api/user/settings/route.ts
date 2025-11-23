@@ -37,7 +37,6 @@ export async function GET() {
     const settings = user.settings
       ? {
           enableWrongQuestionWeight: user.settings.enableWrongQuestionWeight,
-          theme: user.settings.theme,
           examType: user.settings.examType ?? 'A_CLASS',
           aiStylePresetId: user.settings.aiStylePresetId,
           aiStyleCustom: user.settings.aiStyleCustom ?? '',
@@ -45,7 +44,6 @@ export async function GET() {
         }
       : {
           enableWrongQuestionWeight: false,
-          theme: 'light',
           examType: 'A_CLASS',
           aiStylePresetId: null,
           aiStyleCustom: '',
@@ -83,7 +81,6 @@ export async function POST(request: NextRequest) {
     const {
       callsign,
       enableWrongQuestionWeight,
-      theme,
       examType,
       aiStylePresetId,
       aiStyleCustom,
@@ -176,7 +173,6 @@ export async function POST(request: NextRequest) {
       create: {
         userId: user.id,
         enableWrongQuestionWeight: enableWrongQuestionWeight || false,
-        theme: theme || 'light',
         examType: normalizedExamType,
         aiStylePresetId: resolvedPresetId,
         aiStyleCustom: customPrompt,
@@ -184,7 +180,6 @@ export async function POST(request: NextRequest) {
       },
       update: {
         enableWrongQuestionWeight: enableWrongQuestionWeight || false,
-        theme: theme || 'light',
         examType: normalizedExamType,
         aiStylePresetId: resolvedPresetId,
         aiStyleCustom: customPrompt,

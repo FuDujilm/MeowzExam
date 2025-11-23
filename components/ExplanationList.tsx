@@ -42,7 +42,9 @@ export function ExplanationList({
       setLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/questions/${questionId}/explanations`)
+      const response = await fetch(`/api/questions/${questionId}/explanations`, {
+        cache: 'no-store',
+      })
 
       if (!response.ok) {
         throw new Error('获取解析失败')

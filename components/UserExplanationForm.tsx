@@ -11,6 +11,8 @@ export interface UserExplanationFormProps {
   onCancel?: () => void
 }
 
+const MIN_CONTENT_LENGTH = 10
+
 export function UserExplanationForm({
   questionId,
   onSuccess,
@@ -28,8 +30,8 @@ export function UserExplanationForm({
       return
     }
 
-    if (content.trim().length < 20) {
-      setError('解析内容至少需要20个字符')
+    if (content.trim().length < MIN_CONTENT_LENGTH) {
+      setError(`解析内容至少需要${MIN_CONTENT_LENGTH}个字符`)
       return
     }
 
@@ -64,13 +66,15 @@ export function UserExplanationForm({
     }
   }
 
+  const currentLength = content.trim().length
+
   return (
-    <Card className="border-2 border-purple-300 bg-purple-50">
+    <Card className="border-2 border-purple-300 bg-purple-50 shadow-lg dark:border-purple-500/50 dark:bg-slate-900/70">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-purple-600" />
-            <CardTitle className="text-lg">贡献您的解析</CardTitle>
+            <Lightbulb className="h-5 w-5 text-purple-600 dark:text-purple-300" />
+            <CardTitle className="text-lg text-gray-900 dark:text-slate-100">贡献您的解析</CardTitle>
           </div>
           {onCancel && (
             <Button
@@ -78,6 +82,7 @@ export function UserExplanationForm({
               size="sm"
               onClick={onCancel}
               disabled={submitting}
+              className="text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-white"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -87,10 +92,13 @@ export function UserExplanationForm({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="explanation-content" className="text-sm font-medium text-gray-700">
+            <Label
+              htmlFor="explanation-content"
+              className="text-sm font-medium text-gray-700 dark:text-slate-100"
+            >
               解析内容
             </Label>
-            <p className="text-xs text-gray-500 mb-2">
+            <p className="mb-2 text-xs text-gray-500 dark:text-slate-400">
               请详细解释正确答案的理由，帮助其他考生理解这道题
             </p>
             <Textarea
@@ -100,20 +108,20 @@ export function UserExplanationForm({
               onChange={(e) => setContent(e.target.value)}
               rows={6}
               disabled={submitting}
-              className="resize-none"
+              className="resize-none bg-white/90 text-gray-900 placeholder:text-gray-400 dark:bg-slate-950/40 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
-            <p className="mt-1 text-xs text-gray-500">
-              {content.length} / 最少20字符
+            <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+              {currentLength} / 最少{MIN_CONTENT_LENGTH}字符
             </p>
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-500/40 dark:bg-red-500/10">
+              <p className="text-sm text-red-600 dark:text-red-200">{error}</p>
             </div>
           )}
 
-          <div className="bg-purple-100 rounded-lg p-3 text-xs text-purple-800">
+          <div className="rounded-lg bg-purple-100 p-3 text-xs text-purple-800 dark:bg-purple-500/10 dark:text-purple-100">
             <p className="font-semibold mb-1">提交须知：</p>
             <ul className="list-disc list-inside space-y-1">
               <li>每道题只能提交一次解析</li>
@@ -137,7 +145,7 @@ export function UserExplanationForm({
             )}
             <Button
               type="submit"
-              disabled={submitting || content.trim().length < 20}
+              disabled={submitting || currentLength < MIN_CONTENT_LENGTH}
               className="flex-1"
             >
               {submitting ? (
