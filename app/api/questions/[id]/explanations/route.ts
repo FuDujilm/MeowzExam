@@ -6,6 +6,10 @@ import { createAuditLog } from '@/lib/audit'
 
 export const dynamic = 'force-dynamic'
 
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+} as const
+
 /**
  * POST /api/questions/[id]/explanations
  * 用户提交解析
@@ -47,7 +51,7 @@ export async function POST(
     if (!question) {
       return NextResponse.json(
         { error: 'Question not found' },
-        { status: 404 }
+        { status: 404, headers: noStoreHeaders }
       )
     }
 
@@ -279,12 +283,12 @@ export async function GET(
       })
     }
 
-    return NextResponse.json(response)
+    return NextResponse.json(response, { headers: noStoreHeaders })
   } catch (error: any) {
     console.error('Get explanations error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to get explanations' },
-      { status: 500 }
+      { status: 500, headers: noStoreHeaders }
     )
   }
 }
