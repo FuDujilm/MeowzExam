@@ -70,14 +70,9 @@ export function ExplanationList({
       return
     }
 
+    setInternalGenerating(true)
     try {
-      setInternalGenerating(true)
-      const result = await Promise.resolve(onGenerateAI())
-      if (result === false) {
-        return
-      }
-
-      await loadExplanations()
+      await Promise.resolve(onGenerateAI())
     } catch (error) {
       console.error('Generate AI explanation via list failed:', error)
       notify({
@@ -86,6 +81,7 @@ export function ExplanationList({
         description: '请稍后重试或手动撰写解析。',
       })
     } finally {
+      await loadExplanations()
       setInternalGenerating(false)
     }
   }
@@ -124,14 +120,9 @@ export function ExplanationList({
       return
     }
 
+    setInternalRegenerating(true)
     try {
-      setInternalRegenerating(true)
-      const result = await Promise.resolve(onRegenerateAI())
-      if (result === false) {
-        return
-      }
-
-      await loadExplanations()
+      await Promise.resolve(onRegenerateAI())
     } catch (error) {
       console.error('Regenerate AI explanation via list failed:', error)
       notify({
@@ -140,6 +131,7 @@ export function ExplanationList({
         description: '请稍后再试或检查积分余额',
       })
     } finally {
+      await loadExplanations()
       setInternalRegenerating(false)
     }
   }
