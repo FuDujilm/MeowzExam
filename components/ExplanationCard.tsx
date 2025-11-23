@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -67,17 +67,18 @@ export interface ExplanationCardProps {
 }
 
 const MemoryAidIcon: React.FC<{ type: string }> = ({ type }) => {
+  const baseClass = 'text-base leading-none'
   switch (type) {
     case 'ACRONYM':
-      return <span className="text-purple-600">🔤</span>
+      return <span className={`${baseClass} text-purple-600 dark:text-purple-300`}>🔤</span>
     case 'RHYMING':
-      return <span className="text-pink-600">🎵</span>
+      return <span className={`${baseClass} text-pink-600 dark:text-pink-300`}>🎵</span>
     case 'RULE':
-      return <span className="text-blue-600">📏</span>
+      return <span className={`${baseClass} text-blue-600 dark:text-blue-300`}>📏</span>
     case 'STORY':
-      return <span className="text-green-600">📖</span>
+      return <span className={`${baseClass} text-green-600 dark:text-green-300`}>📖</span>
     default:
-      return <Zap className="h-4 w-4" />
+      return <Zap className="h-4 w-4 text-amber-600 dark:text-amber-300" />
   }
 }
 
@@ -106,6 +107,8 @@ export function ExplanationCard({
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [reportReason, setReportReason] = useState('')
   const { notify } = useNotification()
+  const [voteLocked, setVoteLocked] = useState(false)
+  const voteCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const selectedOptionSet = new Set(
     (selectedOptionIds || []).map(option => option.toUpperCase())
@@ -126,7 +129,42 @@ export function ExplanationCard({
       .join('、')
   }
 
-  const handleReport = () => {
+  useEffect(() => {
+    return () => {
+      if (voteCooldownRef.current) {
+        clearTimeout(voteCooldownRef.current)
+      }
+    }
+  }, [])
+
+  const scheduleUnlock = () => {
+    if (voteCooldownRef.current) {
+      clearTimeout(voteCooldownRef.current)
+    }
+    voteCooldownRef.current = setTimeout(() => setVoteLocked(false), 800)
+  }
+
+  const executeVote = async (vote: 'UP' | 'DOWN' | 'REPORT', reason?: string) => {
+    if (!onVote || voteLocked) {
+      return false
+    }
+    setVoteLocked(true)
+    try {
+      await Promise.resolve(onVote(vote, reason))
+      return true
+    } catch (error) {
+      notify({
+        variant: 'destructive',
+        title: '操作失败',
+        description: error instanceof Error ? error.message : '请求未完成，请稍后重试。',
+      })
+      return false
+    } finally {
+      scheduleUnlock()
+    }
+  }
+
+  const handleReport = async () => {
     if (!reportReason.trim()) {
       notify({
         variant: 'warning',
@@ -135,9 +173,11 @@ export function ExplanationCard({
       })
       return
     }
-    onVote?.('REPORT', reportReason)
-    setReportDialogOpen(false)
-    setReportReason('')
+    const dispatched = await executeVote('REPORT', reportReason)
+    if (dispatched) {
+      setReportDialogOpen(false)
+      setReportReason('')
+    }
   }
 
   const typeColors = {
@@ -177,7 +217,8 @@ export function ExplanationCard({
                   variant="ghost"
                   size="sm"
                   className={userVote === 'UP' ? 'text-green-600' : ''}
-                  onClick={() => onVote('UP')}
+                  disabled={voteLocked}
+                  onClick={() => executeVote('UP')}
                 >
                   <ThumbsUp className="h-4 w-4" />
                   <span className="ml-1 text-xs">{upvotes}</span>
@@ -186,7 +227,8 @@ export function ExplanationCard({
                   variant="ghost"
                   size="sm"
                   className={userVote === 'DOWN' ? 'text-red-600' : ''}
-                  onClick={() => onVote('DOWN')}
+                  disabled={voteLocked}
+                  onClick={() => executeVote('DOWN')}
                 >
                   <ThumbsDown className="h-4 w-4" />
                   <span className="ml-1 text-xs">{downvotes}</span>
@@ -256,26 +298,28 @@ export function ExplanationCard({
                 <span className="text-xs text-gray-500 dark:text-gray-400">by {createdBy.name}</span>
               )}
             </div>
-            {type !== 'OFFICIAL' && onVote && explanationId && (
-              <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={userVote === 'UP' ? 'text-green-600' : ''}
-                  onClick={() => onVote('UP')}
-                >
-                  <ThumbsUp className="h-4 w-4" />
-                  <span className="ml-1 text-xs">{upvotes}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={userVote === 'DOWN' ? 'text-red-600' : ''}
-                  onClick={() => onVote('DOWN')}
-                >
-                  <ThumbsDown className="h-4 w-4" />
-                  <span className="ml-1 text-xs">{downvotes}</span>
-                </Button>
+                {type !== 'OFFICIAL' && onVote && explanationId && (
+                  <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={userVote === 'UP' ? 'text-green-600' : ''}
+                      disabled={voteLocked}
+                      onClick={() => executeVote('UP')}
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                      <span className="ml-1 text-xs">{upvotes}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={userVote === 'DOWN' ? 'text-red-600' : ''}
+                      disabled={voteLocked}
+                      onClick={() => executeVote('DOWN')}
+                    >
+                      <ThumbsDown className="h-4 w-4" />
+                      <span className="ml-1 text-xs">{downvotes}</span>
+                    </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -351,7 +395,8 @@ export function ExplanationCard({
                 variant="ghost"
                 size="sm"
                 className={userVote === 'UP' ? 'text-green-600' : ''}
-                onClick={() => onVote('UP')}
+                disabled={voteLocked}
+                onClick={() => executeVote('UP')}
               >
                 <ThumbsUp className="h-4 w-4" />
                 <span className="ml-1 text-xs">{upvotes}</span>
@@ -360,7 +405,8 @@ export function ExplanationCard({
                 variant="ghost"
                 size="sm"
                 className={userVote === 'DOWN' ? 'text-red-600' : ''}
-                onClick={() => onVote('DOWN')}
+                disabled={voteLocked}
+                onClick={() => executeVote('DOWN')}
               >
                 <ThumbsDown className="h-4 w-4" />
                 <span className="ml-1 text-xs">{downvotes}</span>
@@ -480,18 +526,21 @@ export function ExplanationCard({
         {structured.memoryAids && structured.memoryAids.length > 0 && (
           <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 dark:bg-amber-500/15 dark:border-amber-500/40">
             <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-4 w-4 text-yellow-600" />
-              <p className="text-sm font-semibold text-yellow-800 dark:text-amber-200">助记技巧</p>
+              <Zap className="h-4 w-4 text-yellow-600 dark:text-amber-300" />
+              <p className="text-sm font-semibold text-yellow-800 dark:text-amber-100">助记技巧</p>
             </div>
             <div className="space-y-2">
               {structured.memoryAids.map((aid, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-sm">
+                <div
+                  key={idx}
+                  className="flex items-start gap-2 text-sm text-gray-800 dark:text-amber-50"
+                >
                   <MemoryAidIcon type={aid.type} />
                   <div>
                     <span className="text-xs text-yellow-700 dark:text-amber-200 font-medium">
                       {MemoryAidLabel[aid.type]}:
                     </span>
-                    <p className="text-gray-800">{aid.text}</p>
+                    <p className="text-gray-800 dark:text-amber-50">{aid.text}</p>
                   </div>
                 </div>
               ))}

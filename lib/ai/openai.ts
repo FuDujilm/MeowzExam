@@ -9,6 +9,21 @@ import { AiExplainSchema, SYSTEM_PROMPT_XML, buildUserPrompt, type AiExplainOutp
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4"
 const DEFAULT_TEMPERATURE = 0.2
+const MAX_TOKENS_LIMIT = 65535
+const DEFAULT_MAX_TOKENS = (() => {
+  const parsed = Number(process.env.AI_MAX_TOKENS ?? 65535)
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.min(parsed, MAX_TOKENS_LIMIT)
+  }
+  return MAX_TOKENS_LIMIT
+})()
+const LENGTH_RETRY_STEP = (() => {
+  const parsed = Number(process.env.AI_MAX_TOKENS_STEP ?? 600)
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed
+  }
+  return 600
+})()
 
 type ModelUsageScope = AiModelUsageScope
 
@@ -266,7 +281,7 @@ function decodeXmlEntities(value: string): string {
 }
 
 function getTagContent(source: string, tag: string): string | null {
-  const pattern = new RegExp(`<${tag}[^>]*>([\s\S]*?)</${tag}>`, 'i')
+  const pattern = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i')
   const match = source.match(pattern)
   return match ? decodeXmlEntities(match[1].trim()) : null
 }
@@ -699,7 +714,7 @@ async function requestStructuredExplanation(
       { role: "user", content: userPrompt },
     ],
     temperature: group?.temperature ?? DEFAULT_TEMPERATURE,
-    max_tokens: maxTokensOverride ?? 1500,
+    max_tokens: maxTokensOverride ?? DEFAULT_MAX_TOKENS,
   }
 
   const debugPayload = {
@@ -797,9 +812,8 @@ async function requestStructuredExplanation(
     })
 
     if (retryCount > 0) {
-      const nextMaxTokens = typeof maxTokensOverride === "number"
-        ? Math.min(maxTokensOverride + 512, 4000)
-        : 2000
+      const currentMaxTokens = maxTokensOverride ?? payload.max_tokens ?? DEFAULT_MAX_TOKENS
+      const nextMaxTokens = Math.min(currentMaxTokens + LENGTH_RETRY_STEP, MAX_TOKENS_LIMIT)
 
       return requestStructuredExplanation(client, group, model, request, {
         forceDefaultPrompt: true,
@@ -862,9 +876,8 @@ async function requestStructuredExplanation(
       })
 
       if (retryCount > 0 && finishReason === 'length') {
-        const nextMaxTokens = typeof maxTokensOverride === "number"
-          ? Math.min(maxTokensOverride + 512, 4000)
-          : 2000
+        const currentMaxTokens = maxTokensOverride ?? payload.max_tokens ?? DEFAULT_MAX_TOKENS
+        const nextMaxTokens = Math.min(currentMaxTokens + LENGTH_RETRY_STEP, MAX_TOKENS_LIMIT)
 
         debugLog('xml_parse_retry', { reason: message, nextMaxTokens })
 
@@ -905,9 +918,8 @@ async function requestStructuredExplanation(
           message: parseError instanceof Error ? parseError.message : String(parseError),
           willRetry: true,
         })
-        const nextMaxTokens = typeof maxTokensOverride === "number"
-          ? Math.min(maxTokensOverride + 512, 4000)
-          : 2000
+        const currentMaxTokens = maxTokensOverride ?? payload.max_tokens ?? DEFAULT_MAX_TOKENS
+        const nextMaxTokens = Math.min(currentMaxTokens + LENGTH_RETRY_STEP, MAX_TOKENS_LIMIT)
 
         debugLog('json_parse_retry', { reason: parseError instanceof Error ? parseError.message : String(parseError), nextMaxTokens })
 
@@ -1013,7 +1025,7 @@ export async function generateAIExplanation(
     try {
       const structuredExplanation = await requestStructuredExplanation(client, group, model, request, {
         forceDefaultPrompt: false,
-        retryCount: 1,
+        retryCount: 2,
         attempt: 1,
         trace,
       })
@@ -1041,7 +1053,7 @@ export async function generateAIExplanation(
 
         const fallbackExplanation = await requestStructuredExplanation(client, group, model, request, {
           forceDefaultPrompt: true,
-          retryCount: 1,
+          retryCount: 2,
           attempt: 1,
           trace,
         })
