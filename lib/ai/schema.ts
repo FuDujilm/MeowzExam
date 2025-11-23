@@ -141,6 +141,15 @@ export function buildUserPrompt(params: {
     sections.push('【证据素材】无，可结合教材或法规常识撰写。')
   }
 
+  sections.push([
+    '【写作要求】',
+    '1. 请先理解题目与标准答案再输出 XML，严禁只回复一句结论；',
+    '2. <answers> 与 <optionAnalysis> 需要覆盖全部选项，reason 至少 20 字并写清法规或题干依据；',
+    '3. <summary> 必须点明正确选项及判定逻辑，禁止出现“AI 返回数据缺少结构化摘要”等占位语；',
+    '4. 若证据不足，请将 <insufficiency> 设为 true 并在内容中说明原因，其它节点仍需补全；',
+    '5. 若确无助记或引用，可以删除对应节点，但必须保证 XML 结构合法且层级完整。',
+  ].join('\n'))
+
   const xmlTemplate = `<explanation>\n  <summary></summary>\n  <answers>\n    <answer option=\"A\"></answer>\n  </answers>\n  <optionAnalysis>\n    <item option=\"A\" verdict=\"correct\">\n      <reason></reason>\n    </item>\n  </optionAnalysis>\n  <keyPoints>\n    <point></point>\n  </keyPoints>\n  <memoryAids>\n    <aid type=\"MNEMONIC\"></aid>\n  </memoryAids>\n  <citations>\n    <citation>\n      <title></title>\n      <url></url>\n      <quote></quote>\n    </citation>\n  </citations>\n  <difficulty></difficulty>\n  <insufficiency>false</insufficiency>\n</explanation>`
 
   sections.push(`【输出模板】请参考以下结构：\n${xmlTemplate}`)
