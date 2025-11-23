@@ -121,11 +121,26 @@ interface AiTraceContext {
 function logAiTrace(trace: AiTraceContext | null | undefined, stage: string, detail?: unknown) {
   if (!trace) return
 
-  if (detail === undefined) {
-    console.info(`[AI][Chain][${trace.id}] ${stage}`)
-  } else {
-    console.info(`[AI][Chain][${trace.id}] ${stage}`, detail)
+  const timestamp = new Date().toISOString()
+  const prefix = `[${timestamp}] [AI][Chain][${trace.id}] ${stage}`
+  const isProd = process.env.NODE_ENV === 'production'
+
+  if (detail === undefined || detail === null) {
+    console.info(prefix)
+    return
   }
+
+  if (isProd) {
+    if (typeof detail === 'object') {
+      const keys = Object.keys(detail as Record<string, unknown>)
+      console.info(prefix, keys.length ? `{${keys.slice(0, 4).join(',')}}` : '')
+    } else {
+      console.info(prefix, detail)
+    }
+    return
+  }
+
+  console.info(prefix, detail)
 }
 
 let aiTraceSequence = 0

@@ -272,7 +272,7 @@ export function ExplanationCard({
               <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
                 取消
               </Button>
-              <Button onClick={handleReport}>
+              <Button onClick={handleReport} disabled={voteLocked}>
                 提交举报
               </Button>
             </DialogFooter>
@@ -362,7 +362,7 @@ export function ExplanationCard({
               <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
                 取消
               </Button>
-              <Button onClick={handleReport}>
+              <Button onClick={handleReport} disabled={voteLocked}>
                 提交举报
               </Button>
             </DialogFooter>
@@ -606,7 +606,7 @@ export function ExplanationCard({
             <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
               取消
             </Button>
-            <Button onClick={handleReport}>
+            <Button onClick={handleReport} disabled={voteLocked}>
               提交举报
             </Button>
           </DialogFooter>

@@ -59,6 +59,7 @@ function PracticeContent() {
   const [question, setQuestion] = useState<Question | null>(null)
   const [userQuestion, setUserQuestion] = useState<UserQuestion | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
+  const [favoritePending, setFavoritePending] = useState(false)
   const [selectedAnswer, setSelectedAnswer] = useState<string[]>([])
   const [answerMapping, setAnswerMapping] = useState<Record<string, string>>({}) // 保存当前题目的选项映射
   const [optionTextMap, setOptionTextMap] = useState<Record<string, string>>({})
@@ -364,19 +365,19 @@ const loadQuestion = async (
 
   // 切换收藏
   const toggleFavorite = async () => {
-    if (!question) return
+    if (!question || favoritePending) return
 
+    setFavoritePending(true)
     try {
       if (isFavorite) {
-        // 取消收藏
         const response = await fetch(`/api/favorites?questionId=${question.id}`, {
           method: 'DELETE',
         })
-        if (response.ok) {
-          setIsFavorite(false)
+        if (!response.ok) {
+          throw new Error('取消收藏失败')
         }
+        setIsFavorite(false)
       } else {
-        // 添加收藏
         const response = await fetch('/api/favorites', {
           method: 'POST',
           headers: {
@@ -384,12 +385,20 @@ const loadQuestion = async (
           },
           body: JSON.stringify({ questionId: question.id }),
         })
-        if (response.ok) {
-          setIsFavorite(true)
+        if (!response.ok) {
+          throw new Error('收藏失败')
         }
+        setIsFavorite(true)
       }
     } catch (error) {
       console.error('收藏操作失败:', error)
+      notify({
+        variant: 'danger',
+        title: '收藏失败',
+        description: error instanceof Error ? error.message : '请稍后重试。',
+      })
+    } finally {
+      setFavoritePending(false)
     }
   }
 
@@ -453,6 +462,7 @@ const loadQuestion = async (
           variant="ghost"
           size="sm"
           onClick={toggleFavorite}
+          disabled={favoritePending}
         >
           {isFavorite ? (
             <Heart className="h-5 w-5 fill-red-500 text-red-500" />

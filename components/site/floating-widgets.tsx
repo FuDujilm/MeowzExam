@@ -1,13 +1,19 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
+import { usePathname } from 'next/navigation'
 
 import { AssistantDialog } from './assistant-dialog'
 
 export function FloatingWidgets() {
   const { data: session, status } = useSession()
+  const pathname = usePathname()
 
   if (status !== 'authenticated' || !session?.user) {
+    return null
+  }
+
+  if (pathname?.startsWith('/exam')) {
     return null
   }
 

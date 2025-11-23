@@ -59,6 +59,7 @@ function ErrorRateContent() {
   const [userQuestion, setUserQuestion] = useState<UserQuestion | null>(null)
   const [errorRate, setErrorRate] = useState<number>(1.0)
   const [isFavorite, setIsFavorite] = useState(false)
+  const [favoritePending, setFavoritePending] = useState(false)
   const [selectedAnswer, setSelectedAnswer] = useState<string[]>([])
   const [answerMapping, setAnswerMapping] = useState<Record<string, string>>({})
   const [optionTextMap, setOptionTextMap] = useState<Record<string, string>>({})
@@ -251,16 +252,18 @@ function ErrorRateContent() {
 
   // 切换收藏
   const toggleFavorite = async () => {
-    if (!question) return
+    if (!question || favoritePending) return
 
+    setFavoritePending(true)
     try {
       if (isFavorite) {
         const response = await fetch(`/api/favorites?questionId=${question.id}`, {
           method: 'DELETE',
         })
-        if (response.ok) {
-          setIsFavorite(false)
+        if (!response.ok) {
+          throw new Error('取消收藏失败')
         }
+        setIsFavorite(false)
       } else {
         const response = await fetch('/api/favorites', {
           method: 'POST',
@@ -269,12 +272,20 @@ function ErrorRateContent() {
           },
           body: JSON.stringify({ questionId: question.id }),
         })
-        if (response.ok) {
-          setIsFavorite(true)
+        if (!response.ok) {
+          throw new Error('收藏失败')
         }
+        setIsFavorite(true)
       }
     } catch (error) {
       console.error('收藏操作失败:', error)
+      notify({
+        variant: 'danger',
+        title: '收藏失败',
+        description: error instanceof Error ? error.message : '请稍后重试。',
+      })
+    } finally {
+      setFavoritePending(false)
     }
   }
 
@@ -336,6 +347,7 @@ function ErrorRateContent() {
           variant="ghost"
           size="sm"
           onClick={toggleFavorite}
+          disabled={favoritePending}
         >
           {isFavorite ? (
             <Heart className="h-5 w-5 fill-red-500 text-red-500" />
