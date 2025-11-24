@@ -21,6 +21,7 @@ interface UserSettings {
   aiStylePresetId: string | null
   aiStyleCustom: string
   examQuestionPreference: 'SYSTEM_PRESET' | 'FULL_RANDOM'
+  dailyPracticeTarget: number
 }
 
 interface StylePresetOption {
@@ -42,6 +43,7 @@ export default function SettingsPage() {
     aiStylePresetId: null,
     aiStyleCustom: '',
     examQuestionPreference: 'SYSTEM_PRESET',
+    dailyPracticeTarget: 10,
   })
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -74,6 +76,7 @@ export default function SettingsPage() {
           aiStylePresetId: data.settings?.aiStylePresetId ?? null,
           aiStyleCustom: data.settings?.aiStyleCustom ?? '',
           examQuestionPreference: data.settings?.examQuestionPreference || 'SYSTEM_PRESET',
+          dailyPracticeTarget: data.settings?.dailyPracticeTarget ?? 10,
         })
       }
     } catch (error) {
@@ -110,6 +113,7 @@ export default function SettingsPage() {
           aiStylePresetId: settings.aiStylePresetId,
           aiStyleCustom: settings.aiStyleCustom,
           examQuestionPreference: settings.examQuestionPreference,
+          dailyPracticeTarget: settings.dailyPracticeTarget,
         }),
       })
 
@@ -266,6 +270,30 @@ export default function SettingsPage() {
               </Select>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 系统预设会遵循管理员配置的标签题量与顺序；完全随机则忽略预设，纯随机抽题。
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="daily-target">每日练习题量</Label>
+              <Input
+                id="daily-target"
+                type="number"
+                min={5}
+                max={50}
+                value={settings.dailyPracticeTarget}
+                onChange={(e) => {
+                  const raw = Number(e.target.value)
+                  if (Number.isNaN(raw)) {
+                    setSettings((prev) => ({ ...prev, dailyPracticeTarget: 10 }))
+                    return
+                  }
+                  const clamped = Math.min(Math.max(Math.round(raw), 5), 50)
+                  setSettings((prev) => ({ ...prev, dailyPracticeTarget: clamped }))
+                }}
+                className="mt-1"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                “每日练习”模式的题量目标。完成目标题数后即可获得打卡积分奖励。
               </p>
             </div>
           </CardContent>

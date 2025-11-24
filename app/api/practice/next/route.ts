@@ -1,10 +1,9 @@
-'use server'
-
 import { NextRequest, NextResponse } from 'next/server'
 import type { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
 import { getLibraryForUser } from '@/lib/question-library-service'
+import { getDateKey } from '@/lib/daily-practice'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
 
@@ -100,6 +99,7 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: resolvedUser.id },
+      include: { settings: true },
     })
 
     if (!user) {
@@ -107,6 +107,38 @@ export async function GET(request: NextRequest) {
     }
 
     let question: QuestionWithOptions | null = null
+    const isDailyMode = mode === 'daily'
+    const dailyPracticeTarget = user.settings?.dailyPracticeTarget ?? 10
+    const todayKey = isDailyMode ? getDateKey() : null
+    const dailyPracticeRecord = isDailyMode
+      ? await prisma.dailyPracticeRecord.findUnique({
+          where: {
+            userId_date: {
+              userId: user.id,
+              date: todayKey!,
+            },
+          },
+        })
+      : null
+    const dailyPracticeCount = dailyPracticeRecord?.questionCount ?? 0
+    const dailyPracticeCompleted =
+      isDailyMode && dailyPracticeCount >= dailyPracticeTarget
+
+    if (isDailyMode && dailyPracticeCompleted) {
+      return NextResponse.json(
+        {
+          error: '今日每日练习已完成，明天继续加油！',
+          dailyPractice: {
+            target: dailyPracticeTarget,
+            count: dailyPracticeCount,
+            completed: true,
+            remaining: 0,
+            rewardPoints: dailyPracticeRecord?.rewardPoints ?? 0,
+          },
+        },
+        { status: 409 },
+      )
+    }
 
     if (targetQuestionId) {
       question = await prisma.question.findFirst({
@@ -119,7 +151,9 @@ export async function GET(request: NextRequest) {
         )
       }
     } else {
-      switch (mode) {
+      const effectiveMode = mode === 'daily' ? 'sequential' : mode
+
+      switch (effectiveMode) {
       case 'sequential': {
         const correctQuestions = await prisma.userQuestion.findMany({
           where: {
@@ -306,7 +340,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({
+    const payload: Record<string, unknown> = {
       question: {
         ...question,
         options: shuffledOptions,
@@ -319,7 +353,20 @@ export async function GET(request: NextRequest) {
         name: library.name,
         shortName: library.shortName,
       },
-    })
+    }
+
+    if (isDailyMode) {
+      const count = dailyPracticeCount
+      payload.dailyPractice = {
+        target: dailyPracticeTarget,
+        count,
+        remaining: Math.max(dailyPracticeTarget - count, 0),
+        completed: dailyPracticeCompleted,
+        rewardPoints: dailyPracticeRecord?.rewardPoints ?? 0,
+      }
+    }
+
+    return NextResponse.json(payload)
   } catch (error) {
     console.error('获取练习题目失败:', error)
     return NextResponse.json(

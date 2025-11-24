@@ -48,12 +48,21 @@ interface UserQuestion {
   lastCorrect?: boolean
 }
 
+interface DailyPracticeProgress {
+  target: number
+  count: number
+  remaining: number
+  completed: boolean
+  rewardPoints?: number
+}
+
 function PracticeContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
   const mode = searchParams.get('mode') || 'sequential'
   const type = searchParams.get('type') || 'A_CLASS'
+  const dailyPracticeRedirectUrl = `/daily-practice?type=${encodeURIComponent(type)}`
   const questionIdParam = searchParams.get('questionId')
   
   const [question, setQuestion] = useState<Question | null>(null)
@@ -70,16 +79,40 @@ function PracticeContent() {
   const [loading, setLoading] = useState(false)
   const [questionHistory, setQuestionHistory] = useState<string[]>([]) // 保存浏览过的题目ID
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1) // 当前历史位置
+  const [dailyProgress, setDailyProgress] = useState<DailyPracticeProgress | null>(null)
   const { notify } = useNotification()
+  const isDailyMode = mode === 'daily'
 
   // 获取模式名称
   const getModeName = () => {
     switch (mode) {
-      case 'sequential': return '顺序练习'
-      case 'random': return '随机练习'
-      case 'wrong': return '错题练习'
-      case 'favorite': return '收藏练习'
-      default: return '练习'
+    case 'sequential': return '顺序练习'
+    case 'random': return '随机练习'
+    case 'wrong': return '错题练习'
+    case 'favorite': return '收藏练习'
+    case 'daily': return '每日练习'
+    default: return '练习'
+    }
+  }
+
+  const refreshDailyStatus = async () => {
+    if (!isDailyMode) {
+      setDailyProgress(null)
+      return
+    }
+    try {
+      const res = await fetch('/api/daily-practice/status?days=7', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      setDailyProgress({
+        target: data.target,
+        count: data.today?.count ?? 0,
+        remaining: Math.max(data.target - (data.today?.count ?? 0), 0),
+        completed: data.today?.completed ?? false,
+        rewardPoints: data.today?.rewardPoints ?? 0,
+      })
+    } catch (error) {
+      console.error('加载每日练习状态失败', error)
     }
   }
 
@@ -90,6 +123,14 @@ const loadQuestion = async (
     targetQuestionId?: string | null,
   ) => {
     try {
+      if (isDailyMode && dailyProgress?.completed) {
+        notify({
+          variant: 'success',
+          title: '今日每日练习已完成',
+          description: '明天再来继续坚持吧！',
+        })
+        return false
+      }
       setLoading(true)
       const params = new URLSearchParams({
         mode,
@@ -105,6 +146,23 @@ const loadQuestion = async (
       const response = await fetch(`/api/practice/next?${params}`)
       if (!response.ok) {
         const error = await response.json().catch(() => null)
+        if (isDailyMode && error?.dailyPractice) {
+          setDailyProgress({
+            target: error.dailyPractice.target,
+            count: error.dailyPractice.count,
+            remaining: error.dailyPractice.remaining ?? 0,
+            completed: error.dailyPractice.completed ?? false,
+            rewardPoints: error.dailyPractice.rewardPoints ?? 0,
+          })
+          if (error.dailyPractice.completed) {
+            notify({
+              variant: 'success',
+              title: '今日每日练习已完成',
+              description: '即将跳转到打卡日历查看奖励及记录。',
+            })
+            setTimeout(() => router.push(dailyPracticeRedirectUrl), 1200)
+          }
+        }
         notify({
           variant: 'danger',
           title: '加载题目失败',
@@ -123,8 +181,34 @@ const loadQuestion = async (
         })
         return false
       }
+      if (isDailyMode && data.dailyPractice) {
+        setDailyProgress({
+          target: data.dailyPractice.target,
+          count: data.dailyPractice.count,
+          remaining: data.dailyPractice.remaining ?? Math.max(data.dailyPractice.target - data.dailyPractice.count, 0),
+          completed: data.dailyPractice.completed ?? false,
+          rewardPoints: data.dailyPractice.rewardPoints ?? 0,
+        })
+      }
       setQuestion(data.question)
       setUserQuestion(data.userQuestion)
+      if (isDailyMode && data.dailyPractice) {
+        setDailyProgress({
+          target: data.dailyPractice.target,
+          count: data.dailyPractice.count,
+          remaining: Math.max(data.dailyPractice.target - data.dailyPractice.count, 0),
+          completed: data.dailyPractice.completed ?? false,
+          rewardPoints: data.dailyPractice.rewardPoints ?? 0,
+        })
+        if (data.dailyPractice.completed && data.dailyPractice.rewardPoints) {
+          notify({
+            variant: 'success',
+            title: '每日练习完成！',
+            description: `获得 ${data.dailyPractice.rewardPoints} 积分奖励，别忘了明天继续哦！`,
+          })
+          setTimeout(() => router.push(dailyPracticeRedirectUrl), 1500)
+        }
+      }
       setIsFavorite(data.isFavorite)
       setSelectedAnswer([]) // 重置选择
       setSubmitted(false)
@@ -177,6 +261,15 @@ const loadQuestion = async (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, type, questionIdParam])
 
+  useEffect(() => {
+    if (isDailyMode) {
+      refreshDailyStatus()
+    } else {
+      setDailyProgress(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
   // 提交答案
   const handleSubmit = async () => {
     if (!question || selectedAnswer.length === 0) {
@@ -199,6 +292,7 @@ const loadQuestion = async (
           questionId: question.id,
           userAnswer: selectedAnswer,
           answerMapping, // 传递映射关系
+          mode,
         }),
       })
 
@@ -296,6 +390,14 @@ const loadQuestion = async (
 
   // 下一题
   const handleNext = () => {
+    if (isDailyMode && dailyProgress?.completed) {
+      notify({
+        variant: 'success',
+        title: '今日每日练习已结束',
+        description: '明天再来获取新奖励吧！',
+      })
+      return
+    }
     if (question) {
       loadQuestion(question.id, 'next')
     }
@@ -490,6 +592,18 @@ const loadQuestion = async (
           </div>
         </CardHeader>
         <CardContent>
+          {isDailyMode && dailyProgress && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-400/30 dark:bg-amber-500/15">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                今日进度：{dailyProgress.count}/{dailyProgress.target} 题
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                {dailyProgress.completed
+                  ? '今日十练已打卡，积分奖励已到账。'
+                  : `距离完成还剩 ${dailyProgress.remaining} 题，坚持就是胜利！`}
+              </p>
+            </div>
+          )}
           {question.hasImage && question.imagePath ? (
             <div className="mb-4 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/60">
               <img
@@ -632,11 +746,11 @@ const loadQuestion = async (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button
               variant="outline"
-              onClick={() => router.push('/practice/modes')}
+              onClick={() => router.push('/')}
               className="w-full sm:w-auto"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
-              选择模式
+              返回首页
             </Button>
 
             <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
@@ -655,7 +769,7 @@ const loadQuestion = async (
                   <Button
                     variant="outline"
                     onClick={handleNext}
-                    disabled={loading}
+                    disabled={loading || (isDailyMode && dailyProgress?.completed)}
                     className="flex-1 min-w-[120px] sm:flex-none sm:w-auto"
                   >
                     跳过
@@ -663,7 +777,7 @@ const loadQuestion = async (
                   </Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={loading || selectedAnswer.length === 0}
+                    disabled={loading || selectedAnswer.length === 0 || (isDailyMode && dailyProgress?.completed)}
                     className="w-full text-base sm:w-auto sm:min-w-[180px] sm:text-sm"
                   >
                     提交答案
@@ -672,7 +786,7 @@ const loadQuestion = async (
               ) : (
                 <Button
                   onClick={handleNext}
-                  disabled={loading}
+                  disabled={loading || (isDailyMode && dailyProgress?.completed)}
                   className="w-full sm:w-auto sm:min-w-[160px]"
                 >
                   下一题

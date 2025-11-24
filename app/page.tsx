@@ -31,6 +31,7 @@ import {
   Shuffle,
   TrendingDown,
   Trophy,
+  CalendarCheck,
 } from 'lucide-react'
 
 interface CheckInStatus {
@@ -47,6 +48,16 @@ interface UserStats {
   totalPoints: number
   pointsName?: string
   currentRank?: number
+}
+
+interface DailyPracticeStatus {
+  target: number
+  today?: {
+    count: number
+    completed: boolean
+    remaining: number
+    rewardPoints: number
+  }
 }
 
 const HERO_FEATURES = [
@@ -75,6 +86,7 @@ export default function Home() {
   const [checkInStatus, setCheckInStatus] = useState<CheckInStatus | null>(null)
   const [checkingIn, setCheckingIn] = useState(false)
   const [userStats, setUserStats] = useState<UserStats | null>(null)
+  const [dailyStatus, setDailyStatus] = useState<DailyPracticeStatus | null>(null)
 
   const loading = status === 'loading'
   const isAuthenticated = Boolean(session?.user)
@@ -106,7 +118,7 @@ export default function Home() {
     }
 
     const load = async () => {
-      await Promise.allSettled([loadCheckInStatus(), loadUserStats()])
+      await Promise.allSettled([loadCheckInStatus(), loadUserStats(), loadDailyStatus()])
     }
 
     load()
@@ -121,6 +133,18 @@ export default function Home() {
       }
     } catch (error) {
       console.error('加载用户统计失败:', error)
+    }
+  }
+
+  const loadDailyStatus = async () => {
+    try {
+      const response = await fetch('/api/daily-practice/status?days=1', { cache: 'no-store' })
+      if (response.ok) {
+        const data = (await response.json()) as DailyPracticeStatus
+        setDailyStatus(data)
+      }
+    } catch (error) {
+      console.error('加载每日练习状态失败:', error)
     }
   }
 
@@ -237,6 +261,20 @@ export default function Home() {
         enabled: Boolean(activeLibraryCode),
       },
       {
+        id: 'daily',
+        name: '每日练习',
+        description: dailyStatus
+          ? dailyStatus.today?.completed
+            ? '今日任务已完成，可查看奖励'
+            : `今日进度 ${dailyStatus.today?.count ?? 0}/${dailyStatus.target ?? 10}`
+          : '每天十题打卡赢积分',
+        icon: CalendarCheck,
+        color: 'text-emerald-500 dark:text-emerald-200',
+        bgColor: 'bg-emerald-50 dark:bg-emerald-500/20',
+        path: activeLibraryCode ? `/practice?mode=daily&type=${activeLibraryCode}` : '',
+        enabled: Boolean(activeLibraryCode),
+      },
+      {
         id: 'favorite',
         name: '收藏练习',
         description: '练习收藏的重点题目',
@@ -257,7 +295,7 @@ export default function Home() {
         enabled: Boolean(activeLibraryCode),
       },
     ],
-    [activeLibraryCode],
+    [activeLibraryCode, dailyStatus],
   )
 
   const otherFeatures = useMemo(
@@ -289,6 +327,15 @@ export default function Home() {
         color: 'text-yellow-600 dark:text-amber-200',
         bgColor: 'bg-yellow-50 dark:bg-amber-500/20',
         path: '/leaderboard',
+      },
+      {
+        id: 'daily-practice',
+        name: '每日打卡日历',
+        description: '查看近一个月的打卡记录',
+        icon: CalendarCheck,
+        color: 'text-emerald-600 dark:text-emerald-200',
+        bgColor: 'bg-emerald-50 dark:bg-emerald-500/20',
+        path: '/daily-practice',
       },
     ],
     [activeLibraryCode],

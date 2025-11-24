@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Loader2, RotateCcw, SendHorizonal } from 'lucide-react'
@@ -35,14 +36,13 @@ const WELCOME_MESSAGE =
   '你好！我是“小助手”，可以回答关于题库、考试准备和系统使用的相关问题。请问有什么可以帮到你？'
 
 const AssistantIcon = ({ className, size = 32 }: { className?: string; size?: number }) => (
-  <img
+  <Image
     src="/fox.webp"
     alt="小助手"
     width={size}
     height={size}
-    loading="lazy"
-    decoding="async"
     className={cn('rounded-full object-cover', className)}
+    priority={false}
   />
 )
 
@@ -158,12 +158,12 @@ export function AssistantDialog({ className }: { className?: string }) {
             content: payload.reply.trim(),
           }),
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessages((prev) => prev.filter((item) => item.id !== pendingId))
       notify({
         variant: 'danger',
         title: '发送失败',
-        description: error?.message ?? '请求失败，请稍后再试。',
+        description: error instanceof Error ? error.message : '请求失败，请稍后再试。',
       })
     } finally {
       setLoading(false)

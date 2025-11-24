@@ -49,11 +49,14 @@ model User {
   siteMessageReceipts SiteMessageReceipt[]
   siteMessagesCreated SiteMessage[] @relation("SiteMessageCreatedBy")
   questionLibraryAccesses QuestionLibraryAccess[] @relation("QuestionLibraryAccessUser")
+  dailyPracticeRecords DailyPracticeRecord[]
 
   // 积分信息
   totalPoints Int @default(0) // 总积分
   currentStreak Int @default(0) // 当前连续签到天数
   lastCheckIn DateTime? // 最后签到时间
+  dailyPracticeStreak Int @default(0)
+  dailyPracticeLastCompleted DateTime?
 
   @@map("users")
 }
@@ -115,6 +118,7 @@ model UserSettings {
   aiStylePreset             AiStylePreset? @relation(fields: [aiStylePresetId], references: [id], onDelete: SetNull)
   aiStyleCustom             String?
   examQuestionPreference    String  @default("SYSTEM_PRESET") // "SYSTEM_PRESET" | "FULL_RANDOM"
+  dailyPracticeTarget       Int     @default(10)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -516,6 +520,26 @@ enum PointsType {
   STREAK_BONUS    // 连续签到奖励
   ADMIN_ADJUST    // 管理员调整
   AI_REGENERATE   // AI 重新生成解析扣除
+  DAILY_PRACTICE  // 每日练习奖励
+}
+
+model DailyPracticeRecord {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date          String
+  questionCount Int      @default(0)
+  completed     Boolean  @default(false)
+  completedAt   DateTime?
+  rewardPoints  Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("daily_practice_records")
 }
 
 // 审计日志

@@ -1,4 +1,28 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+
+const blockedGlobs =
+  process.platform === "win32" && process.env.USERPROFILE
+    ? [
+        "Application Data",
+        "Cookies",
+        "Local Settings",
+        "My Documents",
+        "NetHood",
+        "PrintHood",
+        "Recent",
+        "SendTo",
+        "Start Menu",
+        "Templates",
+        path.join("AppData", "Local", "Application Data"),
+        path.join("AppData", "Local", "ElevatedDiagnostics"),
+        path.join("AppData", "Local", "Docker", "run"),
+      ].map((relativePath) =>
+        path
+          .join(process.env.USERPROFILE as string, relativePath)
+          .replace(/\\/g, "/") + "/**",
+      )
+    : []
 
 const appUrl =
   process.env.AUTH_URL ??
@@ -41,6 +65,14 @@ const nextConfig: NextConfig = {
     AUTH_URL: appUrl,
   },
   images: remotePatterns.length ? { remotePatterns } : undefined,
+  outputFileTracingRoot: path.join(__dirname, ".."),
+  outputFileTracingExcludes:
+    blockedGlobs.length > 0
+      ? {
+          "*": blockedGlobs,
+          "next-server": blockedGlobs,
+        }
+      : undefined,
 };
 
 export default nextConfig;

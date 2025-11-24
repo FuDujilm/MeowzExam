@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { getDateKey, differenceInDays, getRewardForStreak } from '@/lib/daily-practice'
 
 function normalizeAnswerList(raw: unknown): string[] {
   if (Array.isArray(raw)) {
@@ -103,7 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null)
-    const { questionId, userAnswer, answerMapping } = body ?? {}
+    const { questionId, userAnswer, answerMapping, mode } = body ?? {}
+    const practiceMode = typeof mode === 'string' ? mode : null
 
     if (!questionId || (!userAnswer && userAnswer !== '')) {
       return NextResponse.json(
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: resolvedUser.id },
+      include: { settings: true },
     })
 
     if (!user) {
@@ -224,7 +227,119 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      return { userQuestion, pointsEarned }
+      let dailyPractice: { target: number; count: number; completed: boolean; rewardPoints: number } | null = null
+
+      if (practiceMode === 'daily') {
+        const target = user.settings?.dailyPracticeTarget ?? 10
+        const todayKey = getDateKey()
+        const now = new Date()
+
+        const existingRecord = await tx.dailyPracticeRecord.findUnique({
+          where: {
+            userId_date: {
+              userId: user.id,
+              date: todayKey,
+            },
+          },
+        })
+
+        const currentCount = existingRecord?.questionCount ?? 0
+        const rewardGranted = (existingRecord?.rewardPoints ?? 0) > 0
+
+        if (currentCount >= target) {
+          dailyPractice = {
+            target,
+            count: currentCount,
+            completed: true,
+            rewardPoints: existingRecord?.rewardPoints ?? 0,
+          }
+        } else {
+          const newCount = Math.min(currentCount + 1, target)
+          const reachedTarget = newCount >= target
+          let updatedRecord
+
+          if (existingRecord) {
+            updatedRecord = await tx.dailyPracticeRecord.update({
+              where: {
+                userId_date: {
+                  userId: user.id,
+                  date: todayKey,
+                },
+              },
+              data: {
+                questionCount: newCount,
+                completed: reachedTarget,
+                completedAt: reachedTarget ? now : null,
+              },
+            })
+          } else {
+            updatedRecord = await tx.dailyPracticeRecord.create({
+              data: {
+                userId: user.id,
+                date: todayKey,
+                questionCount: newCount,
+                completed: reachedTarget,
+                completedAt: reachedTarget ? now : null,
+              },
+            })
+          }
+
+          let rewardPoints = existingRecord?.rewardPoints ?? 0
+
+          if (reachedTarget && !rewardGranted) {
+            const lastCompleted = user.dailyPracticeLastCompleted
+            let nextStreak = 1
+            if (lastCompleted) {
+              const gap = differenceInDays(now, lastCompleted)
+              if (gap === 1) {
+                nextStreak = (user.dailyPracticeStreak ?? 0) + 1
+              } else if (gap === 0) {
+                nextStreak = user.dailyPracticeStreak ?? 1
+              }
+            }
+            rewardPoints = getRewardForStreak(nextStreak)
+
+            await tx.user.update({
+              where: { id: user.id },
+              data: {
+                totalPoints: { increment: rewardPoints },
+                dailyPracticeStreak: nextStreak,
+                dailyPracticeLastCompleted: now,
+              },
+            })
+
+            await tx.pointsHistory.create({
+              data: {
+                userId: user.id,
+                points: rewardPoints,
+                type: 'DAILY_PRACTICE',
+                reason: `每日练习奖励（第${((nextStreak - 1) % 7) + 1}天）`,
+              },
+            })
+
+            updatedRecord = await tx.dailyPracticeRecord.update({
+              where: {
+                userId_date: {
+                  userId: user.id,
+                  date: todayKey,
+                },
+              },
+              data: {
+                rewardPoints,
+              },
+            })
+          }
+
+          dailyPractice = {
+            target,
+            count: updatedRecord.questionCount,
+            completed: updatedRecord.questionCount >= target,
+            rewardPoints,
+          }
+        }
+      }
+
+      return { userQuestion, pointsEarned, dailyPractice }
     })
 
     return NextResponse.json({
@@ -234,6 +349,7 @@ export async function POST(request: NextRequest) {
       aiExplanation: question.aiExplanation,
       userQuestion: result.userQuestion,
       pointsEarned: result.pointsEarned,
+      dailyPractice: result.dailyPractice,
     })
   } catch (error) {
     console.error('提交答案失败:', error)

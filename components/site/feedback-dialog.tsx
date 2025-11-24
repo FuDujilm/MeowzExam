@@ -114,11 +114,11 @@ export function FeedbackDialog({ className, buttonProps }: FeedbackDialogProps) 
       })
       setOpen(false)
       resetForm()
-    } catch (error: any) {
+    } catch (error: unknown) {
       notify({
         variant: 'danger',
         title: '发送失败',
-        description: error?.message ?? '反馈发送失败，请稍后再试。',
+        description: error instanceof Error ? error.message : '反馈发送失败，请稍后再试。',
       })
     } finally {
       setSubmitting(false)

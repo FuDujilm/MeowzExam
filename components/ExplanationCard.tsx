@@ -154,7 +154,7 @@ export function ExplanationCard({
       return true
     } catch (error) {
       notify({
-        variant: 'destructive',
+        variant: 'danger',
         title: '操作失败',
         description: error instanceof Error ? error.message : '请求未完成，请稍后重试。',
       })
