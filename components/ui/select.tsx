@@ -181,7 +181,10 @@ const SelectContent = ({
   const { isMobile, open, setOpen } = useSelectDrawer()
 
   if (isMobile) {
-    return open ? (
+    if (!open) {
+      return <></>
+    }
+    return (
       <SelectPrimitive.Portal>
         <div className="fixed inset-0 z-50 flex">
           <div
@@ -226,7 +229,7 @@ const SelectContent = ({
           </div>
         </div>
       </SelectPrimitive.Portal>
-    ) : null
+    )
   }
 
   return (
