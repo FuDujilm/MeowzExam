@@ -1,5 +1,7 @@
 const path = require("node:path");
 
+const projectRoot = path.resolve(__dirname)
+
 const blockedGlobs =
   process.platform === "win32" && process.env.USERPROFILE
     ? [
@@ -54,12 +56,15 @@ if (oauthBaseUrl) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {
+    root: projectRoot,
+  },
   env: {
     NEXTAUTH_URL: appUrl,
     AUTH_URL: appUrl,
   },
   images: remotePatterns.length ? { remotePatterns } : undefined,
-  outputFileTracingRoot: path.resolve(__dirname),
+  outputFileTracingRoot: projectRoot,
   outputFileTracingExcludes:
     blockedGlobs.length > 0
       ? {

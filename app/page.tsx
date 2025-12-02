@@ -91,14 +91,24 @@ export default function Home() {
   const loading = status === 'loading'
   const isAuthenticated = Boolean(session?.user)
 
+  // 从 localStorage 恢复上次选择的题库
   useEffect(() => {
     if (!libraryLoading && libraries.length) {
-      setSelectedLibraryCode((current) => current ?? libraries[0].code)
+      const savedCode = localStorage.getItem('selectedLibraryCode')
+      const isValidCode = savedCode && libraries.some((lib) => lib.code === savedCode)
+      setSelectedLibraryCode(isValidCode ? savedCode : libraries[0].code)
     }
     if (!libraryLoading && libraries.length === 0) {
       setSelectedLibraryCode(null)
     }
   }, [libraries, libraryLoading])
+
+  // 保存选择的题库到 localStorage
+  useEffect(() => {
+    if (selectedLibraryCode) {
+      localStorage.setItem('selectedLibraryCode', selectedLibraryCode)
+    }
+  }, [selectedLibraryCode])
 
   const selectedLibrary = useMemo(
     () => libraries.find((library) => library.code === selectedLibraryCode) ?? null,

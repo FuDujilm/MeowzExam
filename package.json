@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm next dev --turbopack -p 3001",
+    "dev": "node scripts/dev-runner.cjs",
     "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
@@ -28,7 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.544.0",
     "marked": "^16.4.1",
-    "next": "15.5.4",
+    "next": "16.0.6",
     "next-auth": "5.0.0-beta.29",
     "nodemailer": "^7.0.6",
     "openai": "^6.1.0",

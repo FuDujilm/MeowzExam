@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { CalendarCheck, Loader2 } from 'lucide-react'
 import { useQuestionLibraries } from '@/lib/use-question-libraries'
+import { getStoredLibraryCode, setStoredLibraryCode } from '@/lib/library-selection'
 
 interface DailyRecord {
   id: string
@@ -75,16 +76,38 @@ export default function DailyPracticePage() {
   const queryLibrary = searchParams.get('type')
 
   useEffect(() => {
-    if (queryLibrary) {
-      setLibraryCode(queryLibrary)
+    if (!libraries.length) {
+      setLibraryCode(null)
+      return
     }
-  }, [queryLibrary])
+
+    const isValidCode = (code: string | null | undefined) =>
+      Boolean(code && libraries.some((library) => library.code === code))
+
+    const queryCandidate = isValidCode(queryLibrary) ? queryLibrary : null
+    const storedCandidate = getStoredLibraryCode()
+    const storedValid = isValidCode(storedCandidate) ? storedCandidate : null
+    const fallback = libraries[0]?.code ?? null
+
+    setLibraryCode((prev) => {
+      if (queryCandidate && queryCandidate !== prev) {
+        return queryCandidate
+      }
+      if (prev && isValidCode(prev)) {
+        return prev
+      }
+      if (storedValid && storedValid !== prev) {
+        return storedValid
+      }
+      return prev ?? fallback
+    })
+  }, [libraries, librariesLoading, queryLibrary])
 
   useEffect(() => {
-    if (!libraryCode && !librariesLoading && libraries.length > 0) {
-      setLibraryCode(libraries[0].code)
+    if (libraryCode) {
+      setStoredLibraryCode(libraryCode)
     }
-  }, [libraryCode, librariesLoading, libraries])
+  }, [libraryCode])
 
   const resolvedLibraryCode =
     libraryCode ??
@@ -242,7 +265,7 @@ export default function DailyPracticePage() {
               <CardDescription>最近四周每日练习记录，绿色代表完成、橙色代表部分完成、灰色代表未练习</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
                 {calendarDays.map((day) => {
                   const completed = day.record?.completed
                   const partial = !completed && day.record && day.record.questionCount > 0
@@ -250,7 +273,7 @@ export default function DailyPracticePage() {
                     <div
                       key={day.date}
                       className={cn(
-                        'rounded-lg border p-2 text-center text-xs transition',
+                        'rounded-lg border p-2 text-center text-[11px] transition sm:text-xs',
                         completed
                           ? 'border-green-200 bg-green-50 text-green-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100'
                           : partial
@@ -261,9 +284,13 @@ export default function DailyPracticePage() {
                     >
                       <div className="font-semibold">{day.label}</div>
                       {completed ? (
-                        <div className="text-[10px]">+{day.record?.rewardPoints ?? 0} 积分</div>
+                        <div className="text-[10px] sm:text-[11px]">
+                          +{day.record?.rewardPoints ?? 0} 积分
+                        </div>
                       ) : partial ? (
-                        <div className="text-[10px]">{day.record?.questionCount ?? 0} 题</div>
+                        <div className="text-[10px] sm:text-[11px]">
+                          {day.record?.questionCount ?? 0} 题
+                        </div>
                       ) : (
                         <div className="text-[10px] opacity-70">未打卡</div>
                       )}

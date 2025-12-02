@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react'
 import { useQuestionLibraries } from '@/lib/use-question-libraries'
+import { getStoredLibraryCode, setStoredLibraryCode } from '@/lib/library-selection'
 
 interface QuestionOption {
   id: string
@@ -107,10 +108,34 @@ export default function QuestionsPage() {
   }, [selectedLibrary])
 
   useEffect(() => {
-    if (!libraryLoading && libraries.length > 0 && !selectedLibraryCode) {
-      setSelectedLibraryCode(libraries[0].code)
+    if (!libraries.length) {
+      setSelectedLibraryCode(null)
+      return
     }
-  }, [libraryLoading, libraries, selectedLibraryCode])
+
+    const isValidCode = (code: string | null | undefined) =>
+      Boolean(code && libraries.some((library) => library.code === code))
+
+    const storedCandidate = getStoredLibraryCode()
+    const storedValid = isValidCode(storedCandidate) ? storedCandidate : null
+    const fallback = libraries[0]?.code ?? null
+
+    setSelectedLibraryCode((prev) => {
+      if (prev && isValidCode(prev)) {
+        return prev
+      }
+      if (storedValid && storedValid !== prev) {
+        return storedValid
+      }
+      return prev ?? fallback
+    })
+  }, [libraryLoading, libraries])
+
+  useEffect(() => {
+    if (selectedLibraryCode) {
+      setStoredLibraryCode(selectedLibraryCode)
+    }
+  }, [selectedLibraryCode])
 
   const normalizeOptions = (value: unknown): QuestionOption[] => {
     if (!Array.isArray(value)) {
@@ -465,7 +490,9 @@ export default function QuestionsPage() {
                             )}
                           </div>
                         </div>
-                        <p className="text-sm leading-6 text-gray-900 dark:text-slate-50">{question.title}</p>
+                        <p className="text-sm leading-6 text-gray-900 dark:text-slate-50 break-words break-all whitespace-pre-line">
+                          {question.title}
+                        </p>
                         {question.hasImage && question.imagePath ? (
                           <div className="mt-3 rounded-lg border border-slate-200 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/60">
                             <img
@@ -506,7 +533,7 @@ export default function QuestionsPage() {
                                       </Badge>
                                     )}
                                   </div>
-                                  <p className="mt-1 text-[13px] leading-5 text-gray-700 dark:text-slate-200">
+                                  <p className="mt-1 text-[13px] leading-5 text-gray-700 dark:text-slate-200 break-words break-all whitespace-pre-line">
                                     {option.text || '（尚未提供内容）'}
                                   </p>
                                 </div>

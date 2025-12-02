@@ -148,10 +148,10 @@ export default async function AboutPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200/40 bg-white">
-            <CardHeader className="border-b border-slate-200/60 pb-6">
-              <CardTitle className="text-slate-900">快速导航</CardTitle>
-              <CardDescription className="text-slate-600">
+          <Card className="border-slate-200/40 bg-white dark:border-slate-700/60 dark:bg-slate-900/60">
+            <CardHeader className="border-b border-slate-200/60 pb-6 dark:border-slate-700/60">
+              <CardTitle className="text-slate-900 dark:text-white">快速导航</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-300">
                 访问本页的核心法律文档，了解使用条款、隐私政策与最新更新。
               </CardDescription>
             </CardHeader>
@@ -163,7 +163,7 @@ export default async function AboutPage() {
                 <Link
                   key={section.key}
                   href={`#${section.anchor}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700/80 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800"
                 >
                   <FileText className="h-4 w-4 text-emerald-500" />
                   {section.title}
@@ -184,14 +184,14 @@ export default async function AboutPage() {
               <section
                 key={section.key}
                 id={section.anchor}
-                className="scroll-mt-20 rounded-3xl border border-slate-200 bg-white p-8 shadow-lg transition hover:border-slate-300"
+                className="scroll-mt-20 rounded-3xl border border-slate-200 bg-white p-8 shadow-lg transition hover:border-slate-300 dark:border-slate-700/70 dark:bg-slate-900/70 dark:hover:border-slate-500"
               >
-                <h2 className="text-2xl font-semibold text-slate-900">{section.title}</h2>
-                <p className="mt-2 text-sm text-slate-500">
+                <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{section.title}</h2>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                   文档格式：{document.format?.toUpperCase() ?? 'MARKDOWN'}
                 </p>
                 <article
-                  className="mt-6 space-y-4 text-slate-700 dark:text-slate-100 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-5 [&_h3]:text-xl [&_p]:leading-relaxed [&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_li]:leading-relaxed [&_a]:text-indigo-600 [&_a:hover]:underline [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_strong]:font-semibold"
+                  className="mt-6 space-y-4 text-slate-700 dark:text-slate-100 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:text-slate-900 [&_h2]:dark:text-white [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:text-slate-900 [&_h3]:dark:text-white [&_p]:leading-relaxed [&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_li]:leading-relaxed [&_a]:text-indigo-600 [&_a:hover]:underline [&_a]:dark:text-indigo-300 [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:dark:bg-slate-800/70 [&_strong]:font-semibold"
                   dangerouslySetInnerHTML={{ __html: html }}
                 />
               </section>

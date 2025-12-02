@@ -587,7 +587,7 @@ const loadQuestion = async (
                   {question.questionType === 'true_false' && '判断题'}
                 </Badge>
               </div>
-              <CardTitle className="text-lg">{question.title}</CardTitle>
+              <CardTitle className="text-lg break-words break-all whitespace-pre-line">{question.title}</CardTitle>
             </div>
           </div>
         </CardHeader>
@@ -645,7 +645,7 @@ const loadQuestion = async (
                   />
                   <Label
                     htmlFor={option.id}
-                    className="flex-1 cursor-pointer"
+                    className="flex-1 cursor-pointer text-left whitespace-pre-line break-words break-all"
                   >
                     <span className="font-medium mr-2">{option.id}.</span>
                     {option.text}
@@ -678,7 +678,7 @@ const loadQuestion = async (
                     <RadioGroupItem value={option.id} id={option.id} />
                     <Label
                       htmlFor={option.id}
-                      className="flex-1 cursor-pointer"
+                      className="flex-1 cursor-pointer text-left whitespace-pre-line break-words break-all"
                     >
                       <span className="font-medium mr-2">{option.id}.</span>
                       {option.text}
@@ -703,7 +703,7 @@ const loadQuestion = async (
                 ) : (
                   <>
                     <XCircle className="h-5 w-5" />
-                    <span className="font-medium">
+                    <span className="font-medium break-words break-all whitespace-pre-line">
                       回答错误! 正确答案: {correctAnswers.map(id => {
                         const option = question.options.find(opt => opt.id === id)
                         return option ? `${id}. ${option.text}` : id

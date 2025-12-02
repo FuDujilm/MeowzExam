@@ -17,8 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, CheckCircle2, XCircle, Lightbulb, Sparkles, Loader2, RotateCcw } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, Lightbulb, Sparkles, Loader2, RotateCcw, Grid3x3, X } from 'lucide-react'
 import { useQuestionLibraries } from '@/lib/use-question-libraries'
+import { getStoredLibraryCode, setStoredLibraryCode } from '@/lib/library-selection'
 import type { AiExplainOutput, OptionAnalysis } from '@/lib/ai/schema'
 
 function formatAiExplanation(value: unknown): string {
@@ -149,20 +150,41 @@ function ExamContent() {
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const navButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const navContainerRef = useRef<HTMLDivElement | null>(null)
+  const [answerSheetOpen, setAnswerSheetOpen] = useState(false)
 
   useEffect(() => {
-    if (!libraries.length) return
+    if (!libraries.length) {
+      setSelectedLibraryCode(null)
+      return
+    }
+
+    const isValidCode = (code: string | null | undefined) =>
+      Boolean(code && libraries.some((library) => library.code === code))
+
+    const queryCandidate = isValidCode(queryLibraryCode) ? queryLibraryCode : null
+    const storedCandidate = getStoredLibraryCode()
+    const storedValid = isValidCode(storedCandidate) ? storedCandidate : null
+    const fallback = libraries[0]?.code ?? null
+
     setSelectedLibraryCode((prev) => {
-      if (prev && libraries.some((library) => library.code === prev)) {
+      if (queryCandidate && queryCandidate !== prev) {
+        return queryCandidate
+      }
+      if (prev && isValidCode(prev)) {
         return prev
       }
-      const matched =
-        (queryLibraryCode &&
-          libraries.find((library) => library.code === queryLibraryCode)) ||
-        libraries[0]
-      return matched ? matched.code : null
+      if (storedValid && storedValid !== prev) {
+        return storedValid
+      }
+      return prev ?? fallback
     })
   }, [libraries, queryLibraryCode])
+
+  useEffect(() => {
+    if (selectedLibraryCode) {
+      setStoredLibraryCode(selectedLibraryCode)
+    }
+  }, [selectedLibraryCode])
 
   useEffect(() => {
     if (!selectedLibraryCode) {
@@ -916,7 +938,7 @@ function ExamContent() {
                               >
                                 <div className="flex items-start gap-2">
                                   <span className="font-semibold">{option.id}.</span>
-                                  <p className="flex-1 whitespace-pre-line break-words">{option.text}</p>
+                                  <p className="flex-1 whitespace-pre-line break-words break-all">{option.text}</p>
                                 </div>
                                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                                   {isCorrect && (
@@ -1224,17 +1246,16 @@ function ExamContent() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4 dark:bg-slate-950">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:grid lg:grid-cols-[260px_minmax(0,1fr)_300px] lg:items-start">
-        <div className="lg:hidden space-y-4">{renderExamInfoCard()}</div>
+    <>
+      <div className="min-h-screen bg-gray-50 py-6 px-4 pb-32 dark:bg-slate-950">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:grid lg:grid-cols-[260px_minmax(0,1fr)_300px] lg:items-start">
+          <div className="hidden lg:flex lg:flex-col lg:space-y-4 lg:sticky lg:top-6 lg:self-start">
+            {renderAnswerSheetCard()}
+          </div>
 
-        <div className="hidden lg:flex lg:flex-col lg:space-y-4 lg:sticky lg:top-6 lg:self-start">
-          {renderAnswerSheetCard()}
-        </div>
-
-        <div className="space-y-6">
-          {renderProgressSummary()}
-          {questions.map((question, index) => {
+          <div className="space-y-6">
+            {renderProgressSummary()}
+            {questions.map((question, index) => {
             const userAnswer = answers[question.id] || []
             const isActive = activeQuestion?.id === question.id
             return (
@@ -1263,7 +1284,7 @@ function ExamContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 break-words whitespace-pre-line">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 break-words break-all whitespace-pre-line">
                     {question.title}
                   </h3>
                   {question.hasImage && question.imagePath ? (
@@ -1295,7 +1316,7 @@ function ExamContent() {
                             >
                               <div className="flex items-start gap-3">
                                 <Checkbox checked={isSelected} />
-                                <Label className="flex-1 cursor-pointer break-words text-left whitespace-pre-line">
+                                <Label className="flex-1 cursor-pointer break-words break-all text-left whitespace-pre-line">
                                   <span className="font-medium">{option.id}. </span>
                                   {option.text}
                                 </Label>
@@ -1323,7 +1344,7 @@ function ExamContent() {
                                   <RadioGroupItem value={option.id} id={`${question.id}-${option.id}`} />
                                   <Label
                                     htmlFor={`${question.id}-${option.id}`}
-                                    className="flex-1 cursor-pointer break-words text-left whitespace-pre-line"
+                                    className="flex-1 cursor-pointer break-words break-all text-left whitespace-pre-line"
                                   >
                                     <span className="font-medium">{option.id}. </span>
                                     {option.text}
@@ -1348,10 +1369,133 @@ function ExamContent() {
           {renderExamInfoCard()}
           {renderActionCard()}
         </div>
-
-        <div className="lg:hidden space-y-4">{renderActionCard()}</div>
       </div>
     </div>
+
+    {/* 移动端底部悬窗 */}
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4 lg:hidden">
+      <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-900/90">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <Clock className="h-4 w-4 text-orange-500" />
+            <span className={timeLeft < 300 ? 'font-semibold text-red-500 dark:text-red-300' : 'font-semibold'}>
+              {formatTime(timeLeft)}
+            </span>
+            <span className="text-xs">·</span>
+            <span>
+              {answeredCount}/{questions.length}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAnswerSheetOpen(true)}
+              className="inline-flex w-full items-center justify-center gap-1 sm:w-auto"
+            >
+              <Grid3x3 className="h-4 w-4" />
+              答题卡
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSubmitExam}
+              disabled={loading}
+              className="w-full sm:w-auto"
+            >
+              {loading ? '提交中...' : '提交试卷'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* 移动端右侧滑出答题卡 */}
+    {answerSheetOpen && (
+      <>
+        {/* 背景遮罩 */}
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setAnswerSheetOpen(false)}
+        />
+
+        {/* 答题卡面板 */}
+        <div className="fixed inset-y-0 right-0 z-50 w-[85%] max-w-sm overflow-y-auto bg-white shadow-2xl dark:bg-slate-900 lg:hidden">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">答题卡</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAnswerSheetOpen(false)}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <div className="p-4">
+            <div className="mb-4 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900/50">
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span>已答题数</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  {answeredCount}/{questions.length}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span>剩余时间</span>
+                <span className="flex items-center gap-1 font-semibold text-slate-900 dark:text-slate-100">
+                  <Clock className="h-4 w-4 text-orange-500" />
+                  {formatTime(timeLeft)}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-2">
+              {questions.map((question, index) => {
+                const answered = answers[question.id]?.length
+                const isActive = activeQuestion?.id === question.id
+                return (
+                  <button
+                    key={question.id}
+                    type="button"
+                    onClick={() => {
+                      scrollToQuestion(question.id, index)
+                      setAnswerSheetOpen(false)
+                    }}
+                    className={`h-12 rounded-md border text-center text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100'
+                        : answered
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-400/60 dark:bg-emerald-500/15 dark:text-emerald-100'
+                        : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
+                    }`}
+                  >
+                    {index + 1}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="mt-4 space-y-2 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded border-2 border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/20" />
+                <span>当前题目</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded border-2 border-emerald-200 bg-emerald-50 dark:border-emerald-400/60 dark:bg-emerald-500/15" />
+                <span>已作答</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded border-2 border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800" />
+                <span>未作答</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+    </>
   )
 }
 

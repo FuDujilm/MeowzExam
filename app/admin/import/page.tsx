@@ -271,6 +271,19 @@ export default function AdminQuestionLibraryPage() {
   const [renameValue, setRenameValue] = useState('')
   const [renameSaving, setRenameSaving] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<LibrarySummary | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    shortName: '',
+    description: '',
+    region: '',
+    visibility: 'ADMIN_ONLY',
+    displayTemplate: '',
+    allowedEmails: '',
+  })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   const isSessionLoading = status === 'loading'
 
@@ -896,7 +909,7 @@ export default function AdminQuestionLibraryPage() {
 
   const handleDeleteFile = async (fileId: string) => {
     if (!fileDialogLibrary) return
-    const confirmed = window.confirm('确定要删除该文件吗？删除后将无法恢复。')
+    const confirmed = window.confirm('确定要删除该文件吗?删除后将无法恢复。')
     if (!confirmed) return
     try {
       const response = await fetch(`/api/admin/question-library-files/${fileId}`, {
@@ -927,6 +940,128 @@ export default function AdminQuestionLibraryPage() {
         variant: 'danger',
         title: '删除失败',
         description: error?.message ?? '无法删除题库文件，请稍后再试。',
+      })
+    }
+  }
+
+  const openEditDialog = (library: LibrarySummary) => {
+    setEditTarget(library)
+    setEditForm({
+      name: library.name,
+      shortName: library.shortName,
+      description: library.description || '',
+      region: library.region || '',
+      visibility: library.visibility,
+      displayTemplate: library.displayTemplate || '',
+      allowedEmails: '',
+    })
+    setEditError(null)
+    setEditDialogOpen(true)
+  }
+
+  const closeEditDialog = () => {
+    if (editSaving) return
+    setEditDialogOpen(false)
+    setEditTarget(null)
+    setEditForm({
+      name: '',
+      shortName: '',
+      description: '',
+      region: '',
+      visibility: 'ADMIN_ONLY',
+      displayTemplate: '',
+      allowedEmails: '',
+    })
+    setEditError(null)
+  }
+
+  const handleEditLibrary = async () => {
+    if (!editTarget) return
+    try {
+      setEditSaving(true)
+      setEditError(null)
+
+      const allowedEmailsList = editForm.allowedEmails
+        .split(',')
+        .map(e => e.trim())
+        .filter(Boolean)
+
+      const response = await fetch(`/api/admin/question-libraries/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name.trim(),
+          shortName: editForm.shortName.trim(),
+          description: editForm.description.trim(),
+          region: editForm.region.trim(),
+          visibility: editForm.visibility,
+          displayTemplate: editForm.displayTemplate.trim(),
+          allowedEmails: editForm.visibility === 'CUSTOM' ? allowedEmailsList : [],
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || '更新题库失败')
+      }
+
+      setLibraries((prev) =>
+        prev.map((lib) =>
+          lib.id === editTarget.id
+            ? { ...lib, ...data.library }
+            : lib
+        )
+      )
+
+      notify({
+        variant: 'success',
+        title: '题库已更新',
+        description: `题库「${editForm.name}」的信息已保存。`,
+      })
+
+      closeEditDialog()
+      await loadLibraries()
+    } catch (error: any) {
+      const message = error?.message ?? '更新题库失败，请稍后再试。'
+      setEditError(message)
+      notify({
+        variant: 'danger',
+        title: '更新失败',
+        description: message,
+      })
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const handleDeleteLibrary = async (library: LibrarySummary) => {
+    const confirmed = window.confirm(
+      `确定要删除题库「${library.name}」吗？\n\n此操作将同时删除:\n- ${library.totalQuestions} 道题目\n- ${library.presets.length} 个考试预设\n- 所有相关的用户练习记录\n\n删除后将无法恢复!`
+    )
+    if (!confirmed) return
+
+    try {
+      const response = await fetch(`/api/admin/question-libraries/${library.id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || '删除题库失败')
+      }
+
+      setLibraries((prev) => prev.filter((lib) => lib.id !== library.id))
+
+      notify({
+        variant: 'success',
+        title: '题库已删除',
+        description: data.message || `题库「${library.name}」已成功删除。`,
+      })
+    } catch (error: any) {
+      notify({
+        variant: 'danger',
+        title: '删除失败',
+        description: error?.message ?? '无法删除题库，请稍后再试。',
       })
     }
   }
@@ -1120,11 +1255,20 @@ export default function AdminQuestionLibraryPage() {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    onClick={() => openEditDialog(library)}
+                                    className="inline-flex items-center gap-1"
+                                  >
+                                    <PencilLine className="h-3.5 w-3.5" />
+                                    编辑
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     onClick={() => openPresetDialog(library)}
                                     className="inline-flex items-center gap-1"
                                   >
                                     <PencilLine className="h-3.5 w-3.5" />
-                                    管理预设
+                                    预设
                                   </Button>
                                   <Button
                                     size="sm"
@@ -1134,6 +1278,15 @@ export default function AdminQuestionLibraryPage() {
                                   >
                                     <FileText className="h-3.5 w-3.5" />
                                     文件
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteLibrary(library)}
+                                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-500"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    删除
                                   </Button>
                                 </div>
                               </td>
@@ -1788,6 +1941,137 @@ export default function AdminQuestionLibraryPage() {
           </Button>
         </DialogFooter>
       </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={(open) => (!open ? closeEditDialog() : null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>编辑题库信息</DialogTitle>
+            <DialogDescription>
+              修改题库「{editTarget?.name}」的基本信息、可见性设置等。
+            </DialogDescription>
+          </DialogHeader>
+
+          {editError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+              {editError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">题库名称 *</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  placeholder="例如:中国业余无线电 A 类题库"
+                  disabled={editSaving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-short-name">缩写 *</Label>
+                <Input
+                  id="edit-short-name"
+                  value={editForm.shortName}
+                  onChange={(e) => setEditForm({ ...editForm, shortName: e.target.value })}
+                  placeholder="例如:A类"
+                  disabled={editSaving}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">描述</Label>
+              <Input
+                id="edit-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                placeholder="题库的简要说明"
+                disabled={editSaving}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-region">地区</Label>
+                <Input
+                  id="edit-region"
+                  value={editForm.region}
+                  onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
+                  placeholder="例如:中国"
+                  disabled={editSaving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-visibility">可见性设置 *</Label>
+                <Select
+                  value={editForm.visibility}
+                  onValueChange={(value) => setEditForm({ ...editForm, visibility: value })}
+                  disabled={editSaving}
+                >
+                  <SelectTrigger id="edit-visibility">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN_ONLY">仅管理员可见</SelectItem>
+                    <SelectItem value="PUBLIC">所有人可见</SelectItem>
+                    <SelectItem value="CUSTOM">指定用户可见</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {editForm.visibility === 'CUSTOM' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-allowed-emails">允许访问的用户邮箱</Label>
+                <Input
+                  id="edit-allowed-emails"
+                  value={editForm.allowedEmails}
+                  onChange={(e) => setEditForm({ ...editForm, allowedEmails: e.target.value })}
+                  placeholder="用逗号分隔多个邮箱，例如: user1@example.com, user2@example.com"
+                  disabled={editSaving}
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  输入用户邮箱列表(逗号分隔),未注册的邮箱将以占位形式保留。
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-display-template">显示模板</Label>
+              <Input
+                id="edit-display-template"
+                value={editForm.displayTemplate}
+                onChange={(e) => setEditForm({ ...editForm, displayTemplate: e.target.value })}
+                placeholder="例如: {国家/地区}{缩写}题库（{总题量}题）"
+                disabled={editSaving}
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                支持占位符: {'{国家/地区}'}, {'{缩写}'}, {'{总题量}'}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+              <strong className="block font-medium mb-1">注意事项</strong>
+              <ul className="list-disc list-inside space-y-1">
+                <li>题库代码(code)和UUID不可修改,确保系统稳定性</li>
+                <li>修改可见性设置后立即生效,影响所有用户的访问权限</li>
+                <li>题目数量和题型统计由系统自动计算,无需手动修改</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeEditDialog} disabled={editSaving}>
+              取消
+            </Button>
+            <Button onClick={handleEditLibrary} disabled={editSaving}>
+              {editSaving ? '保存中…' : '保存更改'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
 
       <Dialog open={renameDialogOpen} onOpenChange={(open) => (!open ? closeRenameDialog() : null)}>
