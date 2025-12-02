@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
+import {
+  deleteLibraryDirectory,
+  deleteLibraryFileFromDisk,
+} from '@/lib/server/library-file-store'
 
 /**
  * PATCH /api/admin/question-libraries/[libraryId]
@@ -49,7 +53,7 @@ export async function PATCH(
 
     const library = await prisma.questionLibrary.findUnique({
       where: { id: libraryId },
-      include: { access: true },
+      include: { access: true, files: { select: { filepath: true } } },
     })
 
     if (!library) {
@@ -175,7 +179,13 @@ export async function DELETE(
       where: { id: libraryId },
       select: {
         id: true,
+        code: true,
         name: true,
+        files: {
+          select: {
+            filepath: true,
+          },
+        },
         _count: {
           select: {
             questions: true,
@@ -190,10 +200,28 @@ export async function DELETE(
       return NextResponse.json({ error: '题库不存在' }, { status: 404 })
     }
 
+    const filePaths = (library.files ?? [])
+      .map((file) => file.filepath)
+      .filter((filepath): filepath is string => Boolean(filepath))
+
     // 删除题库(级联删除会自动删除相关的题目、预设、文件等)
     await prisma.questionLibrary.delete({
       where: { id: libraryId },
     })
+
+    await Promise.all(
+      filePaths.map((filepath) =>
+        deleteLibraryFileFromDisk(filepath).catch((error) =>
+          console.error('Failed to delete library file from disk:', error),
+        ),
+      ),
+    )
+
+    if (library.code) {
+      await deleteLibraryDirectory(library.code).catch((error) => {
+        console.error('Failed to delete library directory:', error)
+      })
+    }
 
     return NextResponse.json({
       success: true,

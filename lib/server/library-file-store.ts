@@ -24,6 +24,11 @@ export function isPathWithinBase(filePath: string) {
   return resolved.startsWith(base)
 }
 
+export function getLibraryDirectory(libraryCode: string) {
+  const sanitizedCode = sanitizeLibraryCode(libraryCode || 'LIBRARY')
+  return path.join(getLibraryFilesBaseDir(), sanitizedCode)
+}
+
 export async function ensureDirectory(dirPath: string) {
   await fs.mkdir(dirPath, { recursive: true })
 }
@@ -59,6 +64,20 @@ export async function deleteLibraryFileFromDisk(filePath: string) {
   }
   try {
     await fs.unlink(filePath)
+  } catch (error) {
+    if ((error as { code?: string })?.code !== 'ENOENT') {
+      throw error
+    }
+  }
+}
+
+export async function deleteLibraryDirectory(libraryCode: string) {
+  const directoryPath = getLibraryDirectory(libraryCode)
+  if (!isPathWithinBase(directoryPath)) {
+    throw new Error('Invalid directory path.')
+  }
+  try {
+    await fs.rm(directoryPath, { recursive: true, force: true })
   } catch (error) {
     if ((error as { code?: string })?.code !== 'ENOENT') {
       throw error
