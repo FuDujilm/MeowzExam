@@ -26,6 +26,42 @@ const blockedGlobs =
       )
     : []
 
+const tracingExcludes = []
+
+if (process.platform === "win32" && process.env.USERPROFILE) {
+  tracingExcludes.push(
+    path
+      .join(
+        process.env.USERPROFILE,
+        "AppData",
+        "Local",
+        "Microsoft",
+        "WindowsApps",
+        "**",
+      )
+      .replace(/\\/g, "/"),
+    path
+      .join(
+        process.env.USERPROFILE,
+        "AppData",
+        "Local",
+        "JetBrains",
+        "**",
+      )
+      .replace(/\\/g, "/"),
+    path
+      .join(
+        process.env.USERPROFILE,
+        "AppData",
+        "Local",
+        "Autodesk",
+        "Adlm",
+        "**",
+      )
+      .replace(/\\/g, "/"),
+  )
+}
+
 const appUrl =
   process.env.AUTH_URL ??
   process.env.NEXTAUTH_URL ??
@@ -65,6 +101,9 @@ const nextConfig = {
   },
   images: remotePatterns.length ? { remotePatterns } : undefined,
   outputFileTracingRoot: projectRoot,
+  outputFileTracingExcludes: tracingExcludes.length
+    ? { "*": tracingExcludes }
+    : undefined,
   outputFileTracingExcludes:
     blockedGlobs.length > 0
       ? {

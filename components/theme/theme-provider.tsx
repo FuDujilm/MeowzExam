@@ -11,7 +11,7 @@ interface ThemeContextValue {
   toggleTheme: () => void
 }
 
-const STORAGE_KEY = 'exam-web-theme'
+export const THEME_STORAGE_KEY = 'exam-web-theme'
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
@@ -29,34 +29,27 @@ function applyTheme(theme: Theme) {
   }
 }
 
-function detectInitialTheme(): Theme {
-  if (typeof window === 'undefined') {
-    return 'light'
-  }
-
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (stored === 'light' || stored === 'dark') {
-    return stored
-  }
-
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  return prefersDark ? 'dark' : 'light'
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light')
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+    }
 
-  useEffect(() => {
-    const initial = detectInitialTheme()
-    setThemeState(initial)
-    applyTheme(initial)
-  }, [])
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+      if (stored === 'light' || stored === 'dark') {
+        return stored
+      }
+    }
+
+    return 'light'
+  })
 
   const setTheme = useCallback((value: Theme) => {
     setThemeState(value)
     applyTheme(value)
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, value)
+      window.localStorage.setItem(THEME_STORAGE_KEY, value)
     }
   }, [])
 

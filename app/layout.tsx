@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import type { ReactNode } from 'react'
 
 import { FloatingWidgets } from '@/components/site/floating-widgets'
@@ -7,7 +8,7 @@ import { SiteFooter } from '@/components/site/site-footer'
 import { SiteHeader } from '@/components/site/site-header'
 import { SiteConfigProvider } from '@/components/site/site-config-provider'
 import { NotificationProvider } from '@/components/ui/notification-provider'
-import { ThemeProvider } from '@/components/theme/theme-provider'
+import { ThemeProvider, THEME_STORAGE_KEY } from '@/components/theme/theme-provider'
 import { getSiteConfig } from '@/lib/site-config'
 
 import { AuthProvider } from './providers'
@@ -56,10 +57,34 @@ export default async function RootLayout({
   children: ReactNode
 }) {
   const config = await getSiteConfig()
+  const themeInitScript = `
+    (function() {
+      try {
+        var storageKey = '${THEME_STORAGE_KEY}';
+        var stored = localStorage.getItem(storageKey);
+        var theme = stored === 'light' || stored === 'dark'
+          ? stored
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        var root = document.documentElement;
+        if (theme === 'dark') {
+          root.classList.add('dark');
+        } else {
+          root.classList.remove('dark');
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+  `
 
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-50">
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
         <AuthProvider>
           <ThemeProvider>
             <NotificationProvider>

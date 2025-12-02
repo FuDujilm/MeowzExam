@@ -1,6 +1,5 @@
 'use client'
 
-import type { ComponentType, SVGProps } from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -24,6 +23,7 @@ import {
   Users,
   Wand2,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import AdminNav from '@/components/admin/AdminNav'
 import { cn } from '@/lib/utils'
@@ -34,7 +34,7 @@ type AdminSectionItem = {
   href: string
   label: string
   description: string
-  icon: ComponentType<SVGProps<SVGSVGElement>>
+  icon: LucideIcon
   accent: Accent
 }
 
