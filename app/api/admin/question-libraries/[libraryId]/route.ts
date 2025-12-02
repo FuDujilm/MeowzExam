@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 
 /**
  * PATCH /api/admin/question-libraries/[libraryId]
@@ -11,23 +11,26 @@ export async function PATCH(
   context: { params: Promise<{ libraryId: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 })
+    const adminCheck = await checkAdminPermission()
+    if (!adminCheck.success) {
+      return NextResponse.json(
+        { error: adminCheck.error ?? '需要管理员权限' },
+        { status: adminCheck.status ?? 401 },
+      )
+    }
+
+    const sessionEmail = adminCheck.user?.email
+    if (!sessionEmail) {
+      return NextResponse.json({ error: '用户邮箱不存在' }, { status: 404 })
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { email: sessionEmail },
       select: { email: true },
     })
 
     if (!user) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 })
-    }
-
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
-    if (!adminEmails.includes(user.email)) {
-      return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
     }
 
     const params = await context.params
@@ -143,23 +146,26 @@ export async function DELETE(
   context: { params: Promise<{ libraryId: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 })
+    const adminCheck = await checkAdminPermission()
+    if (!adminCheck.success) {
+      return NextResponse.json(
+        { error: adminCheck.error ?? '需要管理员权限' },
+        { status: adminCheck.status ?? 401 },
+      )
+    }
+
+    const sessionEmail = adminCheck.user?.email
+    if (!sessionEmail) {
+      return NextResponse.json({ error: '用户邮箱不存在' }, { status: 404 })
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { email: sessionEmail },
       select: { email: true },
     })
 
     if (!user) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 })
-    }
-
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
-    if (!adminEmails.includes(user.email)) {
-      return NextResponse.json({ error: '需要管理员权限' }, { status: 403 })
     }
 
     const params = await context.params

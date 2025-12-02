@@ -402,7 +402,6 @@ export default function AdminQuestionLibraryPage() {
         body: JSON.stringify({
           fileName: file?.name,
           fileSize: file?.size,
-          fileContent: text,
           payload,
         }),
       })
