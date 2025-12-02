@@ -30,20 +30,25 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  const [theme, setThemeState] = useState<Theme>('light')
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return
     }
 
-    if (typeof window !== 'undefined') {
-      const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
-      if (stored === 'light' || stored === 'dark') {
-        return stored
-      }
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === 'light' || stored === 'dark') {
+      setThemeState(stored)
+      applyTheme(stored)
+      return
     }
 
-    return 'light'
-  })
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+    const initialTheme = document.documentElement.classList.contains('dark') || prefersDark ? 'dark' : 'light'
+    setThemeState(initialTheme)
+    applyTheme(initialTheme)
+  }, [])
 
   const setTheme = useCallback((value: Theme) => {
     setThemeState(value)
