@@ -182,7 +182,7 @@ const SelectContent = ({
 
   if (isMobile) {
     return open ? (
-      <SelectPrimitive.Portal forceMount>
+      <SelectPrimitive.Portal>
         <div className="fixed inset-0 z-50 flex">
           <div
             className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm"
