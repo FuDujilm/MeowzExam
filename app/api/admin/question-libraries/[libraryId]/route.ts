@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 import {
@@ -179,6 +180,7 @@ export async function DELETE(
       where: { id: libraryId },
       select: {
         id: true,
+        uuid: true,
         code: true,
         name: true,
         files: {
@@ -204,9 +206,26 @@ export async function DELETE(
       .map((file) => file.filepath)
       .filter((filepath): filepath is string => Boolean(filepath))
 
-    // 删除题库(级联删除会自动删除相关的题目、预设、文件等)
-    await prisma.questionLibrary.delete({
-      where: { id: libraryId },
+    const questionDeleteConditions: Prisma.QuestionWhereInput[] = [{ libraryId }]
+    if (library.uuid) {
+      questionDeleteConditions.push({ libraryUuid: library.uuid })
+    }
+    if (library.code) {
+      questionDeleteConditions.push({ libraryCode: library.code })
+    }
+
+    const deletedQuestions = await prisma.$transaction(async (tx) => {
+      const result = await tx.question.deleteMany({
+        where: {
+          OR: questionDeleteConditions,
+        },
+      })
+
+      await tx.questionLibrary.delete({
+        where: { id: libraryId },
+      })
+
+      return result.count
     })
 
     await Promise.all(
@@ -227,7 +246,7 @@ export async function DELETE(
       success: true,
       message: `题库「${library.name}」已删除`,
       deletedCounts: {
-        questions: library._count.questions,
+        questions: deletedQuestions,
         presets: library._count.examPresets,
         files: library._count.files,
       },
