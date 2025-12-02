@@ -23,6 +23,20 @@ const MIGRATION_ERROR_CODES = new Set(['P2021', 'P2022'])
 
 type Visibility = 'ADMIN_ONLY' | 'PUBLIC' | 'CUSTOM'
 
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, max-age=0',
+}
+
+function withNoStore(init?: ResponseInit): ResponseInit {
+  return {
+    ...(init ?? {}),
+    headers: {
+      ...NO_STORE_HEADERS,
+      ...(init?.headers ?? {}),
+    },
+  }
+}
+
 type NormalisedQuestion = {
   uuid: string
   externalId: string
@@ -465,7 +479,7 @@ export async function GET() {
     if (!adminCheck.success) {
       return NextResponse.json(
         { error: adminCheck.error },
-        { status: adminCheck.status ?? 401 },
+        withNoStore({ status: adminCheck.status ?? 401 }),
       )
     }
 
@@ -498,11 +512,14 @@ export async function GET() {
     })
     const countMap = new Map(fileCounts.map((item) => [item.libraryId, item._count._all]))
 
-    return NextResponse.json({
-      libraries: libraries.map((library) =>
-        serialiseLibrary(library, { fileCount: countMap.get(library.id) ?? 0 }),
-      ),
-    })
+    return NextResponse.json(
+      {
+        libraries: libraries.map((library) =>
+          serialiseLibrary(library, { fileCount: countMap.get(library.id) ?? 0 }),
+        ),
+      },
+      withNoStore(),
+    )
   } catch (error: any) {
     if (isMigrationError(error)) {
       return NextResponse.json(
@@ -510,14 +527,14 @@ export async function GET() {
           warning: '题库数据表尚未初始化，请先执行数据库迁移。',
           libraries: [],
         },
-        { status: 200 },
+        withNoStore({ status: 200 }),
       )
     }
 
     console.error('List question libraries error:', error)
     return NextResponse.json(
       { error: error?.message ?? '获取题库信息失败' },
-      { status: 500 },
+      withNoStore({ status: 500 }),
     )
   }
 }
@@ -563,7 +580,7 @@ export async function POST(request: NextRequest) {
     if (!adminCheck.success) {
       return NextResponse.json(
         { error: adminCheck.error },
-        { status: adminCheck.status ?? 401 },
+        withNoStore({ status: adminCheck.status ?? 401 }),
       )
     }
     adminUserId = adminCheck.user?.id ?? undefined
@@ -578,7 +595,7 @@ export async function POST(request: NextRequest) {
     if (!payload || typeof payload !== 'object') {
       return NextResponse.json(
         { error: 'JSON 格式无效，导入失败。' },
-        { status: 400 },
+        withNoStore({ status: 400 }),
       )
     }
 
@@ -594,7 +611,7 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(payload.questions) || payload.questions.length === 0) {
       return NextResponse.json(
         { error: '题库文件缺少 questions 数组或题目数量为 0。' },
-        { status: 400 },
+        withNoStore({ status: 400 }),
       )
     }
 
@@ -639,7 +656,7 @@ export async function POST(request: NextRequest) {
           stats,
           warnings,
         },
-        { status: 400 },
+        withNoStore({ status: 400 }),
       )
     }
 
@@ -910,12 +927,12 @@ export async function POST(request: NextRequest) {
       uploadedByEmail: adminEmail,
     })
 
-    return NextResponse.json(responseBody)
+    return NextResponse.json(responseBody, withNoStore())
   } catch (error: any) {
     if (isMigrationError(error)) {
       return NextResponse.json(
         { error: '题库数据表尚未初始化，请先执行数据库迁移。' },
-        { status: 503 },
+        withNoStore({ status: 503 }),
       )
     }
 
@@ -938,7 +955,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { error: error?.message ?? '题库导入失败。' },
-      { status: 500 },
+      withNoStore({ status: 500 }),
     )
   }
 }

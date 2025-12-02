@@ -291,7 +291,15 @@ export default function AdminQuestionLibraryPage() {
     try {
       setLoading(true)
       setFetchError(null)
-      const response = await fetch('/api/admin/import-questions', { cache: 'no-store' })
+      const response = await fetch(
+        `/api/admin/import-questions?ts=${Date.now()}`,
+        {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-store',
+          },
+        },
+      )
       const data = await response.json()
 
       if (!response.ok) {
@@ -394,10 +402,12 @@ export default function AdminQuestionLibraryPage() {
         return
       }
 
-      const response = await fetch('/api/admin/import-questions', {
+      const response = await fetch(`/api/admin/import-questions?ts=${Date.now()}`, {
         method: 'POST',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
         },
         body: JSON.stringify({
           fileName: file?.name,
