@@ -13,6 +13,9 @@ import type {
   QuestionLibraryImportPayload,
 } from '@/types/question-library'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const DISPLAY_TEMPLATE_DEFAULT = '{国家/地区}-{缩写}-{总题量}题'
 const SUPPORTED_QUESTION_TYPES = new Set(['single_choice', 'multiple_choice', 'true_false'] as const)
 const VISIBILITY_VALUES = new Set(['ADMIN_ONLY', 'PUBLIC', 'CUSTOM'] as const)
