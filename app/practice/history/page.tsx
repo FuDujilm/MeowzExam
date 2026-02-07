@@ -438,7 +438,7 @@ function HistoryContent() {
             ) : (
               // 单选题
               <RadioGroup
-                value={selectedAnswer[0] || ''}
+                value={selectedAnswer?.[0] || ''}
                 onValueChange={(value) => handleOptionChange(value)}
                 disabled={submitted}
               >

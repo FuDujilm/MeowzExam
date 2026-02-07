@@ -4,9 +4,9 @@
 /node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
+.pnpm-store
+.pnpm-store/*
+.pnpm-store/v10
 !.yarn/releases
 !.yarn/versions
 
@@ -46,3 +46,4 @@ next-env.d.ts
 # local library files
 /storage/
 
+node_modules

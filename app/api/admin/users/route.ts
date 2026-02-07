@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 import { Prisma } from '@/lib/generated/prisma'
 
+export const dynamic = 'force-dynamic'
+
 const MAX_PAGE_SIZE = 50
 
 function parsePositiveInt(value: string | null, fallback: number) {

@@ -184,7 +184,7 @@ export default function OpenAIConfigPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/admin/openai/model-groups')
+      const res = await fetch('/api/admin/openai/model-groups', { cache: 'no-store' })
       if (res.status === 401) {
         router.push('/login')
         return

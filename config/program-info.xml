@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <programInfo>
-  <metadata name="©喵梓HAM考试" author="LimeNeko" contactEmail="i@mzyd.work" homepage="https://mzyd.work" supportLink="https://example.com/support" repository="https://github.com/fudujilm" lastUpdated="2025-12-02"/>
+  <metadata name="©喵梓HAM考试" author="LimeNeko" contactEmail="i@mzyd.work" homepage="https://mzyd.work" supportLink="https://example.com/support" repository="https://github.com/fudujilm" lastUpdated="2026-02-07"/>
   <documents>
     <termsOfService format="markdown" __cdata="## 服务条款
 
@@ -12,7 +12,7 @@
 4. 使用过程中如需收集个人信息（如邮箱），仅用于身份验证及学习数据统计，未经许可不会对外披露。
 5. 任何因使用本系统而产生的直接或间接损失，项目维护者不承担法律责任。
 
-如有疑问，请联系 support@example.com。"/>
+如有疑问，请联系 i@mzyd.work。"/>
     <privacyPolicy format="markdown" __cdata="## 隐私政策
 
 我们非常重视用户的隐私保护，相关说明如下：
@@ -23,7 +23,7 @@
 - **第三方服务**：若启用 AI 解析等功能，我们可能会将匿名化的题目内容发送至第三方 AI 服务提供商，且不会包含与个人身份相关的信息。
 - **用户权利**：您可以随时发起数据导出或删除请求，我们将在合理时间内处理。
 
-如需了解更多隐私相关问题，请发送邮件至 support@example.com。"/>
+如需了解更多隐私相关问题，请发送邮件至  i@mzyd.work。"/>
     <changelog format="markdown" __cdata="## 更新记录
 
 - 2025-10-01：初始化项目配置与法律文档。"/>

@@ -61,10 +61,10 @@ export default function LeaderboardPage() {
   }
 
   const getRankBadgeColor = (rank: number) => {
-    if (rank === 1) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
-    if (rank === 2) return 'bg-gray-100 text-gray-800 border-gray-300'
-    if (rank === 3) return 'bg-orange-100 text-orange-800 border-orange-300'
-    return 'bg-blue-50 text-blue-700 border-blue-200'
+    if (rank === 1) return 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-700'
+    if (rank === 2) return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+    if (rank === 3) return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-200 dark:border-orange-700'
+    return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700'
   }
 
   const shouldShowCallsign = (user: LeaderboardUser) =>
@@ -97,7 +97,7 @@ export default function LeaderboardPage() {
             <Trophy className="h-8 w-8 text-yellow-500" />
             <h1 className="text-3xl font-bold">积分排行榜</h1>
           </div>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             答对题目获得{pointsName}，每日签到获得更多奖励！
           </p>
         </div>
@@ -107,7 +107,7 @@ export default function LeaderboardPage() {
       {users.length >= 3 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {/* 第二名 */}
-          <Card className="bg-gradient-to-br from-gray-50 to-gray-100">
+          <Card className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900 dark:border-slate-700">
             <CardHeader>
               <div className="text-center">
                 <div className="flex justify-center mb-2">
@@ -121,12 +121,12 @@ export default function LeaderboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <div className="text-3xl font-bold text-gray-700 mb-1">
+                <div className="text-3xl font-bold text-gray-700 dark:text-gray-200 mb-1">
                   {users[1].points}
                 </div>
-                <div className="text-sm text-gray-600">{pointsName}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">{pointsName}</div>
                 {users[1].streak > 0 && (
-                  <div className="flex items-center justify-center gap-1 mt-2 text-orange-600">
+                  <div className="flex items-center justify-center gap-1 mt-2 text-orange-600 dark:text-orange-400">
                     <Flame className="h-4 w-4" />
                     <span className="text-sm">连续签到 {users[1].streak} 天</span>
                   </div>
@@ -136,7 +136,7 @@ export default function LeaderboardPage() {
           </Card>
 
           {/* 第一名 */}
-          <Card className="bg-gradient-to-br from-yellow-50 to-orange-100 border-yellow-400 border-2">
+          <Card className="bg-gradient-to-br from-yellow-50 to-orange-100 border-yellow-400 border-2 dark:from-yellow-900/20 dark:to-orange-900/20 dark:border-yellow-600">
             <CardHeader>
               <div className="text-center">
                 <div className="flex justify-center mb-2">
@@ -150,12 +150,12 @@ export default function LeaderboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <div className="text-4xl font-bold text-yellow-700 mb-1">
+                <div className="text-4xl font-bold text-yellow-700 dark:text-yellow-400 mb-1">
                   {users[0].points}
                 </div>
-                <div className="text-sm text-yellow-800">{pointsName}</div>
+                <div className="text-sm text-yellow-800 dark:text-yellow-500">{pointsName}</div>
                 {users[0].streak > 0 && (
-                  <div className="flex items-center justify-center gap-1 mt-2 text-orange-600">
+                  <div className="flex items-center justify-center gap-1 mt-2 text-orange-600 dark:text-orange-400">
                     <Flame className="h-4 w-4" />
                     <span className="text-sm font-medium">连续签到 {users[0].streak} 天</span>
                   </div>
@@ -165,7 +165,7 @@ export default function LeaderboardPage() {
           </Card>
 
           {/* 第三名 */}
-          <Card className="bg-gradient-to-br from-orange-50 to-orange-100">
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/10 dark:border-orange-900/50">
             <CardHeader>
               <div className="text-center">
                 <div className="flex justify-center mb-2">
@@ -179,12 +179,12 @@ export default function LeaderboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <div className="text-3xl font-bold text-orange-700 mb-1">
+                <div className="text-3xl font-bold text-orange-700 dark:text-orange-400 mb-1">
                   {users[2].points}
                 </div>
-                <div className="text-sm text-orange-800">{pointsName}</div>
+                <div className="text-sm text-orange-800 dark:text-orange-500">{pointsName}</div>
                 {users[2].streak > 0 && (
-                  <div className="flex items-center justify-center gap-1 mt-2 text-orange-600">
+                  <div className="flex items-center justify-center gap-1 mt-2 text-orange-600 dark:text-orange-400">
                     <Flame className="h-4 w-4" />
                     <span className="text-sm">连续签到 {users[2].streak} 天</span>
                   </div>
@@ -207,7 +207,7 @@ export default function LeaderboardPage() {
               <div
                 key={user.id}
                 className={`flex items-center justify-between p-4 rounded-lg border-2 ${
-                  user.rank <= 3 ? getRankBadgeColor(user.rank) : 'border-gray-200 bg-white'
+                  user.rank <= 3 ? getRankBadgeColor(user.rank) : 'border-gray-200 bg-white dark:border-slate-800 dark:bg-slate-900'
                 }`}
               >
                 <div className="flex items-center gap-4 flex-1">
@@ -218,7 +218,7 @@ export default function LeaderboardPage() {
                         {getRankIcon(user.rank)}
                       </div>
                     ) : (
-                      <span className="text-xl font-bold text-gray-600">
+                      <span className="text-xl font-bold text-gray-600 dark:text-gray-400">
                         #{user.rank}
                       </span>
                     )}
@@ -228,13 +228,13 @@ export default function LeaderboardPage() {
                   <div className="flex-1">
                     <div className="font-semibold text-lg">{user.name}</div>
                     {shouldShowCallsign(user) && (
-                      <div className="text-sm text-gray-600">{user.callsign}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{user.callsign}</div>
                     )}
                   </div>
 
                   {/* 连续签到 */}
                   {user.streak > 0 && (
-                    <div className="flex items-center gap-1 text-orange-600">
+                    <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                       <Flame className="h-4 w-4" />
                       <span className="text-sm font-medium">{user.streak}天</span>
                     </div>
@@ -242,10 +242,10 @@ export default function LeaderboardPage() {
 
                   {/* 积分 */}
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {user.points}
                     </div>
-                    <div className="text-xs text-gray-600">{pointsName}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">{pointsName}</div>
                   </div>
                 </div>
               </div>

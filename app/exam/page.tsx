@@ -1326,7 +1326,7 @@ function ExamContent() {
                         })}
                     </div>
                   ) : (
-                    <RadioGroup value={userAnswer[0] || ''} onValueChange={(value) => handleSelectAnswer(question, value)}>
+                    <RadioGroup value={userAnswer?.[0] || ''} onValueChange={(value) => handleSelectAnswer(question, value)}>
                       <div className="space-y-3">
                         {question.options.map((option: any) => {
                           const isSelected = userAnswer.includes(option.id)

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { generateExplanation } from '@/lib/ai/unified'
@@ -163,23 +163,26 @@ export async function POST(request: NextRequest) {
     }
 
     // 检查是否已有结构化解析
-    if (!isRegenerate && question.explanations.length > 0 && mode === 'structured') {
-      await createAuditLog({
-        userId: session.user.id,
-        action: 'AI_EXPLANATION_SKIPPED',
-        entityType: 'Question',
-        entityId: questionId,
-        details: {
-          reason: 'structured_cache_hit',
-        },
-      })
+    if (!isRegenerate && question.explanations && question.explanations.length > 0 && mode === 'structured') {
+      const cachedExplanation = question.explanations[0]
+      if (cachedExplanation) {
+        await createAuditLog({
+          userId: session.user.id,
+          action: 'AI_EXPLANATION_SKIPPED',
+          entityType: 'Question',
+          entityId: questionId,
+          details: {
+            reason: 'structured_cache_hit',
+          },
+        })
 
-      return NextResponse.json({
-        explanation: question.explanations[0].contentJson,
-        explanationId: question.explanations[0].id,
-        mode: 'structured',
-        cached: true,
-      })
+        return NextResponse.json({
+          explanation: cachedExplanation.contentJson,
+          explanationId: cachedExplanation.id,
+          mode: 'structured',
+          cached: true,
+        })
+      }
     }
 
     // 检查旧格式缓存（向后兼容）
@@ -210,8 +213,8 @@ export async function POST(request: NextRequest) {
       // 结构化模式 - 使用统一调用层（自动选择最优 provider）
       const { explanation: structuredExplanation, provider, modelName } = await generateExplanation({
         questionTitle: question.title,
-        options: question.options as any[],
-        correctAnswers: question.correctAnswers as string[],
+        options: (Array.isArray(question.options) ? question.options : []) as any[],
+        correctAnswers: (Array.isArray(question.correctAnswers) ? question.correctAnswers : []) as string[],
         category: question.category,
         difficulty: question.difficulty,
         syllabusPath,

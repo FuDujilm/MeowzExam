@@ -7,6 +7,8 @@ import { prisma } from '@/lib/db'
 import { emailService } from '@/lib/email'
 import { listNotificationRecipients, serializeAdminSiteMessage } from '@/lib/site-messages'
 
+export const dynamic = 'force-dynamic'
+
 function ensureAdmin(session: Session | null) {
   if (!session?.user?.email || !isAdminEmail(session.user.email)) {
     return NextResponse.json({ error: '权限不足：需要管理员账号' }, { status: 403 })

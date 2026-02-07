@@ -257,7 +257,7 @@ export async function GET(
         upvotes: exp.upvotes,
         downvotes: exp.downvotes,
         wilsonScore: exp.wilsonScore,
-        userVote: exp.votes?.[0]?.vote || null,
+        userVote: Array.isArray(exp.votes) ? exp.votes[0]?.vote || null : null,
         createdBy: exp.createdBy
           ? {
               id: exp.createdBy.id,

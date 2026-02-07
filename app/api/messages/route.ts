@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { listSiteMessagesForUser } from '@/lib/site-messages'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await auth()
 

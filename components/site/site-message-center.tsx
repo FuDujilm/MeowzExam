@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { AlertTriangle, Bell, CheckCircle2, Loader2, Mail, RefreshCw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -102,6 +103,7 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
   const [urgentOpen, setUrgentOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [confirming, setConfirming] = useState(false)
+  const pathname = usePathname()
 
   const hasMessages = messages.length > 0
   const unreadLabel = useMemo(() => {
@@ -110,13 +112,18 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
     return `${unreadCount} 条未读`
   }, [unreadCount])
 
-  const fetchMessages = async (mode: 'initial' | 'refresh' = 'initial') => {
+  const fetchMessages = async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
     if (mode === 'initial') {
       setLoading(true)
-    } else {
+    } else if (mode === 'refresh') {
       setRefreshing(true)
     }
-    setError(null)
+    // silent mode sets neither loading nor refreshing
+    
+    if (mode !== 'silent') {
+      setError(null)
+    }
+    
     try {
       const response = await fetch('/api/messages', { cache: 'no-store' })
       if (response.status === 401 || response.status === 403) {
@@ -128,6 +135,12 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
       }
 
       if (!response.ok) {
+        // Silent mode suppresses error alerts unless it's critical, but here we just log
+        if (mode === 'silent') {
+          console.warn('[site-messages] Silent update failed:', response.statusText)
+          return
+        }
+        
         const fallback = await response.json().catch(() => ({}))
         throw new Error(
           typeof fallback?.error === 'string' && fallback.error.trim().length > 0
@@ -143,13 +156,22 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
       setMessages(data.messages)
       setUnreadCount(data.unreadCount)
       if (data.urgentMessage) {
+        // Only reopen urgent dialog if we have a NEW urgent message or it's different
+        // But simplified logic: always set it. If it was already open, it stays open with new content.
+        // If it was closed, it opens.
+        // We should check if it's actually different to avoid annoying reopenings if user closed it (but user can't close urgent without confirming?)
+        // Actually urgent dialog has no close button, only "Confirm".
         setUrgentMessage(data.urgentMessage)
         setUrgentOpen(true)
-      } else if (mode === 'refresh') {
+      } else if (mode === 'refresh' || mode === 'silent') {
         setUrgentMessage(null)
         setUrgentOpen(false)
       }
     } catch (err) {
+      if (mode === 'silent') {
+        console.warn('[site-messages] Silent update error:', err)
+        return
+      }
       if (err instanceof Error) {
         setError(err.message)
       } else {
@@ -163,7 +185,19 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
 
   useEffect(() => {
     void fetchMessages('initial')
+    
+    // Poll every 60 seconds
+    const interval = setInterval(() => {
+      void fetchMessages('silent')
+    }, 60000)
+    
+    return () => clearInterval(interval)
   }, [])
+
+  // Refetch when pathname changes (user navigation)
+  useEffect(() => {
+    void fetchMessages('silent')
+  }, [pathname])
 
   useEffect(() => {
     if (open) {

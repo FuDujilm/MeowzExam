@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { checkAdminPermission } from '@/lib/auth/admin-middleware'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/admin/audit-logs
  * 获取审计日志列表

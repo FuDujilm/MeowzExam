@@ -582,7 +582,7 @@ function buildFallbackStructuredResponse(
       return normalized.summary.trim()
     }
 
-    if (explanationSentences[0]?.length) {
+    if (explanationSentences?.[0]?.length) {
       return explanationSentences[0]
     }
 
@@ -590,7 +590,7 @@ function buildFallbackStructuredResponse(
       return explanationText.slice(0, 200)
     }
 
-    const standardAnswer = request.correctAnswers.join("、") || ""
+    const standardAnswer = request.correctAnswers?.join("、") || ""
     return `AI 返回数据缺少结构化摘要，请结合标准答案 ${standardAnswer} 理解题目。`
   })()
 
@@ -602,14 +602,14 @@ function buildFallbackStructuredResponse(
 
   const answer = normalizedAnswer.length > 0
     ? normalizedAnswer
-    : request.correctAnswers.map(item => item.trim()).filter(Boolean)
+    : request.correctAnswers?.map(item => item.trim()).filter(Boolean) || []
 
   const answerSet = new Set(answer)
 
   if (answerSet.size === 0) {
-    const fallbackAnswer = request.correctAnswers[0]
-      || request.options[0]?.id
-      || request.options[0]?.text
+    const fallbackAnswer = request.correctAnswers?.[0]
+      || request.options?.[0]?.id
+      || request.options?.[0]?.text
       || "A"
     answerSet.add(String(fallbackAnswer).trim())
   }
@@ -795,11 +795,11 @@ async function requestStructuredExplanation(
     })
     handleOpenAIError(error)
   }
-  const content = completion.choices[0]?.message?.content?.trim()
+  const content = completion.choices?.[0]?.message?.content?.trim()
 
   logAiTrace(trace, 'llm_response', {
     attempt,
-    finishReason: completion.choices[0]?.finish_reason ?? null,
+    finishReason: completion.choices?.[0]?.finish_reason ?? null,
     usage: completion.usage ?? null,
     preview: previewText(content ?? '', 200),
   })
@@ -808,9 +808,15 @@ async function requestStructuredExplanation(
     model,
     groupId: group?.id ?? null,
     raw: content ?? null,
-    finishReason: completion.choices[0]?.finish_reason ?? null,
+    finishReason: completion.choices?.[0]?.finish_reason ?? null,
     usage: completion.usage ?? null,
   })
+
+  // Ensure choices exists and has at least one element
+  if (!completion.choices || completion.choices.length === 0) {
+     logAiTrace(trace, 'response_empty_choices', { attempt })
+     throw new Error("AI 返回了空的选项列表")
+  }
 
   const finishReason = (completion.choices[0]?.finish_reason ?? null) as string | null
 
@@ -1175,13 +1181,13 @@ export async function generateSimpleExplanation(
   } catch (error) {
     handleOpenAIError(error)
   }
-  const explanation = completion.choices[0]?.message?.content?.trim()
+  const explanation = completion.choices?.[0]?.message?.content?.trim()
 
   debugLog("simple-response", {
     model,
     groupId: group?.id ?? null,
     raw: explanation ?? null,
-    finishReason: completion.choices[0]?.finish_reason ?? null,
+    finishReason: completion.choices?.[0]?.finish_reason ?? null,
     usage: completion.usage ?? null,
   })
 
@@ -1270,9 +1276,9 @@ export async function generateAssistantChatReply({
   } catch (error) {
     handleOpenAIError(error)
   }
-
-  const reply = completion.choices[0]?.message?.content?.trim()
-  const finishReason = (completion.choices[0]?.finish_reason ?? null) as string | null
+  
+  const reply = completion.choices?.[0]?.message?.content?.trim()
+  const finishReason = (completion.choices?.[0]?.finish_reason ?? null) as string | null
 
   debugLog("assistant-chat-response", {
     model,
