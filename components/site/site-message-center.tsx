@@ -125,7 +125,8 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
     }
     
     try {
-      const response = await fetch('/api/messages', { cache: 'no-store' })
+      // Add timestamp to prevent browser caching
+      const response = await fetch(`/api/messages?_t=${Date.now()}`, { cache: 'no-store' })
       if (response.status === 401 || response.status === 403) {
         setMessages([])
         setUnreadCount(0)

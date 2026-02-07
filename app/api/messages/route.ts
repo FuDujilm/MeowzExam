@@ -15,11 +15,18 @@ export async function GET() {
   try {
     const result = await listSiteMessagesForUser(session.user.id)
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       messages: result.messages,
       unreadCount: result.unreadCount,
       urgentMessage: result.urgentToConfirm,
     })
+
+    // Explicitly disable caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+
+    return response
   } catch (error) {
     console.error('[site-messages] 获取站内消息失败:', error)
     return NextResponse.json({ error: '无法获取站内消息' }, { status: 500 })
