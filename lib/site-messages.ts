@@ -65,7 +65,10 @@ export async function listSiteMessagesForUser(
   userId: string,
   options: { limit?: number; includeExpired?: boolean } = {}
 ): Promise<SiteMessageListResult> {
-  const now = new Date()
+  // Fix timezone issue: DB stores local time (UTC+8) as UTC, so we shift query time by +8h
+  const now = new Date(Date.now() + 8 * 60 * 60 * 1000)
+  console.log('[site-messages] Querying with adjusted time:', now.toISOString())
+
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 100)
   const includeExpired = Boolean(options.includeExpired)
 
