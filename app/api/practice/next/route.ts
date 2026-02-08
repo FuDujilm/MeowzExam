@@ -155,20 +155,18 @@ export async function GET(request: NextRequest) {
 
       switch (effectiveMode) {
       case 'sequential': {
-        const correctQuestions = await prisma.userQuestion.findMany({
+        const practicedQuestions = await prisma.userQuestion.findMany({
           where: {
             userId: user.id,
-            correctCount: { gt: 0 },
-            incorrectCount: 0,
             question: libraryFilter,
           },
           select: { questionId: true },
         })
 
-        const correctIds = correctQuestions.map((item) => item.questionId)
+        const practicedIds = practicedQuestions.map((item) => item.questionId)
         const exclusion =
-          correctIds.length > 0
-            ? { id: { notIn: correctIds } }
+          practicedIds.length > 0
+            ? { id: { notIn: practicedIds } }
             : undefined
 
         const baseWhere = combineWhereConditions(libraryFilter, exclusion)

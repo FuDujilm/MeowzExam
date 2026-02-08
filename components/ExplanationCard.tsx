@@ -1,4 +1,4 @@
-﻿'use client'
+﻿﻿'use client'
 
 import 'katex/dist/katex.min.css'
 import React, { useEffect, useRef, useState } from 'react'
