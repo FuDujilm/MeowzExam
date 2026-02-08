@@ -5,6 +5,8 @@ import { ZodError } from "zod"
 
 import { prisma } from "@/lib/db"
 import { applyStyleToPrompt } from "@/lib/ai/style"
+// 引入全局代理 Patch，确保 AI 请求能遵循系统代理设置
+import "@/lib/network/proxy-fetch"
 import { AiExplainSchema, SYSTEM_PROMPT_XML, buildUserPrompt, type AiExplainOutput, type OptionAnalysis } from "./schema"
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4"
@@ -210,7 +212,23 @@ function resolveApiKey(group: AiModelGroup | null): string {
 }
 
 function resolveBaseUrl(group: AiModelGroup | null): string | undefined {
-  const url = group?.proxyUrl?.trim() || group?.apiUrl?.trim() || process.env.OPENAI_BASE_URL?.trim()
+  let url = group?.proxyUrl?.trim() || group?.apiUrl?.trim() || process.env.OPENAI_BASE_URL?.trim()
+
+  // 自动修正：如果 URL 是纯域名（不包含路径），自动追加 /v1
+  // 许多用户（特别是使用 One API/New API 的用户）容易漏掉 /v1
+  if (url) {
+    try {
+      const urlObj = new URL(url)
+      if (urlObj.pathname === '/' || urlObj.pathname === '') {
+        // 确保不以 / 结尾，然后追加 /v1
+        url = url.replace(/\/+$/, '') + '/v1'
+      }
+    } catch (e) {
+      // URL 解析失败，保持原样
+    }
+  }
+
+  console.log(`[AI Debug] Resolving Base URL. Result: '${url || 'DEFAULT'}' | Group: ${group?.name || 'None'} (Proxy: '${group?.proxyUrl || ''}', API: '${group?.apiUrl || ''}') | Env: '${process.env.OPENAI_BASE_URL || ''}'`)
   return url || undefined
 }
 
@@ -218,6 +236,8 @@ function createClient(group: AiModelGroup | null): OpenAI {
   return new OpenAI({
     apiKey: resolveApiKey(group),
     baseURL: resolveBaseUrl(group),
+    // 显式使用全局 fetch，以便支持 proxy-fetch.ts 中的代理 Patch
+    fetch: globalThis.fetch,
   })
 }
 
@@ -781,9 +801,12 @@ async function requestStructuredExplanation(
 
   let completion: Awaited<ReturnType<typeof client.chat.completions.create>>
   try {
+    const finalBaseUrl = extractBaseUrl(client) || 'https://api.openai.com/v1'
+    console.log(`[AI Debug] Sending request to: ${finalBaseUrl} | Model: ${model}`)
+
     logAiTrace(trace, 'llm_request', {
       attempt,
-      baseURL: extractBaseUrl(client),
+      baseURL: finalBaseUrl,
       model,
       maxTokens: payload.max_tokens,
     })
@@ -813,8 +836,29 @@ async function requestStructuredExplanation(
   })
 
   // Ensure choices exists and has at least one element
-  if (!completion.choices || completion.choices.length === 0) {
-     logAiTrace(trace, 'response_empty_choices', { attempt })
+  if (!completion || !completion.choices || completion.choices.length === 0) {
+     const isHtmlResponse = typeof completion === 'string' && (completion as string).trim().startsWith('<')
+     console.log("[AI Debug] Invalid completion received (Empty choices):", 
+        isHtmlResponse ? "HTML Content (Likely invalid Base URL)" : JSON.stringify(completion, null, 2)
+     )
+     
+     if (isHtmlResponse) {
+        throw new Error("AI 服务返回了 HTML 页面而非 JSON 数据。这通常意味着 API 地址配置错误（例如漏掉了 '/v1' 后缀）或服务暂时不可用。请检查后台模型组的 API URL 配置。")
+     }
+
+     logAiTrace(trace, 'response_empty_choices', { attempt, completion: completion ? 'exists' : 'null' })
+
+     if (retryCount > 0) {
+       debugLog("empty_choices_retry", { retryCount, attempt })
+       return requestStructuredExplanation(client, group, model, request, {
+         forceDefaultPrompt: true,
+          retryCount: retryCount - 1,
+          maxTokensOverride: payload.max_tokens ?? undefined,
+          attempt: attempt + 1,
+          trace,
+       })
+     }
+
      throw new Error("AI 返回了空的选项列表")
   }
 
@@ -850,6 +894,18 @@ async function requestStructuredExplanation(
 
   if (!content) {
     logAiTrace(trace, 'response_empty', { attempt })
+
+    if (retryCount > 0) {
+      debugLog("empty_content_retry", { retryCount, attempt })
+      return requestStructuredExplanation(client, group, model, request, {
+        forceDefaultPrompt: true,
+        retryCount: retryCount - 1,
+        maxTokensOverride: payload.max_tokens ?? undefined,
+        attempt: attempt + 1,
+        trace,
+      })
+    }
+
     throw new Error("AI 返回为空")
   }
 
@@ -1111,10 +1167,10 @@ export async function generateAIExplanation(
   }
 }
 
-const SIMPLE_SYSTEM_PROMPT = "你是一位经验丰富的业余无线电考试辅导老师，擅长用简单易懂的方式讲解复杂的技术概念。"
+const SIMPLE_SYSTEM_PROMPT = "你是一位经验丰富的业余无线电考试辅导老师，擅长用简单易懂的方式讲解复杂的技术概念。若涉及公式或数学推导，请务必使用 LaTeX 格式（如 $E=mc^2$）。"
 
 const ASSISTANT_SYSTEM_PROMPT =
-  "你是业余无线电刷题系统的小助手，能够用中文简洁、友好地回答与业余无线电考试、法规、操作技巧以及系统使用相关的问题。当不知道答案时要坦诚说明，并给出可能的查阅方向。"
+  "你是业余无线电刷题系统的小助手，能够用中文简洁、友好地回答与业余无线电考试、法规、操作技巧以及系统使用相关的问题。当不知道答案时要坦诚说明，并给出可能的查阅方向。回答中如果包含数学公式，请使用 LaTeX 格式（例如 $V=IR$）。"
 
 export async function generateSimpleExplanation(
   request: AIExplanationRequest

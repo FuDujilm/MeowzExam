@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Image from 'next/image'
 import Link from 'next/link'
@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { useSiteConfig } from '@/components/site/site-config-provider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
 import { useQuestionLibraries } from '@/lib/use-question-libraries'
 import { useNotification } from '@/components/ui/notification-provider'
 import {
@@ -87,6 +88,7 @@ export default function Home() {
   const [checkingIn, setCheckingIn] = useState(false)
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [dailyStatus, setDailyStatus] = useState<DailyPracticeStatus | null>(null)
+  const [libraryStats, setLibraryStats] = useState<{ browsedCount: number } | null>(null)
 
   const loading = status === 'loading'
   const isAuthenticated = Boolean(session?.user)
@@ -107,8 +109,19 @@ export default function Home() {
   useEffect(() => {
     if (selectedLibraryCode) {
       localStorage.setItem('selectedLibraryCode', selectedLibraryCode)
+      // 加载题库统计
+      if (isAuthenticated) {
+        fetch(`/api/user/library-stats?code=${selectedLibraryCode}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.browsedCount !== undefined) {
+              setLibraryStats(data)
+            }
+          })
+          .catch((err) => console.error('加载题库统计失败:', err))
+      }
     }
-  }, [selectedLibraryCode])
+  }, [selectedLibraryCode, isAuthenticated])
 
   const selectedLibrary = useMemo(
     () => libraries.find((library) => library.code === selectedLibraryCode) ?? null,
@@ -417,6 +430,17 @@ export default function Home() {
                       : `题库共 ${selectedLibrary.totalQuestions} 道题，尚未配置考试预设。`
                     : '导入题库后可查看对应的考试预设与题量统计。'}
                 </CardDescription>
+                {selectedLibrary && libraryStats && (
+                  <div className="mt-4 space-y-2 w-full">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-300">学习进度</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {libraryStats.browsedCount} / {selectedLibrary.totalQuestions} ({Math.round((libraryStats.browsedCount / (selectedLibrary.totalQuestions || 1)) * 100)}%)
+                      </span>
+                    </div>
+                    <Progress value={(libraryStats.browsedCount / (selectedLibrary.totalQuestions || 1)) * 100} className="h-2 bg-blue-200/50 dark:bg-blue-950/50" />
+                  </div>
+                )}
               </CardHeader>
             </Card>
 

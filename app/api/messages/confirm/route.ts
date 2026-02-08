@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '站内消息不存在或已被删除' }, { status: 404 })
     }
 
-    const now = new Date()
+    // Fix timezone issue: DB stores local time (UTC+8) as UTC, so we shift query time by +8h
+    const now = new Date(Date.now() + 8 * 60 * 60 * 1000)
     if (message.publishedAt > now || (message.expiresAt && message.expiresAt <= now)) {
       return NextResponse.json({ error: '站内消息已失效' }, { status: 400 })
     }

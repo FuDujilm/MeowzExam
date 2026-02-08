@@ -1,6 +1,10 @@
 ﻿'use client'
 
+import 'katex/dist/katex.min.css'
 import React, { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -331,9 +335,14 @@ export function ExplanationCard({
               </div>
             )}
           </div>
-          <p className="whitespace-pre-line text-sm text-gray-700 dark:text-gray-100">
-            {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
-          </p>
+          <div className="whitespace-pre-line text-sm text-gray-700 dark:text-gray-100 markdown-body">
+            <ReactMarkdown
+              remarkPlugins={[remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+            </ReactMarkdown>
+          </div>
           <p className="text-xs text-red-500 mt-2">解析格式不完整，显示原始内容</p>
         </CardContent>
 
@@ -429,7 +438,14 @@ export function ExplanationCard({
             <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">结论</p>
-              <p className="text-sm text-gray-900 dark:text-gray-100">{structured.summary}</p>
+              <div className="text-sm text-gray-900 dark:text-gray-100 markdown-body">
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                >
+                  {structured.summary}
+                </ReactMarkdown>
+              </div>
               {structured.answer && structured.answer.length > 0 && (
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                   正确答案：
@@ -487,15 +503,20 @@ export function ExplanationCard({
                           当前选择
                         </Badge>
                       )}
-                      <p
+                      <div
                         className={
                           item.verdict === 'correct'
-                            ? 'text-green-700 leading-relaxed dark:text-emerald-100'
-                            : 'text-red-700 leading-relaxed dark:text-rose-100'
+                            ? 'text-green-700 leading-relaxed dark:text-emerald-100 markdown-body'
+                            : 'text-red-700 leading-relaxed dark:text-rose-100 markdown-body'
                         }
                       >
-                        {item.reason}
-                      </p>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
+                        >
+                          {item.reason}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 )
@@ -515,7 +536,14 @@ export function ExplanationCard({
               {structured.keyPoints.map((point, idx) => (
                 <li key={idx} className="text-sm text-gray-700 dark:text-gray-200 flex items-start gap-2">
                   <span className="text-indigo-600">•</span>
-                  <span>{point}</span>
+                  <div className="markdown-body">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex]}
+                    >
+                      {point}
+                    </ReactMarkdown>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -540,7 +568,14 @@ export function ExplanationCard({
                     <span className="text-xs text-yellow-700 dark:text-amber-200 font-medium">
                       {MemoryAidLabel[aid.type]}:
                     </span>
-                    <p className="text-gray-800 dark:text-amber-50">{aid.text}</p>
+                    <div className="text-gray-800 dark:text-amber-50">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                      >
+                        {aid.text}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ))}

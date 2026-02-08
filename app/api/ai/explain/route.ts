@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { generateExplanation } from '@/lib/ai/unified'
 import { generateSimpleExplanation } from '@/lib/ai/openai'
+import { checkAndIncrementAiQuota, AiQuotaExceededError } from '@/lib/ai/quota'
 import { createAuditLog } from '@/lib/audit'
 import { calculateWilsonScore } from '@/lib/ai/schema'
 import { isAdminEmail } from '@/lib/auth/admin'
@@ -209,6 +210,10 @@ export async function POST(request: NextRequest) {
       ? `${question.category} > ${question.subSection}`
       : question.category
 
+    // 检查并扣除 AI 配额（管理员跳过限额检查，但仍记录使用量）
+    // 注意：isAdminEmail 依赖 process.env.ADMIN_EMAILS，请确保环境变量已配置
+    await checkAndIncrementAiQuota(session.user.id, 1, isAdmin)
+
     if (mode === 'structured') {
       // 结构化模式 - 使用统一调用层（自动选择最优 provider）
       const { explanation: structuredExplanation, provider, modelName } = await generateExplanation({
@@ -387,6 +392,13 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('AI explanation error:', error)
+
+    if (error instanceof AiQuotaExceededError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 403 }
+      )
+    }
 
     try {
       if (session?.user?.id) {

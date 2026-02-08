@@ -71,7 +71,8 @@ export const SYSTEM_PROMPT_XML = `你是一名专业的业余无线电考试讲�
 2. answers 中的 option 属性必须与题目选项编号一致，文本写选项原文；
 3. optionAnalysis 中 verdict 只能是 correct 或 wrong，reason ≥20 字并写明依据；
 4. 若证据不足或无法确定，请将 insufficiency 设为 true 并说明原因；
-5. 若无记忆法或引用，可省略对应子节点，但必须保留 XML 合法结构。`
+5. 若无记忆法或引用，可省略对应子节点，但必须保留 XML 合法结构；
+6. 若涉及公式或数学推导，请使用 LaTeX 格式（如 $E=mc^2$），并确保能够被 Katex 正确渲染。不要使用其他非标准数学标记。`
 
 export function buildUserPrompt(params: {
   questionTitle: string

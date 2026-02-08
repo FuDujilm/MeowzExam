@@ -37,11 +37,15 @@ export const config = {
       id: "custom",
       name: "自建OAuth",
       type: "oauth",
-      clientId: process.env.OAUTH_CLIENT_ID!,
-      clientSecret: process.env.OAUTH_CLIENT_SECRET!,
+      clientId: (process.env.NODE_ENV === 'development' && process.env.HAM_EXAM_CLIENT_ID) 
+        ? process.env.HAM_EXAM_CLIENT_ID 
+        : process.env.OAUTH_CLIENT_ID!,
+      clientSecret: (process.env.NODE_ENV === 'development' && process.env.HAM_EXAM_CLIENT_SECRET)
+        ? process.env.HAM_EXAM_CLIENT_SECRET
+        : process.env.OAUTH_CLIENT_SECRET!,
       wellKnown: undefined,
       token: {
-        url: `${oauthBaseUrl}/api/oauth/token`,
+        url: `${oauthBaseUrl}/oauth/token`,
         conform: async (response: Response) => {
           if (response.ok) {
             return response
@@ -55,13 +59,13 @@ export const config = {
         token_endpoint_auth_method: "client_secret_post",
       },
       authorization: {
-        url: `${oauthBaseUrl}/api/oauth/authorize`,
+        url: `${oauthBaseUrl}/oauth/authorize`,
         params: {
           scope: "openid profile email",
         },
       },
       userinfo: {
-        url: `${oauthBaseUrl}/api/oauth/userinfo`,
+        url: `${oauthBaseUrl}/oauth/userinfo`,
         async request(context: any) {
           // OAuth服务器的access_token是JWT，直接解码获取用户信息
           const token = context.tokens.access_token
@@ -146,6 +150,17 @@ export const config = {
   session: {
     strategy: "database",
   },
+  cookies: process.env.NODE_ENV === 'development' ? {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: false,
+      },
+    },
+  } : undefined,
 } satisfies NextAuthConfig
 
 export const { handlers, auth, signIn, signOut } = NextAuth(config)

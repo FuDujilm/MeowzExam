@@ -6,8 +6,6 @@ import { Prisma } from '@/lib/generated/prisma'
 
 export const dynamic = 'force-dynamic'
 
-const MAX_PAGE_SIZE = 50
-
 function parsePositiveInt(value: string | null, fallback: number) {
   if (!value) return fallback
   const parsed = Number.parseInt(value, 10)
@@ -50,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   const searchParams = request.nextUrl.searchParams
   const page = Math.max(1, parsePositiveInt(searchParams.get('page'), 1))
-  const limit = Math.min(parsePositiveInt(searchParams.get('limit'), 20), MAX_PAGE_SIZE)
+  const limit = Math.min(parsePositiveInt(searchParams.get('limit'), 20), 50)
   const query = (searchParams.get('q') || '').trim()
 
   const where = query.length > 0

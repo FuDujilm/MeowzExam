@@ -49,12 +49,19 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false)
   const [stylePresets, setStylePresets] = useState<StylePresetOption[]>([])
   const [styleLoading, setStyleLoading] = useState(false)
+  const [stats, setStats] = useState({
+    totalQuestions: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    examsTaken: 0,
+  })
   const { notify } = useNotification()
 
   // 加载设置
   useEffect(() => {
     if (status === 'authenticated') {
       loadSettings()
+      loadStats()
     } else if (status === 'unauthenticated') {
       router.push('/login')
     }
@@ -63,6 +70,23 @@ export default function SettingsPage() {
   useEffect(() => {
     loadStylePresets()
   }, [])
+
+  const loadStats = async () => {
+    try {
+      const res = await fetch('/api/user/stats')
+      if (res.ok) {
+        const data = await res.json()
+        setStats({
+          totalQuestions: data.totalAttempts || 0,
+          correctCount: data.totalCorrect || 0,
+          incorrectCount: data.totalIncorrect || 0,
+          examsTaken: data.examCount || 0,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load stats:', error)
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -358,7 +382,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ai-style-custom">自定义提示词</Label>
+              <Label htmlFor="ai-style-custom">补充提示词</Label>
               <Textarea
                 id="ai-style-custom"
                 rows={4}
@@ -432,16 +456,16 @@ export default function SettingsPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {[
-                { label: '累计答题', color: 'text-blue-500' },
-                { label: '答对题数', color: 'text-green-500' },
-                { label: '错题数量', color: 'text-red-500' },
-                { label: '模拟考试', color: 'text-purple-500' },
+                { label: '累计答题', value: stats.totalQuestions, color: 'text-blue-500' },
+                { label: '答对题数', value: stats.correctCount, color: 'text-green-500' },
+                { label: '错题数量', value: stats.incorrectCount, color: 'text-red-500' },
+                { label: '模拟考试', value: stats.examsTaken, color: 'text-purple-500' },
               ].map((item) => (
                 <div
                   key={item.label}
                   className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/60"
                 >
-                  <p className={cn('text-2xl font-bold', item.color)}>0</p>
+                  <p className={cn('text-2xl font-bold', item.color)}>{item.value}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-400">{item.label}</p>
                 </div>
               ))}

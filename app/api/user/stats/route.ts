@@ -87,6 +87,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       todayAnswered,
       totalAnswered,
+      totalAttempts,
+      totalCorrect,
+      totalIncorrect,
       examCount,
       accuracy: Math.round(accuracy),
       totalPoints: user.totalPoints,

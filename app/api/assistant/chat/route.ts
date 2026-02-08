@@ -4,6 +4,8 @@ import { auth } from '@/auth'
 import { generateAssistantChatReply } from '@/lib/ai/openai'
 import { resolveUserAiStylePrompt } from '@/lib/ai/style'
 import { hitRateLimit } from '@/lib/rate-limit'
+import { checkAndIncrementAiQuota, AiQuotaExceededError } from '@/lib/ai/quota'
+import { isAdminEmail } from '@/lib/auth/admin'
 
 const USER_RATE_LIMIT = {
   limit: Number(process.env.ASSISTANT_RATE_LIMIT_PER_USER ?? 20),
@@ -114,6 +116,11 @@ export async function POST(request: NextRequest) {
   })
 
   try {
+    const isAdmin = session.user.email ? isAdminEmail(session.user.email) : false
+    
+    // 检查并扣除 AI 配额（管理员跳过限额检查，但仍记录使用量）
+    await checkAndIncrementAiQuota(session.user.id, 1, isAdmin)
+
     const stylePrompt = await resolveUserAiStylePrompt(session.user.id)
     const { reply, modelName } = await generateAssistantChatReply({
       messages: sanitised,
@@ -127,6 +134,14 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[assistant] chat failed:', error)
+
+    if (error instanceof AiQuotaExceededError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 403 }
+      )
+    }
+
     return NextResponse.json(
       {
         error: error?.message ?? '小助手暂时不可用，请稍后再试。',

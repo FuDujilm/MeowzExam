@@ -247,6 +247,7 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
       setUrgentOpen(false)
       return
     }
+    setError(null)
     try {
       setConfirming(true)
       const response = await fetch('/api/messages/confirm', {
@@ -424,6 +425,11 @@ export function SiteMessageCenter({ className }: SiteMessageCenterProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {error ? (
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-200">
+                {error}
+              </div>
+            ) : null}
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {urgentMessage?.title}
             </h3>

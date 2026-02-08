@@ -332,7 +332,7 @@ export default function AiModelFormPage() {
               <Textarea
                 id="systemPrompt"
                 rows={4}
-                value={formData.systemPrompt}
+                value={formData.systemPrompt || ''}
                 onChange={(event) => setFormData((prev) => ({ ...prev, systemPrompt: event.target.value }))}
                 placeholder="Leave blank to use the default prompt"
               />
