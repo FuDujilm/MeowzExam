@@ -183,11 +183,11 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: Colors.deepPurple.shade50, // Make AppBar visible
+        title: const Text('Login', style: TextStyle(fontSize: 16)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings, color: Colors.deepPurple),
             tooltip: '配置服务器',
             onPressed: _showServerConfigDialog,
           ),
@@ -231,6 +231,16 @@ class _LoginPageState extends State<LoginPage> {
                      );
                   },
                   child: const Text('游客试用 (跳过登录)'),
+                ),
+                const SizedBox(height: 24),
+                // Fallback Settings Button
+                OutlinedButton.icon(
+                  onPressed: _showServerConfigDialog,
+                  icon: const Icon(Icons.settings, size: 16),
+                  label: const Text('服务器设置'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.grey,
+                  ),
                 ),
               ],
             ),
