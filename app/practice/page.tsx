@@ -117,12 +117,57 @@ function PracticeContent() {
   }
 
   // 加载题目
-const loadQuestion = async (
+  const loadQuestion = async (
     currentId?: string,
     direction: 'next' | 'prev' | 'jump' = 'next',
     targetQuestionId?: string | null,
   ) => {
     try {
+      if (mode === 'guest') {
+        setLoading(true)
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        const mockQ: Question = {
+          id: `mock-${Date.now()}`,
+          uuid: `mock-uuid-${Date.now()}`,
+          externalId: 'GUEST001',
+          type: 'CHOICE',
+          questionType: 'single_choice',
+          difficulty: 'easy',
+          category: '游客体验',
+          categoryCode: 'GUEST',
+          title: '这是一个【游客模式】下的演示题目。\n\n问题：我国业余无线电台操作证书分为几类？',
+          options: [
+            { id: 'A', text: '3类 (A, B, C)', is_correct: true },
+            { id: 'B', text: '2类 (A, B)', is_correct: false },
+            { id: 'C', text: '4类 (A, B, C, D)', is_correct: false },
+            { id: 'D', text: '1类', is_correct: false },
+          ],
+          correctAnswers: ['A'],
+          explanation: '【解析】\n根据《业余无线电台管理办法》，业余无线电台操作证书分为A、B、C三类。\n\n提示：登录后可访问完整题库和保存进度。',
+          hasImage: false,
+        }
+        
+        setQuestion(mockQ)
+        setUserQuestion({ correctCount: 0, incorrectCount: 0 })
+        setIsFavorite(false)
+        setSelectedAnswer([])
+        setSubmitted(false)
+        setIsCorrect(null)
+        setCorrectAnswers([])
+        setAiLoading(false)
+        setAnswerMapping({})
+        setOptionTextMap({
+            'A': '3类 (A, B, C)',
+            'B': '2类 (A, B)',
+            'C': '4类 (A, B, C, D)',
+            'D': '1类'
+        })
+        setLoading(false)
+        return
+      }
+
       if (isDailyMode && dailyProgress?.completed) {
         notify({
           variant: 'success',
@@ -279,6 +324,32 @@ const loadQuestion = async (
         description: '提交前请至少选择一个选项。',
       })
       return
+    }
+
+    if (mode === 'guest') {
+        setSubmitted(true)
+        // Local check
+        const correct = question.correctAnswers
+        const isRight = selectedAnswer.length === correct.length && 
+            selectedAnswer.every(a => correct.includes(a))
+        
+        setIsCorrect(isRight)
+        setCorrectAnswers(correct)
+        
+        if (isRight) {
+            notify({
+                variant: 'success',
+                title: '回答正确',
+                description: '真棒！登录后可以记录您的学习进度哦。'
+            })
+        } else {
+             notify({
+                variant: 'danger',
+                title: '回答错误',
+                description: '没关系，查看解析了解一下吧。'
+            })
+        }
+        return
     }
 
     try {

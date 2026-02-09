@@ -610,11 +610,18 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <Link href="/login">
-              <Button size="lg" className="px-8 py-3">
-                立即开始练习
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/login">
+                <Button size="lg" className="px-8 py-3 w-full sm:w-auto">
+                  立即开始练习
+                </Button>
+              </Link>
+              <Link href="/practice?mode=guest&type=A_CLASS">
+                <Button variant="outline" size="lg" className="px-8 py-3 w-full sm:w-auto">
+                  游客试用 (无需登录)
+                </Button>
+              </Link>
+            </div>
           </section>
         )}
       </main>

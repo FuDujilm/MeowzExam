@@ -38,6 +38,30 @@ export function ExplanationList({
 
   // 加载解析列表
   const loadExplanations = async () => {
+    // Guest Mode / Mock Question Handling
+    if (questionId.startsWith('mock-')) {
+        setLoading(false)
+        // Mock explanations for guest mode
+        setExplanations([
+            {
+                id: 'mock-ai',
+                type: 'AI',
+                content: {
+                    summary: '这是一条演示用的 AI 解析。',
+                    answer: '正确答案是 A。',
+                    analysis: '在游客模式下，我们展示此演示解析。登录后，您将获得针对每道题目的实时 AI 智能解析。',
+                    keyPoints: ['业余无线电', '操作证书', '分类']
+                },
+                format: 'structured',
+                upvotes: 99,
+                downvotes: 0,
+                wilsonScore: 0.99,
+                createdAt: new Date().toISOString()
+            }
+        ])
+        return
+    }
+
     try {
       setLoading(true)
       setError(null)
