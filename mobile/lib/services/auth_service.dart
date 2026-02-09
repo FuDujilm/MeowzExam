@@ -12,8 +12,7 @@ class AuthService {
   // TODO: Replace with your actual Client ID (same as in .env)
   static const String _clientId = '1797f48877790486055d0be1ef70a3dd'; 
   static const String _redirectUriScheme = 'com.meowzexam';
-  // Use HTTP Intermediary Page for Redirect URI
-  // Replace IP with your computer's IP if testing on real device
+  // Use the intermediate page on Next.js server as the redirect URI for OAuth provider
   static const String _redirectUri = 'http://192.168.31.187:3001/mobile-auth-callback';
 
   Future<void> sendCode(String email) async {
