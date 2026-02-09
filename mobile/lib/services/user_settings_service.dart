@@ -32,6 +32,27 @@ class UserSettingsService {
       final response = await _apiClient.client.get('user/stats');
       return response.data;
     } catch (e) {
+      // Return empty stats instead of throwing to prevent UI crash
+      print('Failed to load user stats: $e');
+      return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> getCheckInStatus() async {
+    try {
+      final response = await _apiClient.client.get('points/checkin');
+      return response.data;
+    } catch (e) {
+      print('Failed to load check-in status: $e');
+      return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> checkIn() async {
+    try {
+      final response = await _apiClient.client.post('points/checkin');
+      return response.data;
+    } catch (e) {
       rethrow;
     }
   }
@@ -41,15 +62,9 @@ class UserSettingsService {
       final response = await _apiClient.client.get('points/leaderboard');
       return response.data; // Assuming list of {user: {...}, points: 100}
     } catch (e) {
-      // Return mock data if API fails (e.g., 404 or auth error in guest mode)
-      return List.generate(10, (index) => {
-        'user': {
-            'name': 'User ${index + 1}',
-            'callsign': 'BI4XX${index}',
-            'image': null
-        },
-        'totalPoints': 1000 - (index * 50)
-      });
+      // Return empty list instead of mock data on error
+      print('Failed to load leaderboard: $e');
+      return [];
     }
   }
 }

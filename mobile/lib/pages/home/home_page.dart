@@ -32,29 +32,49 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadData() async {
     try {
       final stats = await _userSettingsService.getUserStats();
-      setState(() {
-        _totalQuestions = stats['totalQuestions'] ?? 1000; // Mock total if not returned
-        _completedQuestions = stats['totalAnswered'] ?? 0;
-        _dailyProgress = stats['todayAnswered'] ?? 0;
-        // _checkInDays = stats['streak'] ?? 0; // If API provides streak
-        _isLoading = false;
-      });
+      final checkInStatus = await _userSettingsService.getCheckInStatus();
+      
+      if (mounted) {
+        setState(() {
+          _totalQuestions = stats['totalQuestions'] ?? 0;
+          _completedQuestions = stats['totalAnswered'] ?? 0;
+          _dailyProgress = stats['todayAnswered'] ?? 0;
+          _checkInDays = checkInStatus['currentStreak'] ?? 0;
+          _isCheckedInToday = checkInStatus['hasCheckedIn'] ?? false;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('Failed to load stats: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _handleCheckIn() {
+  void _handleCheckIn() async {
     if (_isCheckedInToday) return;
-    setState(() {
-      _isCheckedInToday = true;
-      _checkInDays++;
-    });
-    // TODO: Call API to check in
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Checked in successfully! +1 Day')),
-    );
+    
+    try {
+      final result = await _userSettingsService.checkIn();
+      if (result['success'] == true) {
+        if (mounted) {
+          setState(() {
+            _isCheckedInToday = true;
+            _checkInDays = result['streak'] ?? (_checkInDays + 1);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('签到成功! ${result['bonusReason'] ?? ''} 积分 +${result['points']}')),
+          );
+        }
+      } else {
+        throw Exception(result['error'] ?? 'Check-in failed');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('签到失败: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -167,7 +187,11 @@ class _HomePageState extends State<HomePage> {
                 leading: const Icon(Icons.calendar_today),
                 title: const Text('学习日历'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: (){},
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('学习日历功能开发中，敬请期待!')),
+                  );
+                },
               ),
              )
           ],

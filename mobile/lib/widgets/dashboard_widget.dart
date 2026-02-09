@@ -15,11 +15,16 @@ class DashboardWidget extends StatelessWidget {
     required this.completedQuestions,
     required this.dailyGoal,
     required this.dailyProgress,
-    this.weeklyProgress = const [5, 12, 0, 20, 8, 15, 10], // Mock data
+    this.weeklyProgress = const [], // No mock data by default
   });
 
   @override
   Widget build(BuildContext context) {
+    // Fallback if data is empty
+    final safeWeeklyProgress = weeklyProgress.isEmpty 
+        ? List.filled(7, 0) 
+        : weeklyProgress;
+
     return Column(
       children: [
         // 1. Overall Progress (Circular)
@@ -33,16 +38,18 @@ class DashboardWidget extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Total Progress',
+                      const Text('总进度',
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 16),
                       Center(
                         child: CircularPercentIndicator(
                           radius: 50.0,
                           lineWidth: 8.0,
-                          percent: (completedQuestions / totalQuestions).clamp(0.0, 1.0),
+                          percent: totalQuestions > 0 
+                              ? (completedQuestions / totalQuestions).clamp(0.0, 1.0) 
+                              : 0.0,
                           center: Text(
-                            "${((completedQuestions / totalQuestions) * 100).toStringAsFixed(0)}%",
+                            "${totalQuestions > 0 ? ((completedQuestions / totalQuestions) * 100).toStringAsFixed(0) : 0}%",
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           progressColor: Theme.of(context).colorScheme.primary,
@@ -67,26 +74,28 @@ class DashboardWidget extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Today\'s Goal',
+                      const Text('今日目标',
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 24),
                       LinearPercentIndicator(
                         lineHeight: 12.0,
-                        percent: (dailyProgress / dailyGoal).clamp(0.0, 1.0),
+                        percent: dailyGoal > 0 
+                            ? (dailyProgress / dailyGoal).clamp(0.0, 1.0) 
+                            : 0.0,
                         progressColor: Colors.orange,
                         backgroundColor: Colors.orange.withOpacity(0.2),
                         barRadius: const Radius.circular(6),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '$dailyProgress / $dailyGoal Questions',
+                        '$dailyProgress / $dailyGoal 题',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 8),
-                      if (dailyProgress >= dailyGoal)
-                         const Text('🎉 Goal Reached!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))
+                      if (dailyProgress >= dailyGoal && dailyGoal > 0)
+                         const Text('🎉 目标达成!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))
                       else
-                         Text('Keep going!', style: TextStyle(color: Colors.grey[600])),
+                         Text('继续加油!', style: TextStyle(color: Colors.grey[600])),
                     ],
                   ),
                 ),
@@ -103,7 +112,7 @@ class DashboardWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Weekly Activity',
+                const Text('本周活跃度',
                     style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -125,7 +134,7 @@ class DashboardWidget extends StatelessWidget {
                           sideTitles: SideTitles(
                             showTitles: true,
                             getTitlesWidget: (double value, TitleMeta meta) {
-                              const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                              const days = ['一', '二', '三', '四', '五', '六', '日'];
                               if (value.toInt() < days.length) {
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
@@ -138,7 +147,7 @@ class DashboardWidget extends StatelessWidget {
                         ),
                       ),
                       borderData: FlBorderData(show: false),
-                      barGroups: weeklyProgress.asMap().entries.map((e) {
+                      barGroups: safeWeeklyProgress.asMap().entries.map((e) {
                         return BarChartGroupData(
                           x: e.key,
                           barRods: [

@@ -54,6 +54,110 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  void _showEmailLoginDialog() {
+    final emailController = TextEditingController();
+    final codeController = TextEditingController();
+    bool isSending = false;
+    bool isLoggingIn = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('邮箱登录'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: '邮箱',
+                  prefixIcon: Icon(Icons.email),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: codeController,
+                      decoration: const InputDecoration(
+                        labelText: '验证码',
+                        prefixIcon: Icon(Icons.lock),
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: isSending ? null : () async {
+                      if (emailController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入邮箱')));
+                        return;
+                      }
+                      setState(() => isSending = true);
+                      try {
+                        await context.read<AuthService>().sendCode(emailController.text.trim());
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('验证码已发送')));
+                      } catch (e) {
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发送失败: $e')));
+                      } finally {
+                        setState(() => isSending = false);
+                      }
+                    },
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    ),
+                    child: isSending 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('获取'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: isLoggingIn ? null : () async {
+                if (emailController.text.isEmpty || codeController.text.isEmpty) {
+                  return;
+                }
+                setState(() => isLoggingIn = true);
+                try {
+                  final user = await context.read<AuthService>().login(
+                    emailController.text.trim(),
+                    codeController.text.trim(),
+                  );
+                  if (mounted) {
+                    Navigator.pop(context); // Close dialog
+                    _showSuccess('欢迎回来, ${user['name'] ?? 'User'}!');
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const MainScreen()),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('登录失败: $e')));
+                } finally {
+                  setState(() => isLoggingIn = false);
+                }
+              },
+              child: isLoggingIn 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('登录'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showServerConfigDialog() async {
     final authService = context.read<AuthService>();
     String currentUrl = await authService.getApiUrl();
@@ -218,9 +322,19 @@ class _LoginPageState extends State<LoginPage> {
                       width: double.infinity,
                       height: 56,
                       child: FilledButton.icon(
+                        onPressed: _showEmailLoginDialog,
+                        icon: const Icon(Icons.email),
+                        label: const Text('邮箱验证码登录', style: TextStyle(fontSize: 18)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
                     onPressed: _loginWithOAuth,
                     icon: const Icon(Icons.login),
-                    label: const Text('微信一键登录 (OAuth)', style: TextStyle(fontSize: 18)),
+                    label: const Text('OAuth 统一认证登录', style: TextStyle(fontSize: 18)),
                   ),
                 ),
                 const SizedBox(height: 16),
