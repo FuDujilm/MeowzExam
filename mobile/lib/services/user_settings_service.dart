@@ -7,7 +7,7 @@ class UserSettingsService {
   Future<User> updateProfile({String? callsign, String? name}) async {
     try {
       final response = await _apiClient.client.patch(
-        '/user/profile',
+        'user/profile',
         data: {
           if (callsign != null) 'callsign': callsign,
           if (name != null) 'name': name,
@@ -21,7 +21,7 @@ class UserSettingsService {
 
   Future<void> updateSettings(Map<String, dynamic> settings) async {
     try {
-      await _apiClient.client.patch('/user/settings', data: settings);
+      await _apiClient.client.patch('user/settings', data: settings);
     } catch (e) {
       rethrow;
     }
@@ -29,7 +29,7 @@ class UserSettingsService {
 
   Future<Map<String, dynamic>> getUserStats() async {
     try {
-      final response = await _apiClient.client.get('/user/stats');
+      final response = await _apiClient.client.get('user/stats');
       return response.data;
     } catch (e) {
       rethrow;
@@ -38,7 +38,7 @@ class UserSettingsService {
 
   Future<List<dynamic>> getLeaderboard() async {
     try {
-      final response = await _apiClient.client.get('/points/leaderboard');
+      final response = await _apiClient.client.get('points/leaderboard');
       return response.data; // Assuming list of {user: {...}, points: 100}
     } catch (e) {
       // Return mock data if API fails (e.g., 404 or auth error in guest mode)

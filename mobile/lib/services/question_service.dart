@@ -34,7 +34,7 @@ class QuestionService {
 
     try {
       final response = await _apiClient.client.get(
-        '/practice/questions',
+        'practice/questions',
         queryParameters: {
           'type': libraryCode, // The API expects 'type' for library code (A_CLASS etc)
           'page': page,
@@ -58,17 +58,17 @@ class QuestionService {
       // Fallback to mock on error for now to unblock UI dev
       print('API Error: $e. Returning mock data.');
       if (libraryCode == 'A_CLASS') {
-          return List.generate(5, (index) => Question(
-            id: 'fallback_$index',
-            externalId: 'FB${index + 100}',
-            title: 'Fallback Question #$index (API Failed)',
+          return List.generate(1, (index) => Question(
+            id: 'error_fallback_$index',
+            externalId: 'ERR001',
+            title: '【连接失败】请检查 API 地址配置\n\n当前尝试连接: ${_apiClient.client.options.baseUrl}\n错误信息: $e',
             type: 'CHOICE',
             options: [
-              QuestionOption(id: 'A', text: 'Fallback A'),
-              QuestionOption(id: 'B', text: 'Fallback B'),
+              QuestionOption(id: 'A', text: 'Retry'),
+              QuestionOption(id: 'B', text: 'Check Settings'),
             ],
             correctAnswers: ['A'],
-            explanation: 'API failed, so here is a fallback question.',
+            explanation: '无法连接到服务器。请确保您的手机和电脑在同一局域网，且防火墙已允许端口访问。',
           ));
       }
       rethrow;
@@ -77,7 +77,7 @@ class QuestionService {
 
   Future<List<Explanation>> getExplanations(String questionId) async {
     try {
-      final response = await _apiClient.client.get('/questions/$questionId/explanations');
+      final response = await _apiClient.client.get('questions/$questionId/explanations');
       final List<dynamic> data = response.data;
       return data.map((json) => Explanation.fromJson(json)).toList();
     } catch (e) {
@@ -88,7 +88,7 @@ class QuestionService {
 
   Future<Question> getQuestionDetails(String questionId) async {
     try {
-      final response = await _apiClient.client.get('/questions/$questionId');
+      final response = await _apiClient.client.get('questions/$questionId');
       return Question.fromJson(response.data['question']);
     } catch (e) {
       rethrow;

@@ -9,6 +9,19 @@ class AuthService {
   final ApiClient _apiClient = ApiClient();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
+  // Expose API URL configuration
+  Future<void> updateApiUrl(String url) async {
+    await _apiClient.updateBaseUrl(url);
+  }
+  
+  Future<String> getApiUrl() async {
+    return await _apiClient.getBaseUrl();
+  }
+
+  Future<Map<String, dynamic>> checkConnectivity() async {
+    return await _apiClient.testConnection();
+  }
+
   static const String _oauthBaseUrl = 'https://oauth.mzyd.work';
   // TODO: Replace with your actual Client ID (same as in .env)
   static const String _clientId = '1797f48877790486055d0be1ef70a3dd'; 
@@ -19,7 +32,7 @@ class AuthService {
   Future<void> sendCode(String email) async {
     try {
       final response = await _apiClient.client.post(
-        '/auth/send-code',
+        'auth/send-code',
         data: {'email': email},
       );
       
@@ -36,7 +49,7 @@ class AuthService {
   Future<Map<String, dynamic>> login(String email, String code) async {
     try {
       final response = await _apiClient.client.post(
-        '/auth/login',
+        'auth/login',
         data: {
           'email': email,
           'code': code,
