@@ -40,11 +40,23 @@ class Question {
   });
 
   factory Question.fromJson(Map<String, dynamic> json) {
+    // Map backend questionType (single_choice/true_false) to App type (CHOICE/JUDGEMENT)
+    String mappedType = 'CHOICE';
+    final rawType = json['questionType'] as String? ?? json['type'] as String?;
+    
+    if (rawType != null) {
+      if (rawType.toLowerCase().contains('true_false') || rawType == 'JUDGEMENT') {
+        mappedType = 'JUDGEMENT';
+      } else {
+        mappedType = 'CHOICE';
+      }
+    }
+
     return Question(
       id: json['id'] as String,
       externalId: json['externalId'] as String,
       title: json['title'] as String,
-      type: json['type'] as String,
+      type: mappedType,
       category: json['category'] as String?,
       options: (json['options'] as List<dynamic>?)
               ?.map((e) => QuestionOption.fromJson(e as Map<String, dynamic>))
