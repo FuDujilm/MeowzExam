@@ -22,6 +22,8 @@ class Question {
   final bool hasImage;
   final String? imagePath;
   final String? libraryName;
+  final List<String> correctAnswers;
+  final String? explanation;
 
   Question({
     required this.id,
@@ -33,6 +35,8 @@ class Question {
     this.hasImage = false,
     this.imagePath,
     this.libraryName,
+    this.correctAnswers = const [],
+    this.explanation,
   });
 
   factory Question.fromJson(Map<String, dynamic> json) {
@@ -49,6 +53,11 @@ class Question {
       hasImage: json['hasImage'] == true,
       imagePath: json['imagePath'] as String?,
       libraryName: json['libraryName'] as String?,
+      correctAnswers: (json['correctAnswers'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      explanation: json['explanation'] as String? ?? json['aiExplanation'] as String?,
     );
   }
 }
