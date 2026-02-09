@@ -1,5 +1,6 @@
 import '../core/api_client.dart';
 import '../models/question.dart';
+import '../models/explanation.dart';
 
 class QuestionService {
   final ApiClient _apiClient = ApiClient();
@@ -10,6 +11,7 @@ class QuestionService {
     int pageSize = 20,
     String? category,
     String? search,
+    String mode = 'sequential', // 'sequential', 'random'
   }) async {
     // Return mock data for testing if libraryCode is 'MOCK'
     if (libraryCode == 'MOCK') {
@@ -32,19 +34,25 @@ class QuestionService {
 
     try {
       final response = await _apiClient.client.get(
-        '/questions',
+        '/practice/questions',
         queryParameters: {
-          'library': libraryCode,
+          'type': libraryCode, // The API expects 'type' for library code (A_CLASS etc)
           'page': page,
-          'pageSize': pageSize,
+          'limit': pageSize, // API uses 'limit' instead of 'pageSize' for random mode
+          'offset': (page - 1) * pageSize, // API uses offset for sequential
+          'mode': mode,
           if (category != null) 'category': category,
           if (search != null) 'search': search,
         },
       );
 
       final data = response.data;
-      // The API returns { questions: [...], pagination: {...} }
-      final List<dynamic> questionsJson = data['questions'];
+      // The API structure for /practice/questions might return a list directly or nested
+      // Based on typical Next.js route analysis:
+      // If random mode: returns { questions: [...] } or just [...]
+      // Let's assume consistent wrapper based on previous analysis
+      
+      final List<dynamic> questionsJson = (data['questions'] != null) ? data['questions'] : data;
       return questionsJson.map((json) => Question.fromJson(json)).toList();
     } catch (e) {
       // Fallback to mock on error for now to unblock UI dev
@@ -67,7 +75,23 @@ class QuestionService {
     }
   }
 
-  Future<void> submitExam(Map<String, dynamic> payload) async {
-    await _apiClient.client.post('/exam/submit', data: payload);
+  Future<List<Explanation>> getExplanations(String questionId) async {
+    try {
+      final response = await _apiClient.client.get('/questions/$questionId/explanations');
+      final List<dynamic> data = response.data;
+      return data.map((json) => Explanation.fromJson(json)).toList();
+    } catch (e) {
+      print('Failed to load explanations: $e');
+      return [];
+    }
+  }
+
+  Future<Question> getQuestionDetails(String questionId) async {
+    try {
+      final response = await _apiClient.client.get('/questions/$questionId');
+      return Question.fromJson(response.data['question']);
+    } catch (e) {
+      rethrow;
+    }
   }
 }

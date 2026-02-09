@@ -1,13 +1,36 @@
 import 'package:flutter/material.dart';
 import '../quiz/quiz_page.dart';
+import '../../services/user_settings_service.dart';
 
-class PracticePage extends StatelessWidget {
+class PracticePage extends StatefulWidget {
   const PracticePage({super.key});
 
-  void _navigateToQuiz(BuildContext context, String mode, {String libraryCode = 'A_CLASS'}) {
+  @override
+  State<PracticePage> createState() => _PracticePageState();
+}
+
+class _PracticePageState extends State<PracticePage> {
+  String _currentLibraryCode = 'A_CLASS';
+  String _currentLibraryName = 'Class A - Amateur Radio';
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    // TODO: Fetch real user settings
+    // For now, default to A_CLASS
+  }
+
+  void _navigateToQuiz(BuildContext context, String mode, {String? libraryCode}) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => QuizPage(mode: mode, libraryCode: libraryCode),
+        builder: (context) => QuizPage(
+            mode: mode, 
+            libraryCode: libraryCode ?? _currentLibraryCode
+        ),
       ),
     );
   }
@@ -24,10 +47,10 @@ class PracticePage extends StatelessWidget {
             child: ListTile(
               leading: const Icon(Icons.library_books),
               title: const Text('Current Library'),
-              subtitle: const Text('Class A - Amateur Radio'),
+              subtitle: Text(_currentLibraryName),
               trailing: const Icon(Icons.change_circle_outlined),
               onTap: () {
-                // Show library switcher
+                _showLibraryPicker(context);
               },
             ),
           ),
@@ -40,21 +63,21 @@ class PracticePage extends StatelessWidget {
             subtitle: 'Go through questions one by one',
             icon: Icons.list_alt,
             color: Colors.blue,
-            onTap: () => _navigateToQuiz(context, 'sequential', libraryCode: 'A_CLASS'),
+            onTap: () => _navigateToQuiz(context, 'sequential'),
           ),
           _PracticeModeTile(
             title: 'Random Practice',
             subtitle: 'Shuffle questions for a challenge',
             icon: Icons.shuffle,
             color: Colors.purple,
-            onTap: () => _navigateToQuiz(context, 'random', libraryCode: 'A_CLASS'),
+            onTap: () => _navigateToQuiz(context, 'random'),
           ),
           _PracticeModeTile(
             title: 'Mock Exam',
             subtitle: 'Simulate real exam conditions',
             icon: Icons.timer,
             color: Colors.red,
-            onTap: () => _navigateToQuiz(context, 'mock', libraryCode: 'A_CLASS'),
+            onTap: () => _navigateToQuiz(context, 'mock'),
           ),
 
           const SizedBox(height: 24),
@@ -111,6 +134,52 @@ class PracticePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _showLibraryPicker(BuildContext context) {
+      showModalBottomSheet(
+          context: context, 
+          builder: (context) {
+              return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                      ListTile(
+                          title: const Text('Class A - Amateur Radio'),
+                          onTap: () {
+                              setState(() {
+                                  _currentLibraryCode = 'A_CLASS';
+                                  _currentLibraryName = 'Class A - Amateur Radio';
+                              });
+                              Navigator.pop(context);
+                          },
+                          selected: _currentLibraryCode == 'A_CLASS',
+                      ),
+                      ListTile(
+                          title: const Text('Class B - Amateur Radio'),
+                          onTap: () {
+                              setState(() {
+                                  _currentLibraryCode = 'B_CLASS';
+                                  _currentLibraryName = 'Class B - Amateur Radio';
+                              });
+                              Navigator.pop(context);
+                          },
+                          selected: _currentLibraryCode == 'B_CLASS',
+                      ),
+                      ListTile(
+                          title: const Text('Class C - Amateur Radio'),
+                          onTap: () {
+                              setState(() {
+                                  _currentLibraryCode = 'C_CLASS';
+                                  _currentLibraryName = 'Class C - Amateur Radio';
+                              });
+                              Navigator.pop(context);
+                          },
+                          selected: _currentLibraryCode == 'C_CLASS',
+                      ),
+                  ],
+              );
+          }
+      );
   }
 }
 

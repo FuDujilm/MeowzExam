@@ -1,0 +1,38 @@
+import '../core/api_client.dart';
+import '../models/user.dart';
+
+class UserSettingsService {
+  final ApiClient _apiClient = ApiClient();
+
+  Future<User> updateProfile({String? callsign, String? name}) async {
+    try {
+      final response = await _apiClient.client.patch(
+        '/user/profile',
+        data: {
+          if (callsign != null) 'callsign': callsign,
+          if (name != null) 'name': name,
+        },
+      );
+      return User.fromJson(response.data);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateSettings(Map<String, dynamic> settings) async {
+    try {
+      await _apiClient.client.patch('/user/settings', data: settings);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getUserStats() async {
+    try {
+      final response = await _apiClient.client.get('/user/stats');
+      return response.data;
+    } catch (e) {
+      rethrow;
+    }
+  }
+}

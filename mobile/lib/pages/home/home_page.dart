@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/dashboard_widget.dart';
+import '../../services/user_settings_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -9,9 +10,38 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Mock Data - In real app, this comes from a Provider/Service
-  int _checkInDays = 5;
+  final _userSettingsService = UserSettingsService();
+  
+  // Real Data
+  int _checkInDays = 0;
   bool _isCheckedInToday = false;
+  int _totalQuestions = 0;
+  int _completedQuestions = 0;
+  int _dailyGoal = 20; // Default
+  int _dailyProgress = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final stats = await _userSettingsService.getUserStats();
+      setState(() {
+        _totalQuestions = stats['totalQuestions'] ?? 1000; // Mock total if not returned
+        _completedQuestions = stats['totalAnswered'] ?? 0;
+        _dailyProgress = stats['todayAnswered'] ?? 0;
+        // _checkInDays = stats['streak'] ?? 0; // If API provides streak
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Failed to load stats: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
   void _handleCheckIn() {
     if (_isCheckedInToday) return;
@@ -19,6 +49,7 @@ class _HomePageState extends State<HomePage> {
       _isCheckedInToday = true;
       _checkInDays++;
     });
+    // TODO: Call API to check in
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Checked in successfully! +1 Day')),
     );
@@ -27,7 +58,9 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,11 +113,11 @@ class _HomePageState extends State<HomePage> {
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            const DashboardWidget(
-              totalQuestions: 1000,
-              completedQuestions: 350,
-              dailyGoal: 20,
-              dailyProgress: 12,
+            DashboardWidget(
+              totalQuestions: _totalQuestions,
+              completedQuestions: _completedQuestions,
+              dailyGoal: _dailyGoal,
+              dailyProgress: _dailyProgress,
             ),
             const SizedBox(height: 24),
 
