@@ -133,10 +133,11 @@ export async function POST(request: NextRequest) {
       data: { callsign: nextCallsign }
     })
 
-    // 更新或创建设置
+    // Allow any non-empty string for examType (Library Code)
+    // The previous validation restricted it to A/B/C_CLASS, which blocks custom libraries
     const normalizedExamType =
-      typeof examType === 'string' && ['A_CLASS', 'B_CLASS', 'C_CLASS'].includes(examType)
-        ? examType
+      typeof examType === 'string' && examType.trim().length > 0
+        ? examType.trim()
         : 'A_CLASS'
 
     let resolvedPresetId: string | null = null
