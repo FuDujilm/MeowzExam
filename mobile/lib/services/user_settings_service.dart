@@ -19,9 +19,20 @@ class UserSettingsService {
     }
   }
 
+  Future<Map<String, dynamic>> getSettings() async {
+    try {
+      final response = await _apiClient.client.get('user/settings');
+      return response.data['settings'] ?? {};
+    } catch (e) {
+      print('Failed to load settings: $e');
+      return {};
+    }
+  }
+
   Future<void> updateSettings(Map<String, dynamic> settings) async {
     try {
-      await _apiClient.client.patch('user/settings', data: settings);
+      // API uses POST for updates
+      await _apiClient.client.post('user/settings', data: settings);
     } catch (e) {
       rethrow;
     }

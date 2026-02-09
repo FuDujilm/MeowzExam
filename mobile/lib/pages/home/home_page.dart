@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/dashboard_widget.dart';
 import '../../services/user_settings_service.dart';
+import '../../services/question_service.dart';
+import '../../models/question_library.dart';
 import 'leaderboard_page.dart';
 import '../quiz/quiz_page.dart';
 
@@ -13,6 +15,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _userSettingsService = UserSettingsService();
+  final _questionService = QuestionService();
   
   // Real Data
   int _checkInDays = 0;
@@ -23,6 +26,11 @@ class _HomePageState extends State<HomePage> {
   int _dailyProgress = 0;
   bool _isLoading = true;
 
+  // Library Selection
+  List<QuestionLibrary> _libraries = [];
+  String _currentLibraryCode = 'A_CLASS';
+  String _currentLibraryName = '加载中...';
+
   @override
   void initState() {
     super.initState();
@@ -31,11 +39,39 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadData() async {
     try {
+      // 1. Fetch Libraries
+      final libraries = await _questionService.getLibraries();
+      
+      // 2. Fetch User Settings
+      final settings = await _userSettingsService.getSettings();
+      final savedExamType = settings['examType'] as String?;
+      
+      // 3. Determine current library
+      String initialCode = savedExamType ?? 'A_CLASS';
+      String initialName = 'A类题库'; // Fallback
+      
+      if (libraries.isNotEmpty) {
+        // Check if saved code exists in available libraries
+        final match = libraries.where((l) => l.code == initialCode).firstOrNull;
+        if (match != null) {
+          initialName = match.name;
+        } else {
+          // If not found, default to first available
+          initialCode = libraries.first.code;
+          initialName = libraries.first.name;
+        }
+      }
+
+      // 4. Fetch Stats & Check-in
       final stats = await _userSettingsService.getUserStats();
       final checkInStatus = await _userSettingsService.getCheckInStatus();
       
       if (mounted) {
         setState(() {
+          _libraries = libraries;
+          _currentLibraryCode = initialCode;
+          _currentLibraryName = initialName;
+          
           _totalQuestions = stats['totalQuestions'] ?? 0;
           _completedQuestions = stats['totalAnswered'] ?? 0;
           _dailyProgress = stats['todayAnswered'] ?? 0;
@@ -49,6 +85,60 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  void _handleLibraryChange() async {
+    if (_libraries.isEmpty) return;
+
+    final QuestionLibrary? selected = await showModalBottomSheet<QuestionLibrary>(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('选择题库', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _libraries.length,
+                  itemBuilder: (context, index) {
+                    final lib = _libraries[index];
+                    return ListTile(
+                      title: Text(lib.name),
+                      subtitle: Text('${lib.totalQuestions} 题'),
+                      trailing: lib.code == _currentLibraryCode ? const Icon(Icons.check, color: Colors.blue) : null,
+                      onTap: () => Navigator.pop(context, lib),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected != null && selected.code != _currentLibraryCode) {
+      setState(() {
+        _currentLibraryCode = selected.code;
+        _currentLibraryName = selected.name;
+        _isLoading = true; // Reload stats for new library
+      });
+
+      // Save preference
+      try {
+        await _userSettingsService.updateSettings({'examType': selected.code});
+        // Reload stats to reflect new library context if backend stats are library-specific
+        // (Currently stats are global, but good practice to reload)
+        _loadData(); 
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存设置失败: $e')));
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
 
   void _handleCheckIn() async {
     if (_isCheckedInToday) return;
@@ -87,6 +177,24 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 0. Library Selector
+            Card(
+              elevation: 0,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.library_books),
+                title: const Text('当前题库'),
+                subtitle: Text(_currentLibraryName),
+                trailing: const Icon(Icons.swap_horiz),
+                onTap: _handleLibraryChange,
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // 1. Header Card with Check-in
             Card(
               color: Theme.of(context).colorScheme.primaryContainer,
@@ -159,7 +267,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () {
                        Navigator.of(context).push(
                          MaterialPageRoute(
-                           builder: (_) => const QuizPage(mode: 'random', libraryCode: 'A_CLASS'),
+                           builder: (_) => QuizPage(mode: 'random', libraryCode: _currentLibraryCode),
                          ),
                        );
                     },

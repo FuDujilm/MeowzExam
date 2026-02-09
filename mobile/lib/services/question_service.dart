@@ -1,9 +1,26 @@
 import '../core/api_client.dart';
 import '../models/question.dart';
 import '../models/explanation.dart';
+import '../models/question_library.dart';
 
 class QuestionService {
   final ApiClient _apiClient = ApiClient();
+
+  Future<List<QuestionLibrary>> getLibraries() async {
+    try {
+      final response = await _apiClient.client.get('question-libraries');
+      final data = response.data;
+      if (data['libraries'] != null) {
+        return (data['libraries'] as List)
+            .map((json) => QuestionLibrary.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Failed to load libraries: $e');
+      return [];
+    }
+  }
 
   Future<List<Question>> getQuestions({
     required String libraryCode,
