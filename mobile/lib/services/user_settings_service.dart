@@ -68,10 +68,30 @@ class UserSettingsService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getStudyCalendar(String start, String end) async {
+    try {
+      final response = await _apiClient.client.get(
+        'user/calendar',
+        queryParameters: {'start': start, 'end': end},
+      );
+      if (response.data['records'] != null) {
+        return List<Map<String, dynamic>>.from(response.data['records']);
+      }
+      return [];
+    } catch (e) {
+      print('Failed to load study calendar: $e');
+      return [];
+    }
+  }
+
   Future<List<dynamic>> getLeaderboard() async {
     try {
       final response = await _apiClient.client.get('points/leaderboard');
-      return response.data; // Assuming list of {user: {...}, points: 100}
+      // API returns { users: [...], total: ..., pointsName: ... }
+      if (response.data['users'] != null) {
+        return response.data['users'];
+      }
+      return [];
     } catch (e) {
       // Return empty list instead of mock data on error
       print('Failed to load leaderboard: $e');

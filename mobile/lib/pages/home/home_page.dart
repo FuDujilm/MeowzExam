@@ -4,6 +4,7 @@ import '../../services/user_settings_service.dart';
 import '../../services/question_service.dart';
 import '../../models/question_library.dart';
 import 'leaderboard_page.dart';
+import 'calendar_page.dart';
 import '../quiz/quiz_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -296,8 +297,8 @@ class _HomePageState extends State<HomePage> {
                 title: const Text('学习日历'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('学习日历功能开发中，敬请期待!')),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CalendarPage()),
                   );
                 },
               ),
