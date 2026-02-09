@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/question.dart';
 import '../../services/question_service.dart';
+import '../../services/exam_service.dart';
+import '../practice/exam_result_page.dart';
 
 class QuizPage extends StatefulWidget {
-  final String mode; // 'sequential', 'random', etc.
+  final String mode; // 'sequential', 'random', 'mock'
   final String libraryCode;
 
   const QuizPage({
@@ -19,6 +22,7 @@ class QuizPage extends StatefulWidget {
 
 class _QuizPageState extends State<QuizPage> {
   final _questionService = QuestionService();
+  final _examService = ExamService();
   final PageController _pageController = PageController();
   
   List<Question> _questions = [];
@@ -30,10 +34,23 @@ class _QuizPageState extends State<QuizPage> {
   // Track if answer was revealed: questionId -> true
   final Map<String, bool> _revealedAnswers = {};
 
+  // Exam Mode
+  Timer? _timer;
+  int _secondsRemaining = 45 * 60; // 45 minutes default for exam
+
+  bool get _isExamMode => widget.mode == 'mock';
+
   @override
   void initState() {
     super.initState();
     _loadQuestions();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadQuestions() async {
@@ -43,16 +60,18 @@ class _QuizPageState extends State<QuizPage> {
         _error = null;
       });
 
-      // TODO: Implement different loading logic based on widget.mode
-      // For now, just load the first page of the library
       final questions = await _questionService.getQuestions(
         libraryCode: widget.libraryCode,
-        pageSize: 50, // Load a batch
+        pageSize: _isExamMode ? 30 : 50, // Exam usually has fixed size
+        mode: widget.mode,
       );
 
       setState(() {
         _questions = questions;
         _isLoading = false;
+        if (_isExamMode) {
+          _startTimer();
+        }
       });
     } catch (e) {
       setState(() {
@@ -62,32 +81,87 @@ class _QuizPageState extends State<QuizPage> {
     }
   }
 
-  void _handleOptionSelected(Question question, String optionId) {
-    if (_userAnswers.containsKey(question.id)) return; // Already answered
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_secondsRemaining > 0) {
+        setState(() {
+          _secondsRemaining--;
+        });
+      } else {
+        _timer?.cancel();
+        _submitExam();
+      }
+    });
+  }
 
+  String _formatTime(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  void _handleOptionSelected(Question question, String optionId) {
     setState(() {
       _userAnswers[question.id] = optionId;
-      _revealedAnswers[question.id] = true; // Show result immediately
+      if (!_isExamMode) {
+        _revealedAnswers[question.id] = true; 
+      }
     });
+  }
 
-    // TODO: Send answer to backend/analytics
-    
-    // Auto-advance after a short delay if correct? 
-    // For now, let user swipe manually or click next.
+  Future<void> _submitExam() async {
+    _timer?.cancel();
+    setState(() => _isLoading = true);
+
+    try {
+      // Calculate score locally for immediate feedback (or rely on backend response)
+      int correctCount = 0;
+      for (var q in _questions) {
+        final answer = _userAnswers[q.id];
+        if (answer != null && q.correctAnswers.contains(answer)) {
+          correctCount++;
+        }
+      }
+      
+      // Navigate to Result Page
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ExamResultPage(
+              score: (correctCount / _questions.length * 100).toInt(),
+              correctCount: correctCount,
+              totalQuestions: _questions.length,
+              timeSpent: (45 * 60) - _secondsRemaining,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit: $e')),
+      );
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_getModeTitle()),
+        title: _isExamMode 
+          ? Text('剩余时间: ${_formatTime(_secondsRemaining)}') 
+          : Text(_getModeTitle()),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              // Show quiz info
-            },
-          ),
+          if (_isExamMode)
+            TextButton(
+              onPressed: _submitExam,
+              child: const Text('交卷', style: TextStyle(color: Colors.white)),
+            ),
+          if (!_isExamMode)
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              onPressed: () {},
+            ),
         ],
       ),
       body: Column(
@@ -112,18 +186,26 @@ class _QuizPageState extends State<QuizPage> {
                       );
                     },
                     icon: const Icon(Icons.arrow_back),
-                    label: const Text('Prev'),
+                    label: const Text('上一题'),
                   ),
                   FilledButton.icon(
                     onPressed: () {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
+                      if (_pageController.page!.toInt() == _questions.length - 1) {
+                         if (_isExamMode) {
+                           _submitExam();
+                         } else {
+                           Navigator.pop(context);
+                         }
+                      } else {
+                        _pageController.nextPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      }
                     },
-                    icon: const Icon(Icons.arrow_forward),
-                    label: const Text('Next'),
-                    iconAlignment: IconAlignment.end, // Available in newer Flutter, else swap icon/label manually
+                    icon: Icon(_pageController.hasClients && _pageController.page!.toInt() == _questions.length - 1 ? Icons.check : Icons.arrow_forward),
+                    label: Text(_pageController.hasClients && _pageController.page!.toInt() == _questions.length - 1 ? (_isExamMode ? '交卷' : '完成') : '下一题'),
+                    iconAlignment: IconAlignment.end, 
                   ),
                 ],
               ),
@@ -135,10 +217,10 @@ class _QuizPageState extends State<QuizPage> {
 
   String _getModeTitle() {
     switch (widget.mode) {
-      case 'sequential': return 'Sequential Practice';
-      case 'random': return 'Random Practice';
-      case 'mock': return 'Mock Exam';
-      default: return 'Practice';
+      case 'sequential': return '顺序练习';
+      case 'random': return '随机练习';
+      case 'mock': return '模拟考试';
+      default: return '练题';
     }
   }
 
@@ -154,11 +236,11 @@ class _QuizPageState extends State<QuizPage> {
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
-            Text('Error: $_error'),
+            Text('出错了: $_error'),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _loadQuestions,
-              child: const Text('Retry'),
+              child: const Text('重试'),
             ),
           ],
         ),
@@ -166,7 +248,7 @@ class _QuizPageState extends State<QuizPage> {
     }
 
     if (_questions.isEmpty) {
-      return const Center(child: Text('No questions found.'));
+      return const Center(child: Text('没有找到题目。'));
     }
 
     return PageView.builder(
@@ -175,12 +257,16 @@ class _QuizPageState extends State<QuizPage> {
       itemBuilder: (context, index) {
         return _buildQuestionCard(_questions[index], index);
       },
+      onPageChanged: (index) {
+        setState(() {}); // Rebuild to update progress bar and button label
+      },
     );
   }
 
   Widget _buildQuestionCard(Question question, int index) {
     final userAnswer = _userAnswers[question.id];
     final isAnswered = userAnswer != null;
+    final isRevealed = _revealedAnswers[question.id] == true;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -192,7 +278,7 @@ class _QuizPageState extends State<QuizPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Question ${index + 1}/${_questions.length}',
+                '第 ${index + 1}/${_questions.length} 题',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: Colors.grey,
                 ),
@@ -228,7 +314,7 @@ class _QuizPageState extends State<QuizPage> {
             Color? cardColor;
             Color borderColor = Colors.transparent;
             
-            if (isAnswered) {
+            if (isRevealed) {
                 if (isSelected) {
                     cardColor = isCorrect 
                         ? Colors.green.withOpacity(0.1) 
@@ -239,6 +325,10 @@ class _QuizPageState extends State<QuizPage> {
                      cardColor = Colors.green.withOpacity(0.1);
                      borderColor = Colors.green;
                 }
+            } else if (isSelected) {
+                // Exam mode or just selected but not revealed
+                cardColor = Theme.of(context).colorScheme.primaryContainer;
+                borderColor = Theme.of(context).colorScheme.primary;
             }
 
             return Card(
@@ -252,7 +342,7 @@ class _QuizPageState extends State<QuizPage> {
                 ),
               ),
               child: InkWell(
-                onTap: isAnswered ? null : () => _handleOptionSelected(question, option.id),
+                onTap: (isRevealed && !_isExamMode) ? null : () => _handleOptionSelected(question, option.id),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -265,18 +355,22 @@ class _QuizPageState extends State<QuizPage> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isSelected || (isAnswered && isCorrect)
-                                ? (isCorrect ? Colors.green : Colors.red)
+                            color: isSelected || (isRevealed && isCorrect)
+                                ? ((isRevealed && !isCorrect && !isSelected) ? Colors.green : (isSelected ? Theme.of(context).colorScheme.primary : Colors.grey))
                                 : Colors.grey,
                           ),
-                          color: isSelected || (isAnswered && isCorrect)
-                              ? (isCorrect ? Colors.green : Colors.red)
+                          color: isSelected || (isRevealed && isCorrect)
+                              ? (isRevealed 
+                                  ? (isCorrect ? Colors.green : (isSelected ? Colors.red : null)) 
+                                  : Theme.of(context).colorScheme.primary)
                               : null,
                         ),
-                        child: isSelected || (isAnswered && isCorrect)
+                        child: isSelected || (isRevealed && isCorrect)
                             ? Icon(
-                                isCorrect ? Icons.check : Icons.close,
-                                size: 16, 
+                                isRevealed 
+                                  ? (isCorrect ? Icons.check : Icons.close)
+                                  : Icons.circle, // Just a dot for selected in exam
+                                size: 12, 
                                 color: Colors.white
                               )
                             : Text(
@@ -289,8 +383,8 @@ class _QuizPageState extends State<QuizPage> {
                         child: Text(
                             option.text,
                             style: TextStyle(
-                                color: isAnswered && isCorrect ? Colors.green[800] : null,
-                                fontWeight: isAnswered && isCorrect ? FontWeight.bold : null,
+                                color: isRevealed && isCorrect ? Colors.green[800] : null,
+                                fontWeight: isRevealed && isCorrect ? FontWeight.bold : null,
                             ),
                         ),
                       ),
@@ -301,7 +395,7 @@ class _QuizPageState extends State<QuizPage> {
             );
           }),
 
-          if (isAnswered) ...[
+          if (isRevealed) ...[
              const SizedBox(height: 24),
              // Explanation Area
              Container(

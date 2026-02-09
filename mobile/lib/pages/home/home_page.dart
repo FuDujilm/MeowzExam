@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/dashboard_widget.dart';
 import '../../services/user_settings_service.dart';
+import 'leaderboard_page.dart';
+import '../quiz/quiz_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -76,14 +78,14 @@ class _HomePageState extends State<HomePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Keep it up!',
+                          '坚持就是胜利!',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 color: Theme.of(context).colorScheme.onPrimaryContainer,
                               ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$_checkInDays Day Streak',
+                          '连续打卡 $_checkInDays 天',
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -95,7 +97,7 @@ class _HomePageState extends State<HomePage> {
                     FilledButton.icon(
                       onPressed: _isCheckedInToday ? null : _handleCheckIn,
                       icon: Icon(_isCheckedInToday ? Icons.check : Icons.touch_app),
-                      label: Text(_isCheckedInToday ? 'Done' : 'Check In'),
+                      label: Text(_isCheckedInToday ? '已签到' : '签到'),
                       style: FilledButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -109,7 +111,7 @@ class _HomePageState extends State<HomePage> {
 
             // 2. Dashboard
             Text(
-              'Your Progress',
+              '学习进度',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -123,7 +125,7 @@ class _HomePageState extends State<HomePage> {
 
             // 3. Shortcuts
             Text(
-              'Quick Actions',
+              '快捷入口',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -132,10 +134,14 @@ class _HomePageState extends State<HomePage> {
                 Expanded(
                   child: _ShortcutCard(
                     icon: Icons.flash_on,
-                    title: 'Daily Practice',
+                    title: '每日一练',
                     color: Colors.orange,
                     onTap: () {
-                       // Navigate to practice logic
+                       Navigator.of(context).push(
+                         MaterialPageRoute(
+                           builder: (_) => const QuizPage(mode: 'random', libraryCode: 'A_CLASS'),
+                         ),
+                       );
                     },
                   ),
                 ),
@@ -143,10 +149,12 @@ class _HomePageState extends State<HomePage> {
                 Expanded(
                   child: _ShortcutCard(
                     icon: Icons.leaderboard,
-                    title: 'Leaderboard',
+                    title: '排行榜',
                     color: Colors.blue,
                     onTap: () {
-                      // Navigate to leaderboard
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const LeaderboardPage()),
+                      );
                     },
                   ),
                 ),
@@ -157,7 +165,7 @@ class _HomePageState extends State<HomePage> {
              Card(
               child: ListTile(
                 leading: const Icon(Icons.calendar_today),
-                title: const Text('Study Calendar'),
+                title: const Text('学习日历'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: (){},
               ),

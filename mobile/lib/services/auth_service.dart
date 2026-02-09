@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import '../core/api_client.dart';
@@ -60,11 +61,13 @@ class AuthService {
   Future<Map<String, dynamic>> loginWithOAuth() async {
     try {
       // 1. Initiate OAuth Flow
+      final String source = kIsWeb ? 'web' : 'app';
       final url = Uri.parse('$_oauthBaseUrl/oauth/authorize').replace(queryParameters: {
         'response_type': 'code',
         'client_id': _clientId,
         'redirect_uri': _redirectUri,
         'scope': 'openid profile email',
+        'state': 'source=$source', // Add platform-aware source identifier
       });
 
       final result = await FlutterWebAuth2.authenticate(

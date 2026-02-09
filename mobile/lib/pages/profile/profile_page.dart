@@ -24,7 +24,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const Text('设置')),
       body: ListView(
         children: [
           // 1. User Profile Header
@@ -41,7 +41,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('User Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      const Text('用户名', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                       Text('user@example.com', style: TextStyle(color: Colors.grey[600])),
                     ],
                   ),
@@ -55,14 +55,14 @@ class _ProfilePageState extends State<ProfilePage> {
           // 2. Personal Info
           ListTile(
             leading: const Icon(Icons.badge),
-            title: const Text('Callsign'),
-            subtitle: const Text('Set your radio callsign'),
+            title: const Text('电台呼号'),
+            subtitle: const Text('设置您的业余无线电呼号'),
             trailing: SizedBox(
               width: 100,
               child: TextField(
                 controller: _callsignController,
                 textAlign: TextAlign.end,
-                decoration: const InputDecoration(border: InputBorder.none, hintText: 'None'),
+                decoration: const InputDecoration(border: InputBorder.none, hintText: '未设置'),
               ),
             ),
           ),
@@ -70,21 +70,21 @@ class _ProfilePageState extends State<ProfilePage> {
           const Divider(),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('Study Preferences', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+            child: Text('学习偏好', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
           ),
 
           SwitchListTile(
             secondary: const Icon(Icons.priority_high),
-            title: const Text('Prioritize Weak Spots'),
-            subtitle: const Text('Increase weight of questions you get wrong'),
+            title: const Text('优先错题'),
+            subtitle: const Text('增加错题出现的概率'),
             value: _enableWrongQuestionWeight,
             onChanged: (val) => setState(() => _enableWrongQuestionWeight = val),
           ),
           
           ListTile(
             leading: const Icon(Icons.fitness_center),
-            title: const Text('Daily Question Goal'),
-            subtitle: Text('${_dailyQuestionLimit.toInt()} questions / day'),
+            title: const Text('每日题量目标'),
+            subtitle: Text('${_dailyQuestionLimit.toInt()} 题 / 天'),
             trailing: SizedBox(
               width: 120,
               child: Slider(
@@ -101,16 +101,16 @@ class _ProfilePageState extends State<ProfilePage> {
           const Divider(),
            const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('AI Assistant', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+            child: Text('AI 助手', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
           ),
           
           ListTile(
             leading: const Icon(Icons.smart_toy),
-            title: const Text('Explanation Style'),
+            title: const Text('解析风格'),
             trailing: DropdownButton<String>(
               value: _aiStyle,
               underline: const SizedBox(),
-              items: ['Rigorous', 'Humorous', 'Encouraging'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              items: ['Rigorous', 'Humorous', 'Encouraging'].map((e) => DropdownMenuItem(value: e, child: Text(e == 'Rigorous' ? '严谨' : (e == 'Humorous' ? '幽默' : '鼓励')))).toList(),
               onChanged: (val) => setState(() => _aiStyle = val!),
             ),
           ),
@@ -118,19 +118,19 @@ class _ProfilePageState extends State<ProfilePage> {
           const Divider(),
            const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('System', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+            child: Text('系统', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
           ),
           
           SwitchListTile(
             secondary: Icon(_isDarkMode ? Icons.dark_mode : Icons.light_mode),
-            title: const Text('Dark Mode'),
+            title: const Text('深色模式'),
             value: _isDarkMode,
             onChanged: (val) => setState(() => _isDarkMode = val),
           ),
 
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Logout', style: TextStyle(color: Colors.red)),
+            title: const Text('退出登录', style: TextStyle(color: Colors.red)),
             onTap: () async {
               await context.read<AuthService>().logout();
               if (mounted) {
@@ -142,7 +142,7 @@ class _ProfilePageState extends State<ProfilePage> {
             },
           ),
           const SizedBox(height: 32),
-          const Center(child: Text('Version 1.0.0', style: TextStyle(color: Colors.grey))),
+          const Center(child: Text('版本 1.0.0', style: TextStyle(color: Colors.grey))),
           const SizedBox(height: 32),
         ],
       ),

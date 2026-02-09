@@ -46,7 +46,7 @@ class _PracticePageState extends State<PracticePage> {
             margin: const EdgeInsets.only(bottom: 16),
             child: ListTile(
               leading: const Icon(Icons.library_books),
-              title: const Text('Current Library'),
+              title: const Text('当前题库'),
               subtitle: Text(_currentLibraryName),
               trailing: const Icon(Icons.change_circle_outlined),
               onTap: () {
@@ -55,78 +55,78 @@ class _PracticePageState extends State<PracticePage> {
             ),
           ),
 
-          const Text('Core Practice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const Text('核心练习', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           const SizedBox(height: 8),
           
           _PracticeModeTile(
-            title: 'Sequential Practice',
-            subtitle: 'Go through questions one by one',
+            title: '顺序练习',
+            subtitle: '按照顺序逐一练习',
             icon: Icons.list_alt,
             color: Colors.blue,
             onTap: () => _navigateToQuiz(context, 'sequential'),
           ),
           _PracticeModeTile(
-            title: 'Random Practice',
-            subtitle: 'Shuffle questions for a challenge',
+            title: '随机练习',
+            subtitle: '随机抽取题目进行练习',
             icon: Icons.shuffle,
             color: Colors.purple,
             onTap: () => _navigateToQuiz(context, 'random'),
           ),
           _PracticeModeTile(
-            title: 'Mock Exam',
-            subtitle: 'Simulate real exam conditions',
+            title: '模拟考试',
+            subtitle: '全真模拟考试环境',
             icon: Icons.timer,
             color: Colors.red,
             onTap: () => _navigateToQuiz(context, 'mock'),
           ),
 
           const SizedBox(height: 24),
-          const Text('Focused Training', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const Text('专项强化', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           const SizedBox(height: 8),
 
           _PracticeModeTile(
-            title: 'High Error Rate',
-            subtitle: 'Focus on your weak spots',
+            title: '高频错题',
+            subtitle: '针对薄弱环节进行强化',
             icon: Icons.warning_amber_rounded,
             color: Colors.orange,
             onTap: () {},
           ),
           _PracticeModeTile(
-            title: 'Mistake Review',
-            subtitle: 'Review questions you got wrong',
+            title: '错题回顾',
+            subtitle: '查看并复习做错的题目',
             icon: Icons.history_edu,
             color: Colors.teal,
             onTap: () {},
           ),
            _PracticeModeTile(
-            title: 'Daily Selection',
-            subtitle: '30 questions curated for today',
+            title: '每日精选',
+            subtitle: '每日 30 道精选题目',
             icon: Icons.calendar_today,
             color: Colors.green,
             onTap: () {},
           ),
 
           const SizedBox(height: 24),
-          const Text('Tools', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const Text('辅助工具', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           const SizedBox(height: 8),
           
           _PracticeModeTile(
-            title: 'Browse All Questions',
-            subtitle: 'Search and filter the question bank',
+            title: '浏览题库',
+            subtitle: '搜索和查看所有题目',
             icon: Icons.search,
             color: Colors.grey,
             onTap: () {},
           ),
           _PracticeModeTile(
-            title: 'Favorites',
-            subtitle: 'Questions you saved',
+            title: '我的收藏',
+            subtitle: '查看收藏的题目',
             icon: Icons.bookmark,
             color: Colors.pink,
             onTap: () {},
           ),
            _PracticeModeTile(
-            title: 'History',
-            subtitle: 'Your past practice sessions',
+            title: '练习历史',
+            subtitle: '查看过往练习记录',
             icon: Icons.history,
             color: Colors.blueGrey,
             onTap: () {},
@@ -144,33 +144,33 @@ class _PracticePageState extends State<PracticePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                       ListTile(
-                          title: const Text('Class A - Amateur Radio'),
+                          title: const Text('A类 - 业余无线电台操作证书'),
                           onTap: () {
                               setState(() {
                                   _currentLibraryCode = 'A_CLASS';
-                                  _currentLibraryName = 'Class A - Amateur Radio';
+                                  _currentLibraryName = 'A类 - 业余无线电台操作证书';
                               });
                               Navigator.pop(context);
                           },
                           selected: _currentLibraryCode == 'A_CLASS',
                       ),
                       ListTile(
-                          title: const Text('Class B - Amateur Radio'),
+                          title: const Text('B类 - 业余无线电台操作证书'),
                           onTap: () {
                               setState(() {
                                   _currentLibraryCode = 'B_CLASS';
-                                  _currentLibraryName = 'Class B - Amateur Radio';
+                                  _currentLibraryName = 'B类 - 业余无线电台操作证书';
                               });
                               Navigator.pop(context);
                           },
                           selected: _currentLibraryCode == 'B_CLASS',
                       ),
                       ListTile(
-                          title: const Text('Class C - Amateur Radio'),
+                          title: const Text('C类 - 业余无线电台操作证书'),
                           onTap: () {
                               setState(() {
                                   _currentLibraryCode = 'C_CLASS';
-                                  _currentLibraryName = 'Class C - Amateur Radio';
+                                  _currentLibraryName = 'C类 - 业余无线电台操作证书';
                               });
                               Navigator.pop(context);
                           },

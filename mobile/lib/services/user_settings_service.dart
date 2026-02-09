@@ -35,4 +35,21 @@ class UserSettingsService {
       rethrow;
     }
   }
+
+  Future<List<dynamic>> getLeaderboard() async {
+    try {
+      final response = await _apiClient.client.get('/points/leaderboard');
+      return response.data; // Assuming list of {user: {...}, points: 100}
+    } catch (e) {
+      // Return mock data if API fails (e.g., 404 or auth error in guest mode)
+      return List.generate(10, (index) => {
+        'user': {
+            'name': 'User ${index + 1}',
+            'callsign': 'BI4XX${index}',
+            'image': null
+        },
+        'totalPoints': 1000 - (index * 50)
+      });
+    }
+  }
 }

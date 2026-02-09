@@ -101,24 +101,24 @@ class _LoginPageState extends State<LoginPage> {
                       width: double.infinity,
                       height: 56,
                       child: FilledButton.icon(
-                        onPressed: _loginWithOAuth,
-                        icon: const Icon(Icons.login),
-                        label: const Text('Login with OAuth', style: TextStyle(fontSize: 18)),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                         Navigator.of(context).pushReplacement(
-                           MaterialPageRoute(builder: (_) => const MainScreen()),
-                         );
-                      },
-                      child: const Text('Skip Login (Guest Mode)'),
-                    ),
-                  ],
+                    onPressed: _loginWithOAuth,
+                    icon: const Icon(Icons.login),
+                    label: const Text('微信一键登录 (OAuth)', style: TextStyle(fontSize: 18)),
+                  ),
                 ),
-            ],
-          ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                     Navigator.of(context).pushReplacement(
+                       MaterialPageRoute(builder: (_) => const MainScreen()),
+                     );
+                  },
+                  child: const Text('游客试用 (跳过登录)'),
+                ),
+              ],
+            ),
+        ],
+      ),
         ),
       ),
     );
