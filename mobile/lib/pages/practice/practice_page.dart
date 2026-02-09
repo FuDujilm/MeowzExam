@@ -40,21 +40,21 @@ class PracticePage extends StatelessWidget {
             subtitle: 'Go through questions one by one',
             icon: Icons.list_alt,
             color: Colors.blue,
-            onTap: () => _navigateToQuiz(context, 'sequential', libraryCode: 'MOCK'), // Use MOCK for testing
+            onTap: () => _navigateToQuiz(context, 'sequential', libraryCode: 'A_CLASS'),
           ),
           _PracticeModeTile(
             title: 'Random Practice',
             subtitle: 'Shuffle questions for a challenge',
             icon: Icons.shuffle,
             color: Colors.purple,
-            onTap: () => _navigateToQuiz(context, 'random', libraryCode: 'MOCK'),
+            onTap: () => _navigateToQuiz(context, 'random', libraryCode: 'A_CLASS'),
           ),
           _PracticeModeTile(
             title: 'Mock Exam',
             subtitle: 'Simulate real exam conditions',
             icon: Icons.timer,
             color: Colors.red,
-            onTap: () => _navigateToQuiz(context, 'mock', libraryCode: 'MOCK'),
+            onTap: () => _navigateToQuiz(context, 'mock', libraryCode: 'A_CLASS'),
           ),
 
           const SizedBox(height: 24),

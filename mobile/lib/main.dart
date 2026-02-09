@@ -95,14 +95,27 @@ class _LoginPageState extends State<LoginPage> {
               if (_isLoading)
                 const CircularProgressIndicator()
               else
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: FilledButton.icon(
-                    onPressed: _loginWithOAuth,
-                    icon: const Icon(Icons.login),
-                    label: const Text('Login with OAuth', style: TextStyle(fontSize: 18)),
-                  ),
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: FilledButton.icon(
+                        onPressed: _loginWithOAuth,
+                        icon: const Icon(Icons.login),
+                        label: const Text('Login with OAuth', style: TextStyle(fontSize: 18)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () {
+                         Navigator.of(context).pushReplacement(
+                           MaterialPageRoute(builder: (_) => const MainScreen()),
+                         );
+                      },
+                      child: const Text('Skip Login (Guest Mode)'),
+                    ),
+                  ],
                 ),
             ],
           ),

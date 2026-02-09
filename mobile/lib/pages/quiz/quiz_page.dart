@@ -90,7 +90,46 @@ class _QuizPageState extends State<QuizPage> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          if (!_isLoading && _questions.isNotEmpty)
+            LinearProgressIndicator(
+              value: (_questions.isEmpty) ? 0 : (_pageController.hasClients ? _pageController.page ?? 0 : 0) / _questions.length,
+              minHeight: 4,
+            ),
+          Expanded(child: _buildBody()),
+          if (!_isLoading && _questions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _pageController.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Prev'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('Next'),
+                    iconAlignment: IconAlignment.end, // Available in newer Flutter, else swap icon/label manually
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
