@@ -185,6 +185,28 @@ export async function GET(request: NextRequest) {
         ).then(results => results.flat())
       }
 
+    } else if (mode === 'wrong') {
+      // 错题练习
+      const userQuestions = await prisma.userQuestion.findMany({
+        where: {
+          userId: resolvedUser.id,
+          incorrectCount: { gt: 0 },
+          question: where
+        },
+        skip: offset,
+        take: limit,
+        orderBy: {
+          lastAnswered: 'desc'
+        },
+        include: {
+          question: {
+            select: selectFields
+          }
+        }
+      })
+      
+      questions = userQuestions.map(uq => uq.question)
+      
     } else {
       // 顺序练习
       questions = await prisma.question.findMany({

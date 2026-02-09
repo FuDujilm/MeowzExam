@@ -29,10 +29,12 @@ class _QuizPageState extends State<QuizPage> {
   bool _isLoading = true;
   String? _error;
   
-  // Track answers: questionId -> selectedOptionId
-  final Map<String, String> _userAnswers = {};
+  // Track answers: questionId -> selectedOptionIds
+  final Map<String, List<String>> _userAnswers = {};
   // Track if answer was revealed: questionId -> true
   final Map<String, bool> _revealedAnswers = {};
+  // Track currently selected (unsubmitted) answers for multiple choice
+  final Map<String, Set<String>> _pendingSelections = {};
 
   // Exam Mode
   Timer? _timer;
@@ -101,12 +103,58 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   void _handleOptionSelected(Question question, String optionId) {
+    if (_revealedAnswers[question.id] == true && !_isExamMode) return;
+
     setState(() {
-      _userAnswers[question.id] = optionId;
-      if (!_isExamMode) {
-        _revealedAnswers[question.id] = true; 
+      if (question.isMultipleChoice) {
+        // Toggle selection for multiple choice
+        final currentSelections = _pendingSelections[question.id] ?? {};
+        if (currentSelections.contains(optionId)) {
+          currentSelections.remove(optionId);
+        } else {
+          currentSelections.add(optionId);
+        }
+        _pendingSelections[question.id] = currentSelections;
+      } else {
+        // Single choice: update directly and reveal if not exam mode
+        _userAnswers[question.id] = [optionId];
+        if (!_isExamMode) {
+          _revealedAnswers[question.id] = true;
+        }
       }
     });
+  }
+
+  void _submitQuestion(Question question) {
+     if (_revealedAnswers[question.id] == true) return;
+
+     setState(() {
+        if (question.isMultipleChoice) {
+            // Commit pending selections to userAnswers
+            final selected = _pendingSelections[question.id] ?? {};
+            if (selected.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请至少选择一个选项')),
+                );
+                return;
+            }
+            _userAnswers[question.id] = selected.toList();
+        } else {
+            // For single choice, it might already be set, but ensure it's marked revealed
+            if (_userAnswers[question.id] == null) {
+                 // Or skip?
+                 return;
+            }
+        }
+        _revealedAnswers[question.id] = true;
+     });
+  }
+  
+  void _skipQuestion(Question question) {
+      setState(() {
+          _revealedAnswers[question.id] = true;
+          // Don't mark any answer, just reveal
+      });
   }
 
   Future<void> _submitExam() async {
@@ -117,9 +165,12 @@ class _QuizPageState extends State<QuizPage> {
       // Calculate score locally for immediate feedback (or rely on backend response)
       int correctCount = 0;
       for (var q in _questions) {
-        final answer = _userAnswers[q.id];
-        if (answer != null && q.correctAnswers.contains(answer)) {
-          correctCount++;
+        final answer = _userAnswers[q.id]; // List<String>
+        if (answer != null) {
+            // Check if lists contain same elements
+            final isCorrect = answer.length == q.correctAnswers.length && 
+                              answer.toSet().containsAll(q.correctAnswers);
+            if (isCorrect) correctCount++;
         }
       }
       
@@ -157,59 +208,205 @@ class _QuizPageState extends State<QuizPage> {
               onPressed: _submitExam,
               child: const Text('交卷', style: TextStyle(color: Colors.white)),
             ),
-          if (!_isExamMode)
-            IconButton(
-              icon: const Icon(Icons.info_outline),
-              onPressed: () {},
-            ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          if (!_isLoading && _questions.isNotEmpty)
-            LinearProgressIndicator(
-              value: (_questions.isEmpty) ? 0 : (_pageController.hasClients ? _pageController.page ?? 0 : 0) / _questions.length,
-              minHeight: 4,
-            ),
-          Expanded(child: _buildBody()),
-          if (!_isLoading && _questions.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _pageController.previousPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('上一题'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: () {
-                      if (_pageController.page!.toInt() == _questions.length - 1) {
-                         if (_isExamMode) {
-                           _submitExam();
-                         } else {
-                           Navigator.pop(context);
-                         }
-                      } else {
-                        _pageController.nextPage(
+          // Content
+          Column(
+            children: [
+              if (!_isLoading && _questions.isNotEmpty)
+                LinearProgressIndicator(
+                  value: (_questions.isEmpty) ? 0 : (_pageController.hasClients ? _pageController.page ?? 0 : 0) / _questions.length,
+                  minHeight: 4,
+                ),
+              Expanded(child: _buildBody()),
+              // Add padding at bottom to avoid overlap with floating panel
+              if (!_isExamMode) const SizedBox(height: 200),
+            ],
+          ),
+          
+          // Floating Control Panel (Only in Practice Mode)
+          if (!_isExamMode && !_isLoading && _questions.isNotEmpty)
+             Positioned(
+               left: 16,
+               right: 16,
+               bottom: 16,
+               child: _buildFloatingControlPanel(),
+             ),
+             
+          // Exam Mode Bottom Bar (Standard)
+          if (_isExamMode && !_isLoading && _questions.isNotEmpty)
+             Positioned(
+               left: 0,
+               right: 0,
+               bottom: 0,
+               child: Container(
+                 padding: const EdgeInsets.all(16),
+                 color: Theme.of(context).colorScheme.surface,
+                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _pageController.previousPage(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeInOut,
                         );
-                      }
-                    },
-                    icon: Icon(_pageController.hasClients && _pageController.page!.toInt() == _questions.length - 1 ? Icons.check : Icons.arrow_forward),
-                    label: Text(_pageController.hasClients && _pageController.page!.toInt() == _questions.length - 1 ? (_isExamMode ? '交卷' : '完成') : '下一题'),
-                    iconAlignment: IconAlignment.end, 
-                  ),
+                      },
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('上一题'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () {
+                        if (_pageController.page!.toInt() == _questions.length - 1) {
+                           _submitExam();
+                        } else {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                      icon: Icon(_pageController.hasClients && _pageController.page!.toInt() == _questions.length - 1 ? Icons.check : Icons.arrow_forward),
+                      label: Text(_pageController.hasClients && _pageController.page!.toInt() == _questions.length - 1 ? '交卷' : '下一题'),
+                      iconAlignment: IconAlignment.end, 
+                    ),
+                  ],
+                 ),
+               ),
+             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingControlPanel() {
+    // Current Question
+    final int currentIndex = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
+    final Question? currentQuestion = _questions.isNotEmpty && currentIndex < _questions.length ? _questions[currentIndex] : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+           BoxShadow(
+             color: Colors.black.withOpacity(0.2),
+             blurRadius: 10,
+             offset: const Offset(0, 4),
+           )
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: Return to Home
+          InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                   Icon(Icons.chevron_left, size: 20, color: Colors.grey),
+                   SizedBox(width: 4),
+                   Text('返回首页', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             ),
+          ),
+          
+          // Row 2: Previous | Skip
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: currentIndex > 0 ? () {
+                        _pageController.previousPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                    } : null,
+                    icon: const Icon(Icons.arrow_back, size: 18),
+                    label: const Text('上一题'),
+                    style: OutlinedButton.styleFrom(
+                       padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                         if (currentQuestion != null) _skipQuestion(currentQuestion);
+                         if (currentIndex < _questions.length - 1) {
+                             _pageController.nextPage(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                             );
+                         } else {
+                             // Last question skipped? Show toast or result?
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已经是最后一题了')));
+                         }
+                    },
+                    icon: const Icon(Icons.skip_next, size: 18),
+                    label: const Text('跳过'),
+                    iconAlignment: IconAlignment.end,
+                    style: OutlinedButton.styleFrom(
+                       padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Row 3: Submit Answer
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                   if (currentQuestion != null) {
+                       if (_revealedAnswers[currentQuestion.id] == true) {
+                           // Already submitted/revealed, go to next
+                           if (currentIndex < _questions.length - 1) {
+                               _pageController.nextPage(
+                                   duration: const Duration(milliseconds: 300),
+                                   curve: Curves.easeInOut,
+                               );
+                           } else {
+                               // Finish
+                               Navigator.pop(context); 
+                           }
+                       } else {
+                           // Submit
+                           _submitQuestion(currentQuestion);
+                       }
+                   }
+                },
+                style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                child: Text(
+                    (currentQuestion != null && _revealedAnswers[currentQuestion.id] == true)
+                        ? (currentIndex < _questions.length - 1 ? '下一题' : '完成练习')
+                        : '提交答案'
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -264,8 +461,8 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   Widget _buildQuestionCard(Question question, int index) {
-    final userAnswer = _userAnswers[question.id];
-    final isAnswered = userAnswer != null;
+    final userAnswers = _userAnswers[question.id] ?? [];
+    final pendingAnswers = _pendingSelections[question.id] ?? {};
     final isRevealed = _revealedAnswers[question.id] == true;
 
     return SingleChildScrollView(
@@ -290,7 +487,7 @@ class _QuizPageState extends State<QuizPage> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  question.type == 'JUDGEMENT' ? '判断题' : '选择题',
+                  question.isMultipleChoice ? '多选题' : (question.type == 'JUDGEMENT' ? '判断题' : '单选题'),
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ),
@@ -308,7 +505,12 @@ class _QuizPageState extends State<QuizPage> {
 
           // Options
           ...question.options.map((option) {
-            final isSelected = userAnswer == option.id;
+            final isSelected = isRevealed 
+                ? userAnswers.contains(option.id)
+                : (question.isMultipleChoice 
+                    ? pendingAnswers.contains(option.id) 
+                    : userAnswers.contains(option.id));
+            
             final isCorrect = question.correctAnswers.contains(option.id);
             
             Color? cardColor;
@@ -321,7 +523,7 @@ class _QuizPageState extends State<QuizPage> {
                         : Colors.red.withOpacity(0.1);
                     borderColor = isCorrect ? Colors.green : Colors.red;
                 } else if (isCorrect) {
-                    // Show correct answer if user picked wrong one
+                    // Show correct answer if user picked wrong one or missed it
                      cardColor = Colors.green.withOpacity(0.1);
                      borderColor = Colors.green;
                 }
@@ -353,7 +555,8 @@ class _QuizPageState extends State<QuizPage> {
                         height: 24,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                          shape: question.isMultipleChoice ? BoxShape.rectangle : BoxShape.circle,
+                          borderRadius: question.isMultipleChoice ? BorderRadius.circular(4) : null,
                           border: Border.all(
                             color: isSelected || (isRevealed && isCorrect)
                                 ? ((isRevealed && !isCorrect && !isSelected) ? Colors.green : (isSelected ? Theme.of(context).colorScheme.primary : Colors.grey))
@@ -369,8 +572,8 @@ class _QuizPageState extends State<QuizPage> {
                             ? Icon(
                                 isRevealed 
                                   ? (isCorrect ? Icons.check : Icons.close)
-                                  : Icons.circle, // Just a dot for selected in exam
-                                size: 12, 
+                                  : (question.isMultipleChoice ? Icons.check : Icons.circle), 
+                                size: 16, // Slightly bigger for checkbox
                                 color: Colors.white
                               )
                             : Text(
@@ -412,11 +615,11 @@ class _QuizPageState extends State<QuizPage> {
                         children: [
                             Icon(Icons.lightbulb, color: Colors.amber),
                             SizedBox(width: 8),
-                            Text('Explanation', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                            Text('解析', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
                         ],
                     ),
                     const SizedBox(height: 8),
-                    Text(question.explanation ?? 'No explanation available.'),
+                    Text(question.explanation ?? '暂无解析。'),
                  ],
                ),
              )

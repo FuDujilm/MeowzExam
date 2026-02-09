@@ -25,11 +25,14 @@ class Question {
   final List<String> correctAnswers;
   final String? explanation;
 
+  final String? rawType; // Store original type for multi-choice check
+
   Question({
     required this.id,
     required this.externalId,
     required this.title,
     required this.type,
+    this.rawType,
     this.category,
     required this.options,
     this.hasImage = false,
@@ -38,6 +41,8 @@ class Question {
     this.correctAnswers = const [],
     this.explanation,
   });
+
+  bool get isMultipleChoice => rawType == 'multiple_choice';
 
   factory Question.fromJson(Map<String, dynamic> json) {
     // Map backend questionType (single_choice/true_false) to App type (CHOICE/JUDGEMENT)
@@ -57,6 +62,7 @@ class Question {
       externalId: json['externalId'] as String,
       title: json['title'] as String,
       type: mappedType,
+      rawType: rawType,
       category: json['category'] as String?,
       options: (json['options'] as List<dynamic>?)
               ?.map((e) => QuestionOption.fromJson(e as Map<String, dynamic>))

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
+import { resolveRequestUser } from '@/lib/auth/api-auth'
 import { prisma } from '@/lib/db'
 
 const CALLSIGN_PATTERN = /^[A-Z0-9-]{3,12}$/
@@ -18,15 +18,15 @@ function normalizeCallsign(input: unknown): string | null {
 /**
  * GET /api/user/settings - 获取用户设置
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.email) {
+    const resolvedUser = await resolveRequestUser(request)
+    if (!resolvedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: resolvedUser.id },
       include: { settings: true }
     })
 
@@ -74,8 +74,8 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.email) {
+    const resolvedUser = await resolveRequestUser(request)
+    if (!resolvedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: resolvedUser.id },
     })
 
     if (!user) {
