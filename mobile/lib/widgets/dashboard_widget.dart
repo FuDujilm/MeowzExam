@@ -8,6 +8,7 @@ class DashboardWidget extends StatelessWidget {
   final int dailyGoal;
   final int dailyProgress;
   final List<int> weeklyProgress; // 7 days of question counts
+  final List<double> weeklyAccuracy; // 7 days of accuracy percentages
 
   const DashboardWidget({
     super.key,
@@ -16,6 +17,7 @@ class DashboardWidget extends StatelessWidget {
     required this.dailyGoal,
     required this.dailyProgress,
     this.weeklyProgress = const [], // No mock data by default
+    this.weeklyAccuracy = const [],
   });
 
   @override
@@ -24,6 +26,9 @@ class DashboardWidget extends StatelessWidget {
     final safeWeeklyProgress = weeklyProgress.isEmpty 
         ? List.filled(7, 0) 
         : weeklyProgress;
+    final safeWeeklyAccuracy = weeklyAccuracy.isEmpty
+        ? List.filled(7, 0)
+        : weeklyAccuracy;
 
     return Column(
       children: [
@@ -160,6 +165,85 @@ class DashboardWidget extends StatelessWidget {
                           ],
                         );
                       }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // 4. Weekly Accuracy (Line)
+        Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('本周正确率',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 150,
+                  child: LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: 100,
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 32,
+                            getTitlesWidget: (value, meta) {
+                              if (value == 0 || value == 50 || value == 100) {
+                                return Text('${value.toInt()}%', style: const TextStyle(color: Colors.grey, fontSize: 10));
+                              }
+                              return const SizedBox();
+                            },
+                          ),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (double value, TitleMeta meta) {
+                              const days = ['一', '二', '三', '四', '五', '六', '日'];
+                              if (value.toInt() < days.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(days[value.toInt()], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                );
+                              }
+                              return const SizedBox();
+                            },
+                          ),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: safeWeeklyAccuracy
+                              .asMap()
+                              .entries
+                              .map((e) => FlSpot(e.key.toDouble(), e.value))
+                              .toList(),
+                          isCurved: true,
+                          barWidth: 3,
+                          color: Theme.of(context).colorScheme.secondary,
+                          dotData: const FlDotData(show: true),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

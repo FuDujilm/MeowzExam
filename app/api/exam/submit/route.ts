@@ -71,7 +71,6 @@ export async function POST(request: NextRequest) {
     let correctCount = 0
     let wrongCount = 0
     const questionResults: any[] = []
-    const wrongQuestionIds: string[] = []
 
     for (const examQuestion of sortedExamQuestions) {
       const question = examQuestion.question
@@ -115,7 +114,6 @@ export async function POST(request: NextRequest) {
         correctCount += 1
       } else {
         wrongCount += 1
-        wrongQuestionIds.push(question.id)
       }
 
       questionResults.push({
@@ -164,7 +162,9 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    for (const questionId of wrongQuestionIds) {
+    for (const result of questionResults) {
+      const questionId = result.questionId
+      const isCorrectResult = result.isCorrect === true
       await prisma.userQuestion.upsert({
         where: {
           userId_questionId: {
@@ -175,15 +175,16 @@ export async function POST(request: NextRequest) {
         create: {
           userId: session.user.id,
           questionId,
-          correctCount: 0,
-          incorrectCount: 1,
+          correctCount: isCorrectResult ? 1 : 0,
+          incorrectCount: isCorrectResult ? 0 : 1,
           lastAnswered: new Date(),
-          lastCorrect: false,
+          lastCorrect: isCorrectResult,
         },
         update: {
-          incorrectCount: { increment: 1 },
+          correctCount: isCorrectResult ? { increment: 1 } : undefined,
+          incorrectCount: !isCorrectResult ? { increment: 1 } : undefined,
           lastAnswered: new Date(),
-          lastCorrect: false,
+          lastCorrect: isCorrectResult,
         },
       })
     }

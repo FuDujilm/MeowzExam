@@ -1,4 +1,5 @@
-# Repository Guidelines
+
+
 
 ## Project Structure & Module Organization
 The `app/` directory houses App Router route segments such as `practice`, `exam`, and `admin`, each with route-specific `page.tsx` files and server actions. Shared UI lives in `components/` (with reusable primitives under `components/ui`) while admin dashboards stay in `components/admin`. Cross-cutting server logic is grouped in `lib/` for AI integrations, auth, auditing, and Prisma helpers; import them with the `@/*` path alias configured in `tsconfig.json`. Database schema and migrations belong in `prisma/`, types in `types/index.ts`, static assets in `public/`, and data-verification scripts like `test-api.js` remain at the project root.

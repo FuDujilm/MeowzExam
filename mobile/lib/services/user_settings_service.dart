@@ -84,18 +84,14 @@ class UserSettingsService {
     }
   }
 
-  Future<List<dynamic>> getLeaderboard() async {
+  Future<Map<String, dynamic>> getLeaderboard() async {
     try {
       final response = await _apiClient.client.get('points/leaderboard');
       // API returns { users: [...], total: ..., pointsName: ... }
-      if (response.data['users'] != null) {
-        return response.data['users'];
-      }
-      return [];
+      return response.data;
     } catch (e) {
-      // Return empty list instead of mock data on error
       print('Failed to load leaderboard: $e');
-      return [];
+      return {'users': [], 'pointsName': '积分'};
     }
   }
 }

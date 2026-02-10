@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/question.dart';
 import '../../services/question_service.dart';
 import '../../services/exam_service.dart';
 import '../practice/exam_result_page.dart';
+import '../../widgets/ai_explanation_widget.dart';
 
 class QuizPage extends StatefulWidget {
   final String mode; // 'sequential', 'random', 'mock'
@@ -39,8 +41,20 @@ class _QuizPageState extends State<QuizPage> {
   // Exam Mode
   Timer? _timer;
   int _secondsRemaining = 45 * 60; // 45 minutes default for exam
+  
+  // Backend Exam Session Data
+  String? _examId;
+  String? _examResultId;
+  Map<String, dynamic> _answerMappings = {};
+
+  // Pagination
+  int _totalQuestions = 0;
+  int _currentPage = 1;
+  bool _hasMore = true;
+  bool _isFetchingMore = false;
 
   bool get _isExamMode => widget.mode == 'mock';
+  bool get _isSequential => widget.mode == 'sequential';
 
   @override
   void initState() {
@@ -55,30 +69,82 @@ class _QuizPageState extends State<QuizPage> {
     super.dispose();
   }
 
-  Future<void> _loadQuestions() async {
+  Future<void> _loadQuestions({bool refresh = true}) async {
+    if (_isFetchingMore) return;
+    if (!refresh && !_hasMore) return;
+
     try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
+      if (refresh) {
+        setState(() {
+          _isLoading = true;
+          _error = null;
+          _questions = [];
+          _currentPage = 1;
+          _hasMore = true;
+        });
+      } else {
+        setState(() {
+          _isFetchingMore = true;
+        });
+      }
 
-      final questions = await _questionService.getQuestions(
-        libraryCode: widget.libraryCode,
-        pageSize: _isExamMode ? 30 : 50, // Exam usually has fixed size
-        mode: widget.mode,
-      );
-
-      setState(() {
-        _questions = questions;
-        _isLoading = false;
-        if (_isExamMode) {
-          _startTimer();
+      if (_isExamMode) {
+        // ... (Exam mode logic remains same, usually not paginated in this simple implementation)
+        // For simplicity, exam mode loads all questions at once (e.g. 100) or handles pagination internally
+        // Current implementation:
+        final result = await _examService.startExam(widget.libraryCode);
+        _examId = result['examId'];
+        _examResultId = result['examResultId'];
+        
+        final questionsData = result['questions'] as List;
+        final List<Question> questions = [];
+        
+        for (var qData in questionsData) {
+           questions.add(Question.fromJson(qData));
+           if (qData['answerMapping'] != null) {
+             _answerMappings[qData['id']] = qData['answerMapping'];
+           }
         }
-      });
+        
+        if (result['config'] != null && result['config']['duration'] != null) {
+            _secondsRemaining = (result['config']['duration'] as int) * 60;
+        }
+
+        setState(() {
+          _questions = questions;
+          _totalQuestions = questions.length;
+          _isLoading = false;
+          _startTimer();
+        });
+        
+      } else {
+        // Practice Mode (Sequential / Random)
+        final result = await _questionService.getQuestions(
+          libraryCode: widget.libraryCode,
+          page: _currentPage,
+          pageSize: 20, // Load 20 at a time
+          mode: widget.mode,
+        );
+
+        setState(() {
+          if (refresh) {
+            _questions = result.questions;
+          } else {
+            _questions.addAll(result.questions);
+          }
+          
+          _totalQuestions = result.total;
+          _hasMore = result.hasMore;
+          _currentPage++;
+          _isLoading = false;
+          _isFetchingMore = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
+        _isFetchingMore = false;
       });
     }
   }
@@ -118,8 +184,34 @@ class _QuizPageState extends State<QuizPage> {
       } else {
         // Single choice: update directly and reveal if not exam mode
         _userAnswers[question.id] = [optionId];
+        
         if (!_isExamMode) {
           _revealedAnswers[question.id] = true;
+          
+          // Auto-advance logic for sequential practice
+          if (_isSequential) {
+             final isCorrect = question.correctAnswers.contains(optionId);
+             if (isCorrect) {
+                 Future.delayed(const Duration(milliseconds: 800), () {
+                     if (mounted && _pageController.hasClients) {
+                         // Check if we are still on the same page and it's revealed
+                         // Simple check: navigate next
+                         if (_pageController.page!.toInt() < _totalQuestions - 1) {
+                             _pageController.nextPage(
+                                duration: const Duration(milliseconds: 300), 
+                                curve: Curves.easeInOut
+                             );
+                         } else if (_hasMore) {
+                             // Trigger load more explicitly if at boundary? 
+                             // _onPageChanged should handle it, but nextPage might not trigger it if we are at strict end of list before fetch?
+                             // _loadQuestions will append.
+                             // Just trying nextPage might fail if page doesn't exist yet.
+                             // But we load ahead.
+                         }
+                     }
+                 });
+             }
+          }
         }
       }
     });
@@ -129,6 +221,7 @@ class _QuizPageState extends State<QuizPage> {
      if (_revealedAnswers[question.id] == true) return;
 
      setState(() {
+        List<String> selectedAnswer = [];
         if (question.isMultipleChoice) {
             // Commit pending selections to userAnswers
             final selected = _pendingSelections[question.id] ?? {};
@@ -138,15 +231,32 @@ class _QuizPageState extends State<QuizPage> {
                 );
                 return;
             }
-            _userAnswers[question.id] = selected.toList();
+            selectedAnswer = selected.toList();
+            _userAnswers[question.id] = selectedAnswer;
         } else {
             // For single choice, it might already be set, but ensure it's marked revealed
             if (_userAnswers[question.id] == null) {
                  // Or skip?
                  return;
             }
+            selectedAnswer = _userAnswers[question.id]!;
         }
         _revealedAnswers[question.id] = true;
+        
+        // Record answer in backend (Practice Mode)
+        if (!_isExamMode) {
+            _questionService.submitAnswer(
+                questionId: question.id,
+                userAnswer: question.isMultipleChoice ? selectedAnswer : selectedAnswer.first,
+                mode: widget.mode, // 'sequential' maps to 'daily' in service if needed
+            ).then((result) {
+                if (result['pointsEarned'] != null && (result['pointsEarned'] as int) > 0) {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('回答正确 +${result['pointsEarned']} 积分')),
+                     );
+                }
+            });
+        }
      });
   }
   
@@ -162,7 +272,48 @@ class _QuizPageState extends State<QuizPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Calculate score locally for immediate feedback (or rely on backend response)
+      // 1. Prepare Answers
+      final Map<String, dynamic> answersPayload = {};
+      for (var entry in _userAnswers.entries) {
+          if (entry.value.isNotEmpty) {
+             // If multiple choice, send list. If single, send string? 
+             // Backend normalizeAnswerList handles list or string.
+             // Usually for single choice we send string ID.
+             if (entry.value.length == 1) {
+                 answersPayload[entry.key] = entry.value.first;
+             } else {
+                 answersPayload[entry.key] = entry.value;
+             }
+          }
+      }
+
+      // 2. Submit to Backend if Exam Mode
+      if (_isExamMode && _examId != null && _examResultId != null) {
+          final result = await _examService.submitExam({
+             'examId': _examId,
+             'examResultId': _examResultId,
+             'answers': answersPayload,
+             'answerMappings': _answerMappings,
+          });
+          
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => ExamResultPage(
+                  score: result['score'] ?? 0,
+                  correctCount: result['correctCount'] ?? 0,
+                  totalQuestions: result['totalQuestions'] ?? 0,
+                  timeSpent: (45 * 60) - _secondsRemaining, // Approx
+                  passed: result['passed'] ?? false,
+                  detailedResults: result['questionResults'],
+                ),
+              ),
+            );
+          }
+          return;
+      }
+
+      // Fallback for offline/local calculation (should rarely happen if startExam works)
       int correctCount = 0;
       for (var q in _questions) {
         final answer = _userAnswers[q.id]; // List<String>
@@ -197,11 +348,19 @@ class _QuizPageState extends State<QuizPage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
+    final currentTotal = _isExamMode ? _questions.length : _totalQuestions;
+    
     return Scaffold(
       appBar: AppBar(
-        title: _isExamMode 
-          ? Text('剩余时间: ${_formatTime(_secondsRemaining)}') 
-          : Text(_getModeTitle()),
+        centerTitle: true,
+        title: Column(
+          children: [
+             Text(_isExamMode ? '剩余时间: ${_formatTime(_secondsRemaining)}' : _getModeTitle(), style: const TextStyle(fontSize: 16)),
+             if (!_isLoading)
+               Text('${currentIndex + 1}/$currentTotal', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
         actions: [
           if (_isExamMode)
             TextButton(
@@ -288,126 +447,141 @@ class _QuizPageState extends State<QuizPage> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
            BoxShadow(
-             color: Colors.black.withOpacity(0.2),
+             color: Colors.black.withOpacity(0.1),
              blurRadius: 10,
              offset: const Offset(0, 4),
            )
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Row 1: Return to Home
-          InkWell(
-            onTap: () => Navigator.of(context).pop(),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                   Icon(Icons.chevron_left, size: 20, color: Colors.grey),
-                   SizedBox(width: 4),
-                   Text('返回首页', style: TextStyle(color: Colors.grey)),
-                ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer.withOpacity(0.7),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 0.5,
               ),
             ),
-          ),
-          
-          // Row 2: Previous | Skip
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: currentIndex > 0 ? () {
-                        _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                    } : null,
-                    icon: const Icon(Icons.arrow_back, size: 18),
-                    label: const Text('上一题'),
-                    style: OutlinedButton.styleFrom(
-                       padding: const EdgeInsets.symmetric(vertical: 12),
+                // Row 1: Return to Home
+                InkWell(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1))),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                         Icon(Icons.chevron_left, size: 20, color: Colors.grey),
+                         SizedBox(width: 4),
+                         Text('返回首页', style: TextStyle(color: Colors.grey)),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                         if (currentQuestion != null) _skipQuestion(currentQuestion);
-                         if (currentIndex < _questions.length - 1) {
-                             _pageController.nextPage(
+                
+                // Row 2: Previous | Skip
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: currentIndex > 0 ? () {
+                              _pageController.previousPage(
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeInOut,
-                             );
-                         } else {
-                             // Last question skipped? Show toast or result?
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已经是最后一题了')));
+                              );
+                          } : null,
+                          icon: const Icon(Icons.arrow_back, size: 18),
+                          label: const Text('上一题'),
+                          style: OutlinedButton.styleFrom(
+                             padding: const EdgeInsets.symmetric(vertical: 12),
+                             backgroundColor: Colors.transparent, 
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                               if (currentQuestion != null) _skipQuestion(currentQuestion);
+                               if (currentIndex < _questions.length - 1) {
+                                   _pageController.nextPage(
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                   );
+                               } else {
+                                   // Last question skipped? Show toast or result?
+                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已经是最后一题了')));
+                               }
+                          },
+                          icon: const Icon(Icons.skip_next, size: 18),
+                          label: const Text('跳过'),
+                          iconAlignment: IconAlignment.end,
+                          style: OutlinedButton.styleFrom(
+                             padding: const EdgeInsets.symmetric(vertical: 12),
+                             backgroundColor: Colors.transparent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Row 3: Submit Answer
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                         if (currentQuestion != null) {
+                             if (_revealedAnswers[currentQuestion.id] == true) {
+                                 // Already submitted/revealed, go to next
+                                 if (currentIndex < _questions.length - 1) {
+                                     _pageController.nextPage(
+                                         duration: const Duration(milliseconds: 300),
+                                         curve: Curves.easeInOut,
+                                     );
+                                 } else {
+                                     // Finish
+                                     Navigator.pop(context); 
+                                 }
+                             } else {
+                                 // Submit
+                                 _submitQuestion(currentQuestion);
+                             }
                          }
-                    },
-                    icon: const Icon(Icons.skip_next, size: 18),
-                    label: const Text('跳过'),
-                    iconAlignment: IconAlignment.end,
-                    style: OutlinedButton.styleFrom(
-                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      },
+                      style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      child: Text(
+                          (currentQuestion != null && _revealedAnswers[currentQuestion.id] == true)
+                              ? (currentIndex < _questions.length - 1 ? '下一题' : '完成练习')
+                              : '提交答案'
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-
-          // Row 3: Submit Answer
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                   if (currentQuestion != null) {
-                       if (_revealedAnswers[currentQuestion.id] == true) {
-                           // Already submitted/revealed, go to next
-                           if (currentIndex < _questions.length - 1) {
-                               _pageController.nextPage(
-                                   duration: const Duration(milliseconds: 300),
-                                   curve: Curves.easeInOut,
-                               );
-                           } else {
-                               // Finish
-                               Navigator.pop(context); 
-                           }
-                       } else {
-                           // Submit
-                           _submitQuestion(currentQuestion);
-                       }
-                   }
-                },
-                style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                child: Text(
-                    (currentQuestion != null && _revealedAnswers[currentQuestion.id] == true)
-                        ? (currentIndex < _questions.length - 1 ? '下一题' : '完成练习')
-                        : '提交答案'
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -456,6 +630,11 @@ class _QuizPageState extends State<QuizPage> {
       },
       onPageChanged: (index) {
         setState(() {}); // Rebuild to update progress bar and button label
+        
+        // Load more if approaching end
+        if (!_isExamMode && _hasMore && !_isFetchingMore && index >= _questions.length - 3) {
+          _loadQuestions(refresh: false);
+        }
       },
     );
   }
@@ -470,27 +649,48 @@ class _QuizPageState extends State<QuizPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Question Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Question Header Tags
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Text(
-                '第 ${index + 1}/${_questions.length} 题',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Colors.grey,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  question.isMultipleChoice ? '多选题' : (question.type == 'JUDGEMENT' ? '判断题' : '单选题'),
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-              ),
+               if (question.category != null)
+                 Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                   decoration: BoxDecoration(
+                     color: Colors.blue.withOpacity(0.1),
+                     borderRadius: BorderRadius.circular(4),
+                     border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                   ),
+                   child: Text(
+                     question.category!,
+                     style: TextStyle(fontSize: 12, color: Colors.blue[700], fontWeight: FontWeight.bold),
+                   ),
+                 ),
+               Container(
+                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                 decoration: BoxDecoration(
+                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                   borderRadius: BorderRadius.circular(4),
+                 ),
+                 child: Text(
+                   question.isMultipleChoice ? '多选题' : (question.type == 'JUDGEMENT' ? '判断题' : '单选题'),
+                   style: Theme.of(context).textTheme.labelSmall,
+                 ),
+               ),
+               if (question.externalId.isNotEmpty)
+                 Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                   decoration: BoxDecoration(
+                     color: Colors.grey.withOpacity(0.1),
+                     borderRadius: BorderRadius.circular(4),
+                     border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                   ),
+                   child: Text(
+                     question.externalId,
+                     style: TextStyle(fontSize: 12, color: Colors.grey[700], fontFamily: 'monospace'),
+                   ),
+                 ),
             ],
           ),
           const SizedBox(height: 16),
@@ -600,29 +800,10 @@ class _QuizPageState extends State<QuizPage> {
 
           if (isRevealed) ...[
              const SizedBox(height: 24),
-             // Explanation Area
-             Container(
-               padding: const EdgeInsets.all(16),
-               decoration: BoxDecoration(
-                 color: Colors.blue.withOpacity(0.05),
-                 borderRadius: BorderRadius.circular(8),
-                 border: Border.all(color: Colors.blue.withOpacity(0.3)),
-               ),
-               child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                    const Row(
-                        children: [
-                            Icon(Icons.lightbulb, color: Colors.amber),
-                            SizedBox(width: 8),
-                            Text('解析', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                        ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(question.explanation ?? '暂无解析。'),
-                 ],
-               ),
-             )
+             // AI Explanation Widget
+             AiExplanationWidget(question: question),
+             // Add extra padding for floating panel
+             const SizedBox(height: 80), 
           ],
         ],
       ),

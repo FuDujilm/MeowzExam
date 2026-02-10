@@ -137,7 +137,10 @@ class _CalendarPageState extends State<CalendarPage> {
         final dateKey = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
         
         final event = _events[dateKey];
-        final hasStudy = event != null && (event['questionCount'] as int? ?? 0) > 0;
+        final studyCount = event != null
+            ? (event['studyCount'] as int?) ?? (event['questionCount'] as int?) ?? 0
+            : 0;
+        final hasStudy = studyCount > 0;
         final isCompleted = event != null && (event['completed'] as bool? ?? false);
 
         Color? bgColor;
