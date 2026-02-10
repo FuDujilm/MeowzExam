@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { AiExplainSchema, calculateWilsonScore } from '@/lib/ai/schema'
 import { createAuditLog } from '@/lib/audit'
@@ -311,7 +310,6 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
   const resolvedUser = await resolveRequestUser(request)
   const { id } = await params
 
