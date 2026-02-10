@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../models/question_explanation.dart';
 
@@ -6,7 +7,13 @@ class ExplanationService {
 
   Future<List<QuestionExplanation>> getQuestionExplanations(String questionId) async {
     try {
-      final response = await _apiClient.client.get('questions/$questionId/explanations');
+      final response = await _apiClient.client.get(
+        'questions/$questionId/explanations',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
+        ),
+      );
       final data = response.data;
       final List<dynamic> list = (data['explanations'] as List?) ?? [];
       return list.map((json) => QuestionExplanation.fromJson(json)).toList();
