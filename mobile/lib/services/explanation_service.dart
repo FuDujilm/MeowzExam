@@ -18,7 +18,21 @@ class ExplanationService {
       final List<dynamic> list = (data['explanations'] as List?) ?? [];
       return list.map((json) => QuestionExplanation.fromJson(json)).toList();
     } catch (e) {
-      print('Failed to load explanations: $e');
+      // Retry once with longer timeout in case of slow server response
+      try {
+        final retryResponse = await _apiClient.client.get(
+          'questions/$questionId/explanations',
+          options: Options(
+            receiveTimeout: const Duration(seconds: 60),
+            sendTimeout: const Duration(seconds: 60),
+          ),
+        );
+        final data = retryResponse.data;
+        final List<dynamic> list = (data['explanations'] as List?) ?? [];
+        return list.map((json) => QuestionExplanation.fromJson(json)).toList();
+      } catch (_) {
+        print('Failed to load explanations: $e');
+      }
       return [];
     }
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../quiz/quiz_page.dart';
+import '../library/library_preview_page.dart';
 import '../../services/user_settings_service.dart';
 import '../../services/question_service.dart';
 import '../../models/question_library.dart';
@@ -206,7 +207,11 @@ class _PracticePageState extends State<PracticePage> {
             subtitle: '搜索和查看所有题目',
             icon: Icons.search,
             color: Colors.grey,
-            onTap: () {},
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LibraryPreviewPage()),
+              );
+            },
           ),
           _PracticeModeTile(
             title: '我的收藏',

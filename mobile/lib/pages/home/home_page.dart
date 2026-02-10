@@ -53,21 +53,25 @@ class _HomePageState extends State<HomePage> {
       String initialCode = savedExamType ?? 'A_CLASS';
       String initialName = 'A类题库'; // Fallback
       
+      QuestionLibrary? resolvedLibrary;
       if (libraries.isNotEmpty) {
         // Check if saved code exists in available libraries
         final match = libraries.where((l) => l.code == initialCode).firstOrNull;
         if (match != null) {
           initialName = match.name;
+          resolvedLibrary = match;
         } else {
           // If not found, default to first available
           initialCode = libraries.first.code;
           initialName = libraries.first.name;
+          resolvedLibrary = libraries.first;
         }
       }
 
       // 4. Fetch Stats & Check-in
       final stats = await _userSettingsService.getUserStats();
       final checkInStatus = await _userSettingsService.getCheckInStatus();
+      final browsedCount = await _userSettingsService.getLibraryBrowsedCount(initialCode);
 
       // 5. Fetch Weekly Progress
       final now = DateTime.now();
@@ -109,8 +113,8 @@ class _HomePageState extends State<HomePage> {
           _currentLibraryCode = initialCode;
           _currentLibraryName = initialName;
 
-          _totalQuestions = stats['totalQuestions'] ?? 0;
-          _completedQuestions = stats['totalAnswered'] ?? 0;
+          _totalQuestions = resolvedLibrary?.totalQuestions ?? 0;
+          _completedQuestions = browsedCount;
           final target = settings['dailyPracticeTarget'];
           if (target is num) {
             _dailyGoal = target.toInt();

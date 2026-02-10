@@ -60,6 +60,16 @@ function shuffleOptions(question: QuestionWithOptions) {
   return { shuffledOptions, answerMapping }
 }
 
+function mapCorrectAnswers(
+  correctAnswers: string[] | null,
+  answerMapping: Record<string, string>,
+): string[] {
+  if (!Array.isArray(correctAnswers) || correctAnswers.length === 0) return []
+  return correctAnswers
+    .map((oldId) => Object.keys(answerMapping).find((key) => answerMapping[key] === oldId))
+    .filter(Boolean) as string[]
+}
+
 export async function GET(request: NextRequest) {
   try {
     const resolvedUser = await resolveRequestUser(request)
@@ -320,6 +330,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { shuffledOptions, answerMapping } = shuffleOptions(question)
+    const mappedCorrectAnswers = mapCorrectAnswers(
+      (question.correctAnswers as string[]) ?? [],
+      answerMapping,
+    )
     const userQuestion = await prisma.userQuestion.findUnique({
       where: {
         userId_questionId: {
@@ -338,11 +352,20 @@ export async function GET(request: NextRequest) {
       },
     })
 
+    const totalQuestions = await prisma.question.count({ where: libraryFilter })
+    const browsedCount = await prisma.userQuestion.count({
+      where: {
+        userId: user.id,
+        question: libraryFilter,
+      },
+    })
+
     const payload: Record<string, unknown> = {
       question: {
         ...question,
         options: shuffledOptions,
         answerMapping,
+        correctAnswers: mappedCorrectAnswers,
       },
       userQuestion,
       isFavorite: Boolean(favorite),
@@ -351,6 +374,8 @@ export async function GET(request: NextRequest) {
         name: library.name,
         shortName: library.shortName,
       },
+      totalQuestions,
+      browsedCount,
     }
 
     if (isDailyMode) {

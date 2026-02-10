@@ -116,7 +116,13 @@ class QuestionService {
         correctAnswers: ['B'],
         explanation: 'Option B is correct because this is a mock question.',
       ));
-      return PagedQuestionResult(questions: questions, total: questions.length, hasMore: false);
+      return PagedQuestionResult(
+        questions: questions,
+        total: questions.length,
+        hasMore: false,
+        page: page,
+        totalPages: 1,
+      );
     }
 
     try {
@@ -138,7 +144,14 @@ class QuestionService {
       final questions = questionsJson.map((json) => Question.fromJson(json)).toList();
       final total = (data['total'] as int?) ?? questions.length;
       final hasMore = (data['hasMore'] as bool?) ?? ((page * pageSize) < total);
-      return PagedQuestionResult(questions: questions, total: total, hasMore: hasMore);
+      final totalPages = total == 0 ? 0 : ((total / pageSize).ceil());
+      return PagedQuestionResult(
+        questions: questions,
+        total: total,
+        hasMore: hasMore,
+        page: page,
+        totalPages: totalPages,
+      );
     } catch (e) {
       print('API Error: $e. Returning mock data.');
       if (libraryCode == 'A_CLASS') {
@@ -154,10 +167,97 @@ class QuestionService {
           correctAnswers: ['A'],
           explanation: '无法连接到服务器。请确保您的手机和电脑在同一局域网，且防火墙已允许端口访问。',
         ));
-        return PagedQuestionResult(questions: questions, total: questions.length, hasMore: false);
+        return PagedQuestionResult(
+          questions: questions,
+          total: questions.length,
+          hasMore: false,
+          page: page,
+          totalPages: 1,
+        );
       }
       rethrow;
     }
+  }
+
+  Future<PagedQuestionResult> getPreviewQuestions({
+    required String libraryCode,
+    int page = 1,
+    int pageSize = 10,
+    String? category,
+    String? search,
+  }) async {
+    final response = await _apiClient.client.get(
+      'questions',
+      queryParameters: {
+        'library': libraryCode,
+        'page': page,
+        'pageSize': pageSize,
+        if (category != null) 'category': category,
+        if (search != null) 'search': search,
+      },
+    );
+
+    final data = response.data as Map<String, dynamic>;
+    final List<dynamic> questionsJson = (data['questions'] as List<dynamic>? ?? []);
+    final questions = questionsJson.map((json) => Question.fromJson(json)).toList();
+    final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
+    final total = (pagination['total'] as int?) ?? questions.length;
+    final totalPages = (pagination['totalPages'] as int?) ?? (total == 0 ? 0 : (total / pageSize).ceil());
+    final currentPage = (pagination['page'] as int?) ?? page;
+    final hasMore = totalPages > 0 && currentPage < totalPages;
+
+    return PagedQuestionResult(
+      questions: questions,
+      total: total,
+      hasMore: hasMore,
+      page: currentPage,
+      totalPages: totalPages,
+    );
+  }
+
+  Future<Map<String, dynamic>> getNextQuestion({
+    required String libraryCode,
+    required String mode,
+    String? currentId,
+    String? questionId,
+  }) async {
+    final response = await _apiClient.client.get(
+      'practice/next',
+      queryParameters: {
+        'library': libraryCode,
+        'mode': mode,
+        if (currentId != null) 'currentId': currentId,
+        if (questionId != null) 'questionId': questionId,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> submitPracticeAnswer({
+    required String questionId,
+    required dynamic userAnswer,
+    Map<String, dynamic>? answerMapping,
+    String mode = 'sequential',
+  }) async {
+    final response = await _apiClient.client.post(
+      'practice/submit',
+      data: {
+        'questionId': questionId,
+        'userAnswer': userAnswer,
+        if (answerMapping != null) 'answerMapping': answerMapping,
+        'mode': mode,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> markQuestionSeen({
+    required String questionId,
+  }) async {
+    await _apiClient.client.post(
+      'practice/seen',
+      data: {'questionId': questionId},
+    );
   }
 
   Future<List<Explanation>> getExplanations(String questionId) async {

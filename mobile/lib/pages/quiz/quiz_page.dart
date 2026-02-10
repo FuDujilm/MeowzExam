@@ -11,11 +11,13 @@ import '../../widgets/question_explanation_panel.dart';
 class QuizPage extends StatefulWidget {
   final String mode; // 'sequential', 'random', 'mock'
   final String libraryCode;
+  final String? startQuestionId;
 
   const QuizPage({
     super.key,
     required this.mode,
     this.libraryCode = 'A_CLASS',
+    this.startQuestionId,
   });
 
   @override
@@ -32,6 +34,7 @@ class _QuizPageState extends State<QuizPage> {
   int _page = 1;
   bool _hasMore = false;
   bool _isPaging = false;
+  int _browsedCount = 0;
   bool _isLoading = true;
   String? _error;
   
@@ -47,6 +50,7 @@ class _QuizPageState extends State<QuizPage> {
   int _secondsRemaining = 45 * 60; // 45 minutes default for exam
 
   bool get _isExamMode => widget.mode == 'mock';
+  bool get _isSequentialMode => widget.mode == 'sequential';
 
   @override
   void initState() {
@@ -69,21 +73,37 @@ class _QuizPageState extends State<QuizPage> {
       });
 
       _page = 1;
-      final result = await _questionService.getQuestionsPaged(
-        libraryCode: widget.libraryCode,
-        pageSize: _isExamMode ? 30 : 50, // Exam usually has fixed size
-        mode: widget.mode,
-      );
+      if (_isSequentialMode) {
+        final payload = await _questionService.getNextQuestion(
+          libraryCode: widget.libraryCode,
+          mode: widget.mode,
+          questionId: widget.startQuestionId,
+        );
+        final question = Question.fromJson(payload['question']);
+        setState(() {
+          _questions = [question];
+          _totalQuestions = payload['totalQuestions'] ?? 0;
+          _browsedCount = payload['browsedCount'] ?? 0;
+          _hasMore = true;
+          _isLoading = false;
+        });
+      } else {
+        final result = await _questionService.getQuestionsPaged(
+          libraryCode: widget.libraryCode,
+          pageSize: _isExamMode ? 30 : 50, // Exam usually has fixed size
+          mode: widget.mode,
+        );
 
-      setState(() {
-        _questions = result.questions;
-        _totalQuestions = result.total;
-        _hasMore = (widget.mode == 'sequential' || widget.mode == 'wrong') ? result.hasMore : false;
-        _isLoading = false;
-        if (_isExamMode) {
-          _startTimer();
-        }
-      });
+        setState(() {
+          _questions = result.questions;
+          _totalQuestions = result.total;
+          _hasMore = (widget.mode == 'sequential' || widget.mode == 'wrong') ? result.hasMore : false;
+          _isLoading = false;
+          if (_isExamMode) {
+            _startTimer();
+          }
+        });
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -118,6 +138,28 @@ class _QuizPageState extends State<QuizPage> {
       if (mounted) {
         setState(() => _isPaging = false);
       }
+    }
+  }
+
+  Future<bool> _fetchNextSequentialQuestion() async {
+    try {
+      final currentId = _questions.isNotEmpty ? _questions.last.id : null;
+      final payload = await _questionService.getNextQuestion(
+        libraryCode: widget.libraryCode,
+        mode: widget.mode,
+        currentId: currentId,
+      );
+      final question = Question.fromJson(payload['question']);
+      if (mounted) {
+        setState(() {
+          _questions.add(question);
+          _totalQuestions = payload['totalQuestions'] ?? _totalQuestions;
+          _browsedCount = payload['browsedCount'] ?? _browsedCount;
+        });
+      }
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -163,7 +205,7 @@ class _QuizPageState extends State<QuizPage> {
     });
   }
 
-  void _submitQuestion(Question question) {
+  Future<void> _submitQuestion(Question question) async {
      if (_revealedAnswers[question.id] == true) return;
 
      setState(() {
@@ -186,13 +228,49 @@ class _QuizPageState extends State<QuizPage> {
         }
         _revealedAnswers[question.id] = true;
      });
+
+     if (!_isExamMode) {
+       try {
+         final answer = _userAnswers[question.id] ?? [];
+         await _questionService.submitPracticeAnswer(
+           questionId: question.id,
+           userAnswer: question.isMultipleChoice ? answer : (answer.isNotEmpty ? answer.first : ''),
+           answerMapping: question.answerMapping,
+           mode: widget.mode,
+         );
+         if (_isSequentialMode) {
+           setState(() {
+             if (_browsedCount < _totalQuestions) {
+               _browsedCount += 1;
+             }
+           });
+         }
+       } catch (_) {
+         // Ignore submit failure to avoid blocking UI
+       }
+     }
   }
   
-  void _skipQuestion(Question question) {
+  Future<void> _skipQuestion(Question question) async {
       setState(() {
           _revealedAnswers[question.id] = true;
           // Don't mark any answer, just reveal
       });
+
+      if (!_isExamMode) {
+        try {
+          await _questionService.markQuestionSeen(questionId: question.id);
+          if (_isSequentialMode) {
+            setState(() {
+              if (_browsedCount < _totalQuestions) {
+                _browsedCount += 1;
+              }
+            });
+          }
+        } catch (_) {
+          // Ignore mark failure
+        }
+      }
   }
 
   Future<void> _submitExam() async {
@@ -237,12 +315,13 @@ class _QuizPageState extends State<QuizPage> {
   Widget build(BuildContext context) {
     final int currentIndex = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
     final int displayTotal = _totalQuestions > 0 ? _totalQuestions : _questions.length;
+    final int displayIndex = _isSequentialMode ? (_browsedCount + 1).clamp(1, displayTotal) : (currentIndex + 1);
 
     return Scaffold(
       appBar: AppBar(
         title: _isExamMode
             ? Text('剩余时间: ${_formatTime(_secondsRemaining)}')
-            : Text('${_getModeTitle()} ${displayTotal > 0 ? '${currentIndex + 1}/$displayTotal' : ''}'),
+            : Text('${_getModeTitle()} ${displayTotal > 0 ? '$displayIndex/$displayTotal' : ''}'),
         actions: [
           if (_isExamMode)
             TextButton(
@@ -259,7 +338,7 @@ class _QuizPageState extends State<QuizPage> {
               if (!_isLoading && _questions.isNotEmpty)
                 LinearProgressIndicator(
                   value: displayTotal > 0
-                      ? (currentIndex + 1) / displayTotal
+                      ? (displayIndex) / displayTotal
                       : 0,
                   minHeight: 4,
                 ),
@@ -400,16 +479,30 @@ class _QuizPageState extends State<QuizPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                               if (currentQuestion != null) _skipQuestion(currentQuestion);
+                          onPressed: () async {
+                               if (currentQuestion != null) {
+                                 await _skipQuestion(currentQuestion);
+                               }
                                if (currentIndex < _questions.length - 1) {
                                    _pageController.nextPage(
                                       duration: const Duration(milliseconds: 300),
                                       curve: Curves.easeInOut,
                                    );
                                } else {
-                                   // Last question skipped? Show toast or result?
-                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已经是最后一题了')));
+                                   if (_isSequentialMode) {
+                                     final loaded = await _fetchNextSequentialQuestion();
+                                     if (loaded && mounted) {
+                                       _pageController.nextPage(
+                                         duration: const Duration(milliseconds: 300),
+                                         curve: Curves.easeInOut,
+                                       );
+                                     } else {
+                                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已经是最后一题了')));
+                                     }
+                                   } else {
+                                     // Last question skipped? Show toast or result?
+                                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已经是最后一题了')));
+                                   }
                                }
                           },
                           icon: const Icon(Icons.skip_next, size: 18),
@@ -431,7 +524,7 @@ class _QuizPageState extends State<QuizPage> {
                   child: SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () {
+                      onPressed: () async {
                          if (currentQuestion != null) {
                              if (_revealedAnswers[currentQuestion.id] == true) {
                                  // Already submitted/revealed, go to next
@@ -441,12 +534,24 @@ class _QuizPageState extends State<QuizPage> {
                                          curve: Curves.easeInOut,
                                      );
                                  } else {
-                                     // Finish
-                                     Navigator.pop(context); 
+                                     if (_isSequentialMode) {
+                                       final loaded = await _fetchNextSequentialQuestion();
+                                       if (loaded && mounted) {
+                                         _pageController.nextPage(
+                                           duration: const Duration(milliseconds: 300),
+                                           curve: Curves.easeInOut,
+                                         );
+                                       } else {
+                                         Navigator.pop(context);
+                                       }
+                                     } else {
+                                       // Finish
+                                       Navigator.pop(context); 
+                                     }
                                  }
                              } else {
                                  // Submit
-                                 _submitQuestion(currentQuestion);
+                                 await _submitQuestion(currentQuestion);
                              }
                          }
                       },
@@ -456,7 +561,7 @@ class _QuizPageState extends State<QuizPage> {
                       ),
                       child: Text(
                           (currentQuestion != null && _revealedAnswers[currentQuestion.id] == true)
-                              ? (currentIndex < _questions.length - 1 ? '下一题' : '完成练习')
+                              ? (currentIndex < _questions.length - 1 ? '下一题' : (_isSequentialMode ? '下一题' : '完成练习'))
                               : '提交答案'
                       ),
                     ),
@@ -515,7 +620,11 @@ class _QuizPageState extends State<QuizPage> {
       onPageChanged: (index) {
         if ((widget.mode == 'sequential' || widget.mode == 'wrong') &&
             index >= _questions.length - 3) {
-          _loadMoreQuestions();
+          if (_isSequentialMode) {
+            _fetchNextSequentialQuestion();
+          } else {
+            _loadMoreQuestions();
+          }
         }
         setState(() {}); // Rebuild to update progress bar and button label
       },
@@ -527,6 +636,7 @@ class _QuizPageState extends State<QuizPage> {
     final pendingAnswers = _pendingSelections[question.id] ?? {};
     final isRevealed = _revealedAnswers[question.id] == true;
     final displayTotal = _totalQuestions > 0 ? _totalQuestions : _questions.length;
+    final displayIndex = _isSequentialMode ? (_browsedCount + 1).clamp(1, displayTotal) : (index + 1);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -538,7 +648,7 @@ class _QuizPageState extends State<QuizPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '第 ${index + 1}/${displayTotal} 题',
+                '第 ${displayIndex}/${displayTotal} 题',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: Colors.grey,
                 ),

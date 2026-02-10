@@ -49,6 +49,19 @@ class UserSettingsService {
     }
   }
 
+  Future<int> getLibraryBrowsedCount(String code) async {
+    try {
+      final response = await _apiClient.client.get(
+        'user/library-stats',
+        queryParameters: {'code': code},
+      );
+      return response.data['browsedCount'] ?? 0;
+    } catch (e) {
+      print('Failed to load library stats: $e');
+      return 0;
+    }
+  }
+
   Future<Map<String, dynamic>> getCheckInStatus() async {
     try {
       final response = await _apiClient.client.get('points/checkin');

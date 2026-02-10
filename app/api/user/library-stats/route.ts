@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { auth } from '@/auth'
+import { resolveRequestUser } from '@/lib/auth/api-auth'
+
+const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
 
 export async function GET(request: NextRequest) {
-  const session = await auth()
-  if (!session?.user) {
+  const resolvedUser = await resolveRequestUser(request)
+  if (!resolvedUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -16,12 +18,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const libraryFilter = LEGACY_TYPE_CODES.has(code)
+      ? {
+          OR: [
+            { libraryCode: code },
+            {
+              libraryCode: null,
+              type: code as any,
+            },
+          ],
+        }
+      : { libraryCode: code }
+
     const browsedCount = await prisma.userQuestion.count({
       where: {
-        userId: session.user.id,
-        question: {
-          libraryCode: code,
-        },
+        userId: resolvedUser.id,
+        question: libraryFilter,
       },
     })
 
