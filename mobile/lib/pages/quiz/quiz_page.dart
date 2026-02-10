@@ -6,7 +6,7 @@ import '../../models/question.dart';
 import '../../services/question_service.dart';
 import '../../services/exam_service.dart';
 import '../practice/exam_result_page.dart';
-import '../../widgets/ai_explanation_widget.dart';
+import '../../widgets/question_explanation_panel.dart';
 
 class QuizPage extends StatefulWidget {
   final String mode; // 'sequential', 'random', 'mock'
@@ -676,7 +676,7 @@ class _QuizPageState extends State<QuizPage> {
           if (isRevealed) ...[
              const SizedBox(height: 24),
              // Explanation Area
-             AiExplanationWidget(question: question),
+             QuestionExplanationPanel(question: question),
           ],
         ],
       ),
