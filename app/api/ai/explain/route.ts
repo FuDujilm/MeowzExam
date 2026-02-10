@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
+import { resolveRequestUser } from '@/lib/auth/api-auth'
 import { prisma } from '@/lib/db'
 import { generateExplanation } from '@/lib/ai/unified'
 import { generateSimpleExplanation } from '@/lib/ai/openai'
@@ -17,14 +17,15 @@ import { isAdminEmail } from '@/lib/auth/admin'
  * - mode?: 'structured' | 'simple' (默认 structured)
  */
 export async function POST(request: NextRequest) {
-  const session = await auth()
+  const resolvedUser = await resolveRequestUser(request)
 
-  if (!session?.user?.id) {
+  if (!resolvedUser?.id) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
     )
   }
+  const userId = resolvedUser.id
 
   try {
     if (process.env.NODE_ENV !== 'production') {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isRegenerate = Boolean(regenerate)
-    const userEmail = session.user.email || ''
+    const userEmail = resolvedUser.email || ''
     const isAdmin = userEmail ? isAdminEmail(userEmail) : false
 
     // 获取题目信息
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
 
       regenCountToday = await prisma.aiUsageLog.count({
         where: {
-          userId: session.user.id,
+          userId,
           action: 'REGENERATE',
           createdAt: {
             gte: startOfDay,
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
 
       if (costToDeduct > 0) {
         const user = await prisma.user.findUnique({
-          where: { id: session.user.id },
+          where: { id: userId },
           select: {
             totalPoints: true,
           },
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
       const cachedExplanation = question.explanations[0]
       if (cachedExplanation) {
         await createAuditLog({
-          userId: session.user.id,
+          userId,
           action: 'AI_EXPLANATION_SKIPPED',
           entityType: 'Question',
           entityId: questionId,
@@ -189,7 +190,7 @@ export async function POST(request: NextRequest) {
     // 检查旧格式缓存（向后兼容）
     if (!isRegenerate && question.aiExplanation && mode === 'simple') {
       await createAuditLog({
-        userId: session.user.id,
+        userId,
         action: 'AI_EXPLANATION_SKIPPED',
         entityType: 'Question',
         entityId: questionId,
@@ -212,7 +213,7 @@ export async function POST(request: NextRequest) {
 
     // 检查并扣除 AI 配额（管理员跳过限额检查，但仍记录使用量）
     // 注意：isAdminEmail 依赖 process.env.ADMIN_EMAILS，请确保环境变量已配置
-    await checkAndIncrementAiQuota(session.user.id, 1, isAdmin)
+    await checkAndIncrementAiQuota(userId, 1, isAdmin)
 
     if (mode === 'structured') {
       // 结构化模式 - 使用统一调用层（自动选择最优 provider）
@@ -223,7 +224,7 @@ export async function POST(request: NextRequest) {
         category: question.category,
         difficulty: question.difficulty,
         syllabusPath,
-      }, session.user.id)
+      }, userId)
 
       // 保存到 Explanation 表
       const newExplanation = await prisma.explanation.create({
@@ -234,7 +235,7 @@ export async function POST(request: NextRequest) {
           lang: 'zh-CN',
           templateVer: '1.0.0',
           status: 'PUBLISHED',
-          createdById: session.user.id,
+          createdById: userId,
           wilsonScore: calculateWilsonScore(0, 0),
         },
       })
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
       }
 
       await createAuditLog({
-        userId: session.user.id,
+        userId,
         action: 'AI_EXPLANATION_GENERATED',
         entityType: 'Question',
         entityId: questionId,
@@ -283,14 +284,14 @@ export async function POST(request: NextRequest) {
           if (costToDeduct > 0) {
             await prisma.$transaction([
               prisma.user.update({
-                where: { id: session.user.id },
+                where: { id: userId },
                 data: {
                   totalPoints: { decrement: costToDeduct },
                 },
               }),
               prisma.pointsHistory.create({
                 data: {
-                  userId: session.user.id,
+                  userId,
                   points: -costToDeduct,
                   reason: 'AI 解析重新生成',
                   type: 'AI_REGENERATE',
@@ -313,7 +314,7 @@ export async function POST(request: NextRequest) {
 
         await prisma.aiUsageLog.create({
           data: {
-            userId: session.user.id,
+            userId,
             action: 'REGENERATE',
             questionId,
           },
@@ -372,7 +373,7 @@ export async function POST(request: NextRequest) {
       })
 
       await createAuditLog({
-        userId: session.user.id,
+        userId,
         action: 'AI_EXPLANATION_GENERATED',
         entityType: 'Question',
         entityId: questionId,
@@ -403,7 +404,7 @@ export async function POST(request: NextRequest) {
     try {
       if (session?.user?.id) {
         await createAuditLog({
-          userId: session.user.id,
+          userId,
           action: 'AI_EXPLANATION_ERROR',
           entityType: 'Question',
           details: {

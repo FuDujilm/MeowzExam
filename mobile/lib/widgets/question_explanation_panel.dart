@@ -359,14 +359,15 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
             style: TextStyle(color: Colors.grey[600]),
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
             children: [
               FilledButton.icon(
                 onPressed: _generateAiExplanation,
                 icon: const Icon(Icons.auto_awesome),
                 label: const Text('AI 快速生成'),
               ),
-              const SizedBox(width: 12),
               OutlinedButton.icon(
                 onPressed: _submitUserExplanation,
                 icon: const Icon(Icons.add_circle_outline),

@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { AiExplainSchema, calculateWilsonScore } from '@/lib/ai/schema'
 import { createAuditLog } from '@/lib/audit'
+import { resolveRequestUser } from '@/lib/auth/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,9 +23,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
+  const resolvedUser = await resolveRequestUser(request)
 
-  if (!session?.user?.id) {
+  if (!resolvedUser?.id) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -82,7 +83,7 @@ export async function POST(
     const existingExplanation = await prisma.explanation.findFirst({
       where: {
         questionId: id,
-        createdById: session.user.id,
+        createdById: resolvedUser.id,
         type: 'USER',
       },
     })
@@ -103,7 +104,7 @@ export async function POST(
         lang: 'zh-CN',
         templateVer: '1.0.0',
         status: 'PUBLISHED', // 用户解析直接发布，但可被举报
-        createdById: session.user.id,
+        createdById: resolvedUser.id,
         wilsonScore: calculateWilsonScore(0, 0),
       },
       include: {
@@ -119,7 +120,7 @@ export async function POST(
 
     // 审计日志
     await createAuditLog({
-      userId: session.user.id,
+      userId: resolvedUser.id,
       action: 'MANUAL_EXPLANATION_UPDATED',
       entityType: 'Question',
       entityId: id,
@@ -171,9 +172,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
+  const resolvedUser = await resolveRequestUser(request)
 
-  if (!session?.user?.id) {
+  if (!resolvedUser?.id) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -224,7 +225,7 @@ export async function PATCH(
       where: {
         id: explanationId,
         questionId: id,
-        createdById: session.user.id,
+        createdById: resolvedUser.id,
         type: 'USER',
       },
       include: {
@@ -263,7 +264,7 @@ export async function PATCH(
     })
 
     await createAuditLog({
-      userId: session.user.id,
+      userId: resolvedUser.id,
       action: 'MANUAL_EXPLANATION_UPDATED',
       entityType: 'Question',
       entityId: id,
@@ -311,6 +312,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
+  const resolvedUser = await resolveRequestUser(request)
   const { id } = await params
 
   try {
@@ -345,10 +347,10 @@ export async function GET(
             email: true,
           },
         },
-        votes: session?.user?.id
+        votes: resolvedUser?.id
           ? {
               where: {
-                userId: session.user.id,
+                userId: resolvedUser.id,
               },
               select: {
                 vote: true,
@@ -409,7 +411,7 @@ export async function GET(
               name: exp.createdBy.name || exp.createdBy.email,
             }
           : null,
-        canEdit: exp.type === 'USER' && session?.user?.id ? exp.createdBy?.id === session.user.id : false,
+        canEdit: exp.type === 'USER' && resolvedUser?.id ? exp.createdBy?.id === resolvedUser.id : false,
         createdAt: exp.createdAt,
       })
     })

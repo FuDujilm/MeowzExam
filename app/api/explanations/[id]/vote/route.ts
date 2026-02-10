@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { calculateWilsonScore } from '@/lib/ai/schema'
 import { Prisma } from '@/lib/generated/prisma'
+import { resolveRequestUser } from '@/lib/auth/api-auth'
 
 /**
  * POST /api/explanations/[id]/vote
@@ -16,8 +17,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  const userId = session?.user?.id
+  const resolvedUser = await resolveRequestUser(request)
+  const userId = resolvedUser?.id
 
   if (!userId) {
     return NextResponse.json(
@@ -249,9 +250,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
+  const resolvedUser = await resolveRequestUser(request)
 
-  if (!session?.user?.id) {
+  if (!resolvedUser?.id) {
     return NextResponse.json({ vote: null, reportReason: null })
   }
 
@@ -262,7 +263,7 @@ export async function GET(
       where: {
         explanationId_userId: {
           explanationId: id,
-          userId: session.user.id,
+          userId: resolvedUser.id,
         },
       },
     })
