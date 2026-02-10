@@ -22,6 +22,8 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
   final AiService _aiService = AiService();
 
   List<QuestionExplanation> _explanations = [];
+  String _filter = 'all';
+  String _sort = 'default';
   bool _loading = false;
   String? _error;
 
@@ -114,6 +116,127 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
     }
   }
 
+  Future<void> _editExplanation(QuestionExplanation explanation) async {
+    if (!explanation.canEdit || explanation.format != 'text') return;
+
+    final controller = TextEditingController(
+      text: explanation.content?.toString() ?? '',
+    );
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('编辑解析'),
+          content: TextField(
+            controller: controller,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              hintText: '请输入你的解析（至少20字）',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('保存'),
+            )
+          ],
+        );
+      },
+    );
+
+    if (submitted != true) return;
+
+    final content = controller.text.trim();
+    if (content.length < 20) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('解析内容至少需要20个字符')),
+      );
+      return;
+    }
+
+    try {
+      await _explanationService.updateExplanation(
+        questionId: widget.question.id,
+        explanationId: explanation.id,
+        content: content,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _reportExplanation(QuestionExplanation explanation) async {
+    if (explanation.isLegacy) return;
+    final controller = TextEditingController();
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('举报解析'),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: '请输入举报原因（必填）',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('提交'),
+            )
+          ],
+        );
+      },
+    );
+
+    if (submitted != true) return;
+
+    final reason = controller.text.trim();
+    if (reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('举报原因不能为空')),
+      );
+      return;
+    }
+
+    try {
+      await _explanationService.voteExplanation(
+        explanationId: explanation.id,
+        vote: 'REPORT',
+        reportReason: reason,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已提交举报')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('举报失败: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _vote(QuestionExplanation explanation, String vote) async {
     if (explanation.isLegacy) return;
 
@@ -147,6 +270,8 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
             upvotes: upvotes,
             downvotes: downvotes,
             userVote: updatedVote,
+            canEdit: item.canEdit,
+            createdById: item.createdById,
             createdBy: item.createdBy,
             createdAt: item.createdAt,
           );
@@ -198,10 +323,14 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
       return _buildEmptyState();
     }
 
+    final explanations = _applyFilterAndSort(_explanations);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ..._explanations.map(_buildExplanationCard),
+        _buildToolbar(),
+        const SizedBox(height: 12),
+        ...explanations.map(_buildExplanationCard),
       ],
     );
   }
@@ -250,6 +379,53 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
     );
   }
 
+  Widget _buildToolbar() {
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            value: _filter,
+            decoration: const InputDecoration(
+              labelText: '筛选',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'all', child: Text('全部解析')),
+              DropdownMenuItem(value: 'official', child: Text('官方解析')),
+              DropdownMenuItem(value: 'ai', child: Text('AI 解析')),
+              DropdownMenuItem(value: 'user', child: Text('用户解析')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _filter = value);
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            value: _sort,
+            decoration: const InputDecoration(
+              labelText: '排序',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'default', child: Text('默认排序')),
+              DropdownMenuItem(value: 'upvotes', child: Text('按点赞')),
+              DropdownMenuItem(value: 'newest', child: Text('最新优先')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _sort = value);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildExplanationCard(QuestionExplanation explanation) {
     final title = _explanationTitle(explanation.type);
 
@@ -282,9 +458,9 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
                   ]
                 ],
               ),
-              if (!explanation.isLegacy)
-                Row(
-                  children: [
+              Row(
+                children: [
+                  if (!explanation.isLegacy) ...[
                     IconButton(
                       icon: Icon(
                         explanation.userVote == 'UP' ? Icons.thumb_up : Icons.thumb_up_outlined,
@@ -302,8 +478,21 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
                       onPressed: () => _vote(explanation, 'DOWN'),
                     ),
                     Text('${explanation.downvotes}'),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.flag_outlined, size: 18),
+                      onPressed: () => _reportExplanation(explanation),
+                    ),
                   ],
-                ),
+                  if (explanation.canEdit && explanation.format == 'text')
+                    TextButton.icon(
+                      onPressed: () => _editExplanation(explanation),
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('编辑'),
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -464,5 +653,42 @@ class _QuestionExplanationPanelState extends State<QuestionExplanationPanel> {
       default:
         return '官方解析';
     }
+  }
+
+  List<QuestionExplanation> _applyFilterAndSort(List<QuestionExplanation> list) {
+    Iterable<QuestionExplanation> filtered = list;
+
+    switch (_filter) {
+      case 'official':
+        filtered = filtered.where((e) => e.type == 'OFFICIAL');
+        break;
+      case 'ai':
+        filtered = filtered.where((e) => e.type == 'AI');
+        break;
+      case 'user':
+        filtered = filtered.where((e) => e.type == 'USER');
+        break;
+      default:
+        break;
+    }
+
+    final result = filtered.toList();
+
+    switch (_sort) {
+      case 'upvotes':
+        result.sort((a, b) => b.upvotes.compareTo(a.upvotes));
+        break;
+      case 'newest':
+        result.sort((a, b) {
+          final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bTime.compareTo(aTime);
+        });
+        break;
+      default:
+        break;
+    }
+
+    return result;
   }
 }

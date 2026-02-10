@@ -6,6 +6,8 @@ class QuestionExplanation {
   final int upvotes;
   final int downvotes;
   final String? userVote; // UP | DOWN | REPORT | null
+  final bool canEdit;
+  final String? createdById;
   final String? createdBy;
   final DateTime? createdAt;
 
@@ -17,6 +19,8 @@ class QuestionExplanation {
     required this.upvotes,
     required this.downvotes,
     this.userVote,
+    required this.canEdit,
+    this.createdById,
     this.createdBy,
     this.createdAt,
   });
@@ -32,6 +36,8 @@ class QuestionExplanation {
       upvotes: json['upvotes'] as int? ?? 0,
       downvotes: json['downvotes'] as int? ?? 0,
       userVote: json['userVote'] as String?,
+      canEdit: json['canEdit'] as bool? ?? false,
+      createdById: json['createdBy']?['id'] as String?,
       createdBy: json['createdBy']?['name'] as String?,
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
     );

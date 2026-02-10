@@ -159,6 +159,150 @@ export async function POST(
 }
 
 /**
+ * PATCH /api/questions/[id]/explanations
+ * 更新用户已提交的解析（仅限本人、USER 类型）
+ *
+ * Body:
+ * - explanationId: string
+ * - content: string | StructuredContent
+ * - format: 'text' | 'structured'
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
+  const { id } = await params
+  const body = await request.json()
+  const { explanationId, content, format = 'text' } = body
+
+  if (!explanationId) {
+    return NextResponse.json(
+      { error: 'Missing explanationId' },
+      { status: 400 }
+    )
+  }
+
+  if (!content) {
+    return NextResponse.json(
+      { error: 'Missing content' },
+      { status: 400 }
+    )
+  }
+
+  try {
+    // 校验结构化内容
+    let validatedContent = content
+    if (format === 'structured') {
+      try {
+        validatedContent = AiExplainSchema.parse(content)
+      } catch (error: any) {
+        return NextResponse.json(
+          { error: `解析格式不正确: ${error.message}` },
+          { status: 400 }
+        )
+      }
+    } else {
+      if (typeof content !== 'string' || content.trim().length < 20) {
+        return NextResponse.json(
+          { error: '解析内容至少需要20个字符' },
+          { status: 400 }
+        )
+      }
+      validatedContent = content.trim()
+    }
+
+    const existing = await prisma.explanation.findFirst({
+      where: {
+        id: explanationId,
+        questionId: id,
+        createdById: session.user.id,
+        type: 'USER',
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: '解析不存在或无权限' },
+        { status: 404 }
+      )
+    }
+
+    const updated = await prisma.explanation.update({
+      where: { id: existing.id },
+      data: {
+        contentJson: validatedContent,
+        updatedAt: new Date(),
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    await createAuditLog({
+      userId: session.user.id,
+      action: 'MANUAL_EXPLANATION_UPDATED',
+      entityType: 'Question',
+      entityId: id,
+      details: {
+        explanationId: updated.id,
+        format,
+        type: 'USER',
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      explanation: {
+        id: updated.id,
+        type: updated.type,
+        content: updated.contentJson,
+        format,
+        upvotes: updated.upvotes,
+        downvotes: updated.downvotes,
+        wilsonScore: updated.wilsonScore,
+        createdBy: updated.createdBy
+          ? {
+              id: updated.createdBy.id,
+              name: updated.createdBy.name || updated.createdBy.email,
+            }
+          : null,
+        createdAt: updated.createdAt,
+      },
+    })
+  } catch (error: any) {
+    console.error('Update explanation error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to update explanation' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
  * GET /api/questions/[id]/explanations
  * 获取题目的所有解析（官方+AI+用户，按优先级排序）
  */
@@ -236,6 +380,7 @@ export async function GET(
         downvotes: 0,
         wilsonScore: 1,
         userVote: null,
+        canEdit: false,
         createdAt: null,
       })
     }
@@ -264,6 +409,7 @@ export async function GET(
               name: exp.createdBy.name || exp.createdBy.email,
             }
           : null,
+        canEdit: exp.type === 'USER' && session?.user?.id ? exp.createdBy?.id === session.user.id : false,
         createdAt: exp.createdAt,
       })
     })
@@ -279,6 +425,7 @@ export async function GET(
         downvotes: 0,
         wilsonScore: 0.5,
         userVote: null,
+        canEdit: false,
         createdAt: null,
       })
     }
