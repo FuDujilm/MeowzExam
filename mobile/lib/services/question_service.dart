@@ -2,6 +2,7 @@ import '../core/api_client.dart';
 import '../models/question.dart';
 import '../models/explanation.dart';
 import '../models/question_library.dart';
+import '../models/paged_result.dart';
 
 class QuestionService {
   final ApiClient _apiClient = ApiClient();
@@ -87,6 +88,73 @@ class QuestionService {
             correctAnswers: ['A'],
             explanation: '无法连接到服务器。请确保您的手机和电脑在同一局域网，且防火墙已允许端口访问。',
           ));
+      }
+      rethrow;
+    }
+  }
+
+  Future<PagedQuestionResult> getQuestionsPaged({
+    required String libraryCode,
+    int page = 1,
+    int pageSize = 20,
+    String? category,
+    String? search,
+    String mode = 'sequential',
+  }) async {
+    if (libraryCode == 'MOCK') {
+      final questions = List.generate(10, (index) => Question(
+        id: 'mock_$index',
+        externalId: 'MOCK${index + 100}',
+        title: 'This is a mock question #$index for testing purposes. Which option is correct?',
+        type: 'CHOICE',
+        options: [
+          QuestionOption(id: 'A', text: 'Option A is incorrect'),
+          QuestionOption(id: 'B', text: 'Option B is correct'),
+          QuestionOption(id: 'C', text: 'Option C is incorrect'),
+          QuestionOption(id: 'D', text: 'Option D is incorrect'),
+        ],
+        correctAnswers: ['B'],
+        explanation: 'Option B is correct because this is a mock question.',
+      ));
+      return PagedQuestionResult(questions: questions, total: questions.length, hasMore: false);
+    }
+
+    try {
+      final response = await _apiClient.client.get(
+        'practice/questions',
+        queryParameters: {
+          'type': libraryCode,
+          'page': page,
+          'limit': pageSize,
+          'offset': (page - 1) * pageSize,
+          'mode': mode,
+          if (category != null) 'category': category,
+          if (search != null) 'search': search,
+        },
+      );
+
+      final data = response.data;
+      final List<dynamic> questionsJson = (data['questions'] != null) ? data['questions'] : data;
+      final questions = questionsJson.map((json) => Question.fromJson(json)).toList();
+      final total = (data['total'] as int?) ?? questions.length;
+      final hasMore = (data['hasMore'] as bool?) ?? ((page * pageSize) < total);
+      return PagedQuestionResult(questions: questions, total: total, hasMore: hasMore);
+    } catch (e) {
+      print('API Error: $e. Returning mock data.');
+      if (libraryCode == 'A_CLASS') {
+        final questions = List.generate(1, (index) => Question(
+          id: 'error_fallback_$index',
+          externalId: 'ERR001',
+          title: '【连接失败】请检查 API 地址配置\n\n当前尝试连接: ${_apiClient.client.options.baseUrl}\n错误信息: $e',
+          type: 'CHOICE',
+          options: [
+            QuestionOption(id: 'A', text: 'Retry'),
+            QuestionOption(id: 'B', text: 'Check Settings'),
+          ],
+          correctAnswers: ['A'],
+          explanation: '无法连接到服务器。请确保您的手机和电脑在同一局域网，且防火墙已允许端口访问。',
+        ));
+        return PagedQuestionResult(questions: questions, total: questions.length, hasMore: false);
       }
       rethrow;
     }

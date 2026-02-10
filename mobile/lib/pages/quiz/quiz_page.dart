@@ -6,6 +6,7 @@ import '../../models/question.dart';
 import '../../services/question_service.dart';
 import '../../services/exam_service.dart';
 import '../practice/exam_result_page.dart';
+import '../../widgets/ai_explanation_widget.dart';
 
 class QuizPage extends StatefulWidget {
   final String mode; // 'sequential', 'random', 'mock'
@@ -27,6 +28,10 @@ class _QuizPageState extends State<QuizPage> {
   final PageController _pageController = PageController();
   
   List<Question> _questions = [];
+  int _totalQuestions = 0;
+  int _page = 1;
+  bool _hasMore = false;
+  bool _isPaging = false;
   bool _isLoading = true;
   String? _error;
   
@@ -63,14 +68,17 @@ class _QuizPageState extends State<QuizPage> {
         _error = null;
       });
 
-      final questions = await _questionService.getQuestions(
+      _page = 1;
+      final result = await _questionService.getQuestionsPaged(
         libraryCode: widget.libraryCode,
         pageSize: _isExamMode ? 30 : 50, // Exam usually has fixed size
         mode: widget.mode,
       );
 
       setState(() {
-        _questions = questions;
+        _questions = result.questions;
+        _totalQuestions = result.total;
+        _hasMore = (widget.mode == 'sequential' || widget.mode == 'wrong') ? result.hasMore : false;
         _isLoading = false;
         if (_isExamMode) {
           _startTimer();
@@ -81,6 +89,35 @@ class _QuizPageState extends State<QuizPage> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMoreQuestions() async {
+    if (_isPaging || !_hasMore) return;
+    setState(() => _isPaging = true);
+
+    try {
+      final nextPage = _page + 1;
+      final result = await _questionService.getQuestionsPaged(
+        libraryCode: widget.libraryCode,
+        page: nextPage,
+        pageSize: _isExamMode ? 30 : 50,
+        mode: widget.mode,
+      );
+
+      if (mounted) {
+        setState(() {
+          _page = nextPage;
+          _questions.addAll(result.questions);
+          _totalQuestions = result.total;
+          _hasMore = result.hasMore;
+          _isPaging = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPaging = false);
+      }
     }
   }
 
@@ -198,11 +235,14 @@ class _QuizPageState extends State<QuizPage> {
 
   @override
   Widget build(BuildContext context) {
+    final int currentIndex = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
+    final int displayTotal = _totalQuestions > 0 ? _totalQuestions : _questions.length;
+
     return Scaffold(
       appBar: AppBar(
-        title: _isExamMode 
-          ? Text('剩余时间: ${_formatTime(_secondsRemaining)}') 
-          : Text(_getModeTitle()),
+        title: _isExamMode
+            ? Text('剩余时间: ${_formatTime(_secondsRemaining)}')
+            : Text('${_getModeTitle()} ${displayTotal > 0 ? '${currentIndex + 1}/$displayTotal' : ''}'),
         actions: [
           if (_isExamMode)
             TextButton(
@@ -218,7 +258,9 @@ class _QuizPageState extends State<QuizPage> {
             children: [
               if (!_isLoading && _questions.isNotEmpty)
                 LinearProgressIndicator(
-                  value: (_questions.isEmpty) ? 0 : (_pageController.hasClients ? _pageController.page ?? 0 : 0) / _questions.length,
+                  value: displayTotal > 0
+                      ? (currentIndex + 1) / displayTotal
+                      : 0,
                   minHeight: 4,
                 ),
               Expanded(child: _buildBody()),
@@ -471,6 +513,10 @@ class _QuizPageState extends State<QuizPage> {
         return _buildQuestionCard(_questions[index], index);
       },
       onPageChanged: (index) {
+        if ((widget.mode == 'sequential' || widget.mode == 'wrong') &&
+            index >= _questions.length - 3) {
+          _loadMoreQuestions();
+        }
         setState(() {}); // Rebuild to update progress bar and button label
       },
     );
@@ -480,6 +526,7 @@ class _QuizPageState extends State<QuizPage> {
     final userAnswers = _userAnswers[question.id] ?? [];
     final pendingAnswers = _pendingSelections[question.id] ?? {};
     final isRevealed = _revealedAnswers[question.id] == true;
+    final displayTotal = _totalQuestions > 0 ? _totalQuestions : _questions.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -491,7 +538,7 @@ class _QuizPageState extends State<QuizPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '第 ${index + 1}/${_questions.length} 题',
+                '第 ${index + 1}/${displayTotal} 题',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: Colors.grey,
                 ),
@@ -507,6 +554,18 @@ class _QuizPageState extends State<QuizPage> {
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (question.externalId.isNotEmpty) _buildTagChip('题号 ${question.externalId}'),
+              if (question.category != null && question.category!.isNotEmpty)
+                _buildTagChip(question.category!),
+              if (question.categoryCode != null && question.categoryCode!.isNotEmpty)
+                _buildTagChip(question.categoryCode!),
             ],
           ),
           const SizedBox(height: 16),
@@ -617,30 +676,23 @@ class _QuizPageState extends State<QuizPage> {
           if (isRevealed) ...[
              const SizedBox(height: 24),
              // Explanation Area
-             Container(
-               padding: const EdgeInsets.all(16),
-               decoration: BoxDecoration(
-                 color: Colors.blue.withOpacity(0.05),
-                 borderRadius: BorderRadius.circular(8),
-                 border: Border.all(color: Colors.blue.withOpacity(0.3)),
-               ),
-               child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                    const Row(
-                        children: [
-                            Icon(Icons.lightbulb, color: Colors.amber),
-                            SizedBox(width: 8),
-                            Text('解析', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                        ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(question.explanation ?? '暂无解析。'),
-                 ],
-               ),
-             )
+             AiExplanationWidget(question: question),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildTagChip(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall,
       ),
     );
   }

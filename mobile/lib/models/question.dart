@@ -18,6 +18,8 @@ class Question {
   final String title;
   final String type; // CHOICE, JUDGEMENT
   final String? category;
+  final String? categoryCode;
+  final String? difficulty;
   final List<QuestionOption> options;
   final bool hasImage;
   final String? imagePath;
@@ -25,15 +27,17 @@ class Question {
   final List<String> correctAnswers;
   final String? explanation;
 
-  final String? rawType; // Store original type for multi-choice check
+  final String? questionType; // Store original questionType for multi-choice check
 
   Question({
     required this.id,
     required this.externalId,
     required this.title,
     required this.type,
-    this.rawType,
+    this.questionType,
     this.category,
+    this.categoryCode,
+    this.difficulty,
     required this.options,
     this.hasImage = false,
     this.imagePath,
@@ -42,12 +46,12 @@ class Question {
     this.explanation,
   });
 
-  bool get isMultipleChoice => rawType == 'multiple_choice';
+  bool get isMultipleChoice => questionType == 'multiple_choice';
 
   factory Question.fromJson(Map<String, dynamic> json) {
     // Map backend questionType (single_choice/true_false) to App type (CHOICE/JUDGEMENT)
     String mappedType = 'CHOICE';
-    final rawType = json['questionType'] as String? ?? json['type'] as String?;
+    final rawType = json['questionType'] as String?;
     
     if (rawType != null) {
       if (rawType.toLowerCase().contains('true_false') || rawType == 'JUDGEMENT') {
@@ -62,8 +66,10 @@ class Question {
       externalId: json['externalId'] as String,
       title: json['title'] as String,
       type: mappedType,
-      rawType: rawType,
+      questionType: rawType,
       category: json['category'] as String?,
+      categoryCode: json['categoryCode'] as String?,
+      difficulty: json['difficulty'] as String?,
       options: (json['options'] as List<dynamic>?)
               ?.map((e) => QuestionOption.fromJson(e as Map<String, dynamic>))
               .toList() ??
