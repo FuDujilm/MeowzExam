@@ -4,19 +4,7 @@ import '../models/exam_result.dart';
 class ExamService {
   final ApiClient _apiClient = ApiClient();
 
-  Future<Map<String, dynamic>> startExam(String libraryCode) async {
-    try {
-      final response = await _apiClient.client.post(
-        'exam/start',
-        data: {'library': libraryCode},
-      );
-      return response.data;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> submitExam(Map<String, dynamic> payload) async {
+  Future<void> submitExam(Map<String, dynamic> payload) async {
     // payload structure:
     // {
     //   "examId": "...",
@@ -25,8 +13,7 @@ class ExamService {
     //   "answerMappings": { "questionId": "A/B/C" } // optional
     // }
     try {
-      final response = await _apiClient.client.post('exam/submit', data: payload);
-      return response.data;
+      await _apiClient.client.post('exam/submit', data: payload);
     } catch (e) {
       rethrow;
     }

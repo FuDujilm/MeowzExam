@@ -68,37 +68,39 @@ class _HomePageState extends State<HomePage> {
       // 4. Fetch Stats & Check-in
       final stats = await _userSettingsService.getUserStats();
       final checkInStatus = await _userSettingsService.getCheckInStatus();
-      
+
       // 5. Fetch Weekly Progress
       final now = DateTime.now();
       final currentWeekday = now.weekday; // 1=Mon, 7=Sun
       final monday = now.subtract(Duration(days: currentWeekday - 1));
       final sunday = monday.add(const Duration(days: 6));
-      
+
       final weekData = await _userSettingsService.getStudyCalendar(
-         monday.toIso8601String().split('T')[0],
-         sunday.toIso8601String().split('T')[0],
+        monday.toIso8601String().split('T')[0],
+        sunday.toIso8601String().split('T')[0],
       );
-      
+
       List<int> weeklyProgress = List.filled(7, 0);
       List<double> weeklyAccuracy = List.filled(7, 0);
       for (var record in weekData) {
-          if (record['date'] != null) {
-              // date is YYYY-MM-DD string or similar
-              final date = DateTime.parse(record['date']);
-              final index = date.weekday - 1;
-              if (index >= 0 && index < 7) {
-                  weeklyProgress[index] = (record['studyCount'] as int?) ?? (record['questionCount'] as int?) ?? 0;
-                  final correct = (record['studyCorrectCount'] as int?) ?? 0;
-                  final incorrect = (record['studyIncorrectCount'] as int?) ?? 0;
-                  final total = correct + incorrect;
-                  if (total > 0) {
-                    weeklyAccuracy[index] = (correct / total) * 100;
-                  } else if (record['accuracy'] != null) {
-                    weeklyAccuracy[index] = (record['accuracy'] as num).toDouble();
-                  }
-              }
+        if (record['date'] != null) {
+          // date is YYYY-MM-DD string or similar
+          final date = DateTime.parse(record['date']);
+          final index = date.weekday - 1;
+          if (index >= 0 && index < 7) {
+            weeklyProgress[index] = (record['studyCount'] as int?) ??
+                (record['questionCount'] as int?) ??
+                0;
+            final correct = (record['studyCorrectCount'] as int?) ?? 0;
+            final incorrect = (record['studyIncorrectCount'] as int?) ?? 0;
+            final total = correct + incorrect;
+            if (total > 0) {
+              weeklyAccuracy[index] = (correct / total) * 100;
+            } else if (record['accuracy'] != null) {
+              weeklyAccuracy[index] = (record['accuracy'] as num).toDouble();
+            }
           }
+        }
       }
 
       if (mounted) {
@@ -106,7 +108,7 @@ class _HomePageState extends State<HomePage> {
           _libraries = libraries;
           _currentLibraryCode = initialCode;
           _currentLibraryName = initialName;
-          
+
           _totalQuestions = stats['totalQuestions'] ?? 0;
           _completedQuestions = stats['totalAnswered'] ?? 0;
           final target = settings['dailyPracticeTarget'];

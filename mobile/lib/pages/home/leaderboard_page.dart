@@ -25,8 +25,8 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
       final data = await _userService.getLeaderboard();
       if (mounted) {
         setState(() {
-          _leaderboard = data['users'] ?? [];
-          _pointsName = data['pointsName'] ?? '积分';
+          _leaderboard = data['users'] as List<dynamic>? ?? [];
+          _pointsName = data['pointsName'] as String? ?? '积分';
           _isLoading = false;
         });
       }

@@ -232,7 +232,7 @@ class DashboardWidget extends StatelessWidget {
                           spots: safeWeeklyAccuracy
                               .asMap()
                               .entries
-                              .map((e) => FlSpot(e.key.toDouble(), e.value))
+                              .map((e) => FlSpot(e.key.toDouble(), e.value.toDouble()))
                               .toList(),
                           isCurved: true,
                           barWidth: 3,
