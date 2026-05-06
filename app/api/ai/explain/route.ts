@@ -402,7 +402,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      if (session?.user?.id) {
+      if (userId) {
         await createAuditLog({
           userId,
           action: 'AI_EXPLANATION_ERROR',

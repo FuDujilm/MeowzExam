@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // 1. Resolve Library/Type
     let targetLibraryCode = libraryCodeParam
-    let isLegacyType = LEGACY_TYPE_CODES.has(libraryCodeParam)
+    const isLegacyType = LEGACY_TYPE_CODES.has(libraryCodeParam)
 
     if (!isLegacyType) {
        // Try to find library by code

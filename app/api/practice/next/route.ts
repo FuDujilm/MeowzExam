@@ -359,6 +359,13 @@ export async function GET(request: NextRequest) {
         question: libraryFilter,
       },
     })
+    const questionIndex = question.externalId
+      ? await prisma.question.count({
+          where: combineWhereConditions(libraryFilter, {
+            externalId: { lte: question.externalId },
+          }),
+        })
+      : null
 
     const payload: Record<string, unknown> = {
       question: {
@@ -376,6 +383,7 @@ export async function GET(request: NextRequest) {
       },
       totalQuestions,
       browsedCount,
+      questionIndex,
     }
 
     if (isDailyMode) {

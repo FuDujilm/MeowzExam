@@ -37,6 +37,7 @@ class _QuizPageState extends State<QuizPage> {
   int _browsedCount = 0;
   bool _isLoading = true;
   String? _error;
+  final Map<String, int> _questionOrderMap = {};
   
   // Track answers: questionId -> selectedOptionIds
   final Map<String, List<String>> _userAnswers = {};
@@ -80,10 +81,14 @@ class _QuizPageState extends State<QuizPage> {
           questionId: widget.startQuestionId,
         );
         final question = Question.fromJson(payload['question']);
+        final int? questionIndex = payload['questionIndex'] as int?;
         setState(() {
           _questions = [question];
           _totalQuestions = payload['totalQuestions'] ?? 0;
           _browsedCount = payload['browsedCount'] ?? 0;
+          if (questionIndex != null) {
+            _questionOrderMap[question.id] = questionIndex;
+          }
           _hasMore = true;
           _isLoading = false;
         });
@@ -150,11 +155,15 @@ class _QuizPageState extends State<QuizPage> {
         currentId: currentId,
       );
       final question = Question.fromJson(payload['question']);
+      final int? questionIndex = payload['questionIndex'] as int?;
       if (mounted) {
         setState(() {
           _questions.add(question);
           _totalQuestions = payload['totalQuestions'] ?? _totalQuestions;
           _browsedCount = payload['browsedCount'] ?? _browsedCount;
+          if (questionIndex != null) {
+            _questionOrderMap[question.id] = questionIndex;
+          }
         });
       }
       return true;
@@ -315,7 +324,12 @@ class _QuizPageState extends State<QuizPage> {
   Widget build(BuildContext context) {
     final int currentIndex = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
     final int displayTotal = _totalQuestions > 0 ? _totalQuestions : _questions.length;
-    final int displayIndex = _isSequentialMode ? (_browsedCount + 1).clamp(1, displayTotal) : (currentIndex + 1);
+    final Question? currentQuestion = _questions.isNotEmpty && currentIndex < _questions.length
+        ? _questions[currentIndex]
+        : null;
+    final int displayIndex = _isSequentialMode
+        ? (_questionOrderMap[currentQuestion?.id] ?? (_browsedCount + 1)).clamp(1, displayTotal)
+        : (currentIndex + 1);
 
     return Scaffold(
       appBar: AppBar(
@@ -636,7 +650,9 @@ class _QuizPageState extends State<QuizPage> {
     final pendingAnswers = _pendingSelections[question.id] ?? {};
     final isRevealed = _revealedAnswers[question.id] == true;
     final displayTotal = _totalQuestions > 0 ? _totalQuestions : _questions.length;
-    final displayIndex = _isSequentialMode ? (_browsedCount + 1).clamp(1, displayTotal) : (index + 1);
+    final displayIndex = _isSequentialMode
+        ? (_questionOrderMap[question.id] ?? (_browsedCount + 1)).clamp(1, displayTotal)
+        : (index + 1);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
