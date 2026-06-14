@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import '../core/api_client.dart';
@@ -124,7 +124,18 @@ class AuthService {
   }
 
   Future<bool> isLoggedIn() async {
-    final token = await _storage.read(key: AppConstants.tokenKey);
+    String? token;
+    try {
+      token = await _storage.read(key: AppConstants.tokenKey);
+    } catch (e) {
+      debugPrint('Failed to read auth token: $e');
+      try {
+        await _storage.delete(key: AppConstants.tokenKey);
+      } catch (deleteError) {
+        debugPrint('Failed to clear auth token: $deleteError');
+      }
+      return false;
+    }
     return token != null;
   }
 }

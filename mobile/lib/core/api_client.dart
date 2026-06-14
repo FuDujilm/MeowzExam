@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'constants.dart';
 
@@ -61,7 +62,7 @@ class ApiClient {
   }
 
   Future<void> _initBaseUrl() async {
-    final customUrl = await _storage.read(key: 'custom_base_url');
+    final customUrl = await _readStorageValue('custom_base_url');
     if (customUrl != null && customUrl.isNotEmpty) {
       final normalizedUrl = _normalizeBaseUrl(customUrl);
       _dio.options.baseUrl = normalizedUrl;
@@ -75,6 +76,20 @@ class ApiClient {
     final normalizedUrl = _normalizeBaseUrl(url);
     await _storage.write(key: 'custom_base_url', value: normalizedUrl);
     _dio.options.baseUrl = normalizedUrl;
+  }
+
+  Future<String?> _readStorageValue(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } catch (e) {
+      debugPrint('Failed to read secure storage key "$key": $e');
+      try {
+        await _storage.delete(key: key);
+      } catch (deleteError) {
+        debugPrint('Failed to clear secure storage key "$key": $deleteError');
+      }
+      return null;
+    }
   }
 
   Future<String> getBaseUrl() async {

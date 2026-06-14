@@ -5,6 +5,8 @@ import 'pages/main_screen.dart';
 import 'models/user.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(
     MultiProvider(
       providers: [
@@ -23,7 +25,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MeowzExam Mobile',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xff2f7cff),
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: const Color(0xff061426),
         useMaterial3: true,
       ),
       home: const MainScreen(),
