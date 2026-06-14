@@ -79,7 +79,7 @@ export default function AdminSmtpTestPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
     } else if (status === 'authenticated') {
       refreshStatus().catch(() => null)
     }

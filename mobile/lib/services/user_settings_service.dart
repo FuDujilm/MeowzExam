@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../core/api_client.dart';
 import '../models/user.dart';
 
@@ -24,7 +26,7 @@ class UserSettingsService {
       final response = await _apiClient.client.get('user/settings');
       return response.data['settings'] ?? {};
     } catch (e) {
-      print('Failed to load settings: $e');
+      debugPrint('Failed to load settings: $e');
       return {};
     }
   }
@@ -44,21 +46,31 @@ class UserSettingsService {
       return response.data;
     } catch (e) {
       // Return empty stats instead of throwing to prevent UI crash
-      print('Failed to load user stats: $e');
+      debugPrint('Failed to load user stats: $e');
       return {};
     }
   }
 
   Future<int> getLibraryBrowsedCount(String code) async {
     try {
+      final stats = await getLibraryStats(code);
+      return stats['browsedCount'] ?? 0;
+    } catch (e) {
+      debugPrint('Failed to load library stats: $e');
+      return 0;
+    }
+  }
+
+  Future<Map<String, dynamic>> getLibraryStats(String code) async {
+    try {
       final response = await _apiClient.client.get(
         'user/library-stats',
         queryParameters: {'code': code},
       );
-      return response.data['browsedCount'] ?? 0;
+      return response.data as Map<String, dynamic>;
     } catch (e) {
-      print('Failed to load library stats: $e');
-      return 0;
+      debugPrint('Failed to load library stats: $e');
+      return {};
     }
   }
 
@@ -67,7 +79,7 @@ class UserSettingsService {
       final response = await _apiClient.client.get('points/checkin');
       return response.data;
     } catch (e) {
-      print('Failed to load check-in status: $e');
+      debugPrint('Failed to load check-in status: $e');
       return {};
     }
   }
@@ -81,7 +93,8 @@ class UserSettingsService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getStudyCalendar(String start, String end) async {
+  Future<List<Map<String, dynamic>>> getStudyCalendar(
+      String start, String end) async {
     try {
       final response = await _apiClient.client.get(
         'user/calendar',
@@ -92,7 +105,7 @@ class UserSettingsService {
       }
       return [];
     } catch (e) {
-      print('Failed to load study calendar: $e');
+      debugPrint('Failed to load study calendar: $e');
       return [];
     }
   }
@@ -103,7 +116,7 @@ class UserSettingsService {
       // API returns { users: [...], total: ..., pointsName: ... }
       return response.data;
     } catch (e) {
-      print('Failed to load leaderboard: $e');
+      debugPrint('Failed to load leaderboard: $e');
       return {'users': [], 'pointsName': '积分'};
     }
   }

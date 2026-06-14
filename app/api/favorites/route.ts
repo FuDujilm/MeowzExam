@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 
 // POST /api/favorites - 添加收藏
 export async function POST(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
       update: {},
     })
 
-    return NextResponse.json({ success: true, favorite })
+    return attachGuestCookieIfNeeded(NextResponse.json({ success: true, favorite }), resolvedUser)
   } catch (error) {
     console.error('添加收藏失败:', error)
     return NextResponse.json(
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
 // DELETE /api/favorites - 取消收藏
 export async function DELETE(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -87,7 +88,7 @@ export async function DELETE(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ success: true })
+    return attachGuestCookieIfNeeded(NextResponse.json({ success: true }), resolvedUser)
   } catch (error) {
     console.error('取消收藏失败:', error)
     return NextResponse.json(
@@ -100,7 +101,7 @@ export async function DELETE(request: NextRequest) {
 // GET /api/favorites - 获取收藏列表
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ favorites })
+    return attachGuestCookieIfNeeded(NextResponse.json({ favorites }), resolvedUser)
   } catch (error) {
     console.error('获取收藏列表失败:', error)
     return NextResponse.json(

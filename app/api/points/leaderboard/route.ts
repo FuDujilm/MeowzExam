@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     // 获取排行榜
     const users = await prisma.user.findMany({
       where: {
+        userType: 'REGISTERED',
         totalPoints: {
           gt: 0,
         },
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     // 获取总数
     const total = await prisma.user.count({
       where: {
+        userType: 'REGISTERED',
         totalPoints: {
           gt: 0,
         },

@@ -61,7 +61,7 @@ export default function AdminSiteConfigPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
       return
     }
 

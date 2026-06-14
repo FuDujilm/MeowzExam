@@ -4,6 +4,7 @@ import Script from 'next/script'
 import type { ReactNode } from 'react'
 
 import { FloatingWidgets } from '@/components/site/floating-widgets'
+import { GuestMigrationPrompt } from '@/components/site/guest-migration-prompt'
 import { SiteFooter } from '@/components/site/site-footer'
 import { SiteHeader } from '@/components/site/site-header'
 import { SiteConfigProvider } from '@/components/site/site-config-provider'
@@ -90,6 +91,7 @@ export default async function RootLayout({
             <NotificationProvider>
               <SiteConfigProvider initialConfig={config}>
                 <FloatingWidgets />
+                <GuestMigrationPrompt />
                 <div className="flex min-h-screen flex-col">
                   <SiteHeader />
                   <main className="flex-1">

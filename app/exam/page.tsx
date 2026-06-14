@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -108,7 +107,6 @@ interface ExamConfig {
 function ExamContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session, status } = useSession()
   const { notify } = useNotification()
   const {
     libraries,
@@ -558,13 +556,6 @@ function ExamContent() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // 重定向未登录用户
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-    }
-  }, [status, router])
-
   useEffect(() => {
     if (!examStarted || !questions.length) return
     const observer = new IntersectionObserver(
@@ -625,14 +616,6 @@ function ExamContent() {
       container.scrollTo({ top: targetTop, behavior: 'smooth' })
     }
   }, [currentIndex, questions])
-
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-slate-600 dark:bg-slate-950 dark:text-slate-200">
-        <p>加载中...</p>
-      </div>
-    )
-  }
 
   // 开始考试前
   if (!examStarted) {

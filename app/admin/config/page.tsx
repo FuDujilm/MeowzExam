@@ -47,7 +47,7 @@ export default function AdminConfigPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
     }
   }, [status, router])
 

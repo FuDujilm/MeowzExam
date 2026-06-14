@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useMemo, useState, useEffect, Suspense } from 'react'
+import Image from 'next/image'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,6 +57,25 @@ interface DailyPracticeProgress {
   rewardPoints?: number
 }
 
+interface PracticeCompletionInfo {
+  message: string
+  totalQuestions?: number
+  browsedCount?: number
+}
+
+type ApiMessagePayload = {
+  error?: string
+  message?: string
+}
+
+function readApiMessage(data: unknown, key: keyof ApiMessagePayload): string | null {
+  if (typeof data !== 'object' || data === null || !(key in data)) {
+    return null
+  }
+  const value = (data as ApiMessagePayload)[key]
+  return typeof value === 'string' ? value : null
+}
+
 function PracticeContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -64,6 +84,10 @@ function PracticeContent() {
   const type = searchParams.get('type') || 'A_CLASS'
   const dailyPracticeRedirectUrl = `/daily-practice?type=${encodeURIComponent(type)}`
   const questionIdParam = searchParams.get('questionId')
+  const sessionId = useMemo(
+    () => `practice-${mode}-${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    [mode, type],
+  )
   
   const [question, setQuestion] = useState<Question | null>(null)
   const [userQuestion, setUserQuestion] = useState<UserQuestion | null>(null)
@@ -80,6 +104,7 @@ function PracticeContent() {
   const [questionHistory, setQuestionHistory] = useState<string[]>([]) // 保存浏览过的题目ID
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1) // 当前历史位置
   const [dailyProgress, setDailyProgress] = useState<DailyPracticeProgress | null>(null)
+  const [completionInfo, setCompletionInfo] = useState<PracticeCompletionInfo | null>(null)
   const { notify } = useNotification()
   const isDailyMode = mode === 'daily'
 
@@ -208,11 +233,25 @@ function PracticeContent() {
             setTimeout(() => router.push(dailyPracticeRedirectUrl), 1200)
           }
         }
-        notify({
-          variant: 'danger',
-          title: '加载题目失败',
-          description: error?.error || '请稍后再试。',
-        })
+        if (error?.completed) {
+          setCompletionInfo({
+            message: error.error || '当前练习已完成。',
+            totalQuestions: typeof error.totalQuestions === 'number' ? error.totalQuestions : undefined,
+            browsedCount: typeof error.browsedCount === 'number' ? error.browsedCount : undefined,
+          })
+          setQuestion(null)
+          notify({
+            variant: 'success',
+            title: '练习已完成',
+            description: error.error || '可以前往练习历史复盘。',
+          })
+        } else {
+          notify({
+            variant: 'danger',
+            title: '加载题目失败',
+            description: error?.error || '请稍后再试。',
+          })
+        }
         return false
       }
 
@@ -236,6 +275,7 @@ function PracticeContent() {
         })
       }
       setQuestion(data.question)
+      setCompletionInfo(null)
       setUserQuestion(data.userQuestion)
       if (isDailyMode && data.dailyPractice) {
         setDailyProgress({
@@ -364,6 +404,7 @@ function PracticeContent() {
           userAnswer: selectedAnswer,
           answerMapping, // 传递映射关系
           mode,
+          sessionId,
         }),
       })
 
@@ -426,7 +467,7 @@ function PracticeContent() {
       const data = await response.json().catch(() => null)
 
       if (!response.ok) {
-        const message = (typeof data === 'object' && data && 'error' in data ? (data as any).error : null) || '请稍后再试'
+        const message = readApiMessage(data, 'error') || '请稍后再试'
 
         notify({
           variant: response.status === 402 ? 'warning' : 'danger',
@@ -436,7 +477,7 @@ function PracticeContent() {
         return false
       }
 
-      const message = (typeof data === 'object' && data && 'message' in data ? (data as any).message : null)
+      const message = readApiMessage(data, 'message')
         || (regenerate ? '新的解析已保存并替换旧版本。' : '新的解析已保存，将自动显示在解析列表中。')
 
       notify({
@@ -604,8 +645,27 @@ function PracticeContent() {
     return (
       <div className="container mx-auto p-4 max-w-4xl">
         <Card className="border-slate-200 dark:border-slate-800 dark:bg-slate-900/70">
-          <CardContent className="p-6 text-center text-gray-500 dark:text-slate-400">
-            暂无题目
+          <CardContent className="space-y-4 p-6 text-center text-gray-500 dark:text-slate-400">
+            <p>
+              {completionInfo?.message ?? '暂无题目'}
+            </p>
+            {completionInfo ? (
+              <>
+                {completionInfo.totalQuestions ? (
+                  <p className="text-sm">
+                    已完成 {completionInfo.browsedCount ?? completionInfo.totalQuestions} / {completionInfo.totalQuestions} 题。
+                  </p>
+                ) : null}
+                <div className="flex flex-col justify-center gap-2 sm:flex-row">
+                  <Button onClick={() => router.push(`/practice/history?type=${encodeURIComponent(type)}`)}>
+                    查看练习历史
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push('/')}>
+                    返回功能模块
+                  </Button>
+                </div>
+              </>
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -677,12 +737,17 @@ function PracticeContent() {
           )}
           {question.hasImage && question.imagePath ? (
             <div className="mb-4 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/60">
-              <img
+              <div className="relative h-64 w-full">
+                <Image
                 src={question.imagePath}
                 alt={question.imageAlt || question.title}
-                className="mx-auto max-h-64 w-full rounded-md object-contain"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 768px"
+                  className="rounded-md object-contain"
                 loading="lazy"
+                  unoptimized
               />
+              </div>
               {question.imageAlt ? (
                 <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">{question.imageAlt}</p>
               ) : null}

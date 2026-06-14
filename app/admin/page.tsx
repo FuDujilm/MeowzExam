@@ -214,7 +214,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
     }
   }, [status, router])
 

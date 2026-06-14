@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { prisma } from '@/lib/db'
 
 const CALLSIGN_PATTERN = /^[A-Z0-9-]{3,12}$/
@@ -20,7 +21,7 @@ function normalizeCallsign(input: unknown): string | null {
  */
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -52,14 +53,14 @@ export async function GET(request: NextRequest) {
           dailyPracticeTarget: 10,
         }
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       user: {
         email: user.email,
         name: user.name,
         callsign: user.callsign,
       },
       settings,
-    })
+    }), resolvedUser)
   } catch (error) {
     console.error('Get settings error:', error)
     return NextResponse.json(
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ success: true })
+    return attachGuestCookieIfNeeded(NextResponse.json({ success: true }), resolvedUser)
   } catch (error) {
     console.error('Update settings error:', error)
     return NextResponse.json(

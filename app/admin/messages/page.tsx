@@ -145,7 +145,7 @@ export default function AdminMessagesPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
       return
     }
     if (status === 'authenticated') {

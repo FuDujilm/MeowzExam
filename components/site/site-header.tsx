@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession, signIn, signOut } from 'next-auth/react'
 import { useMemo, useState } from 'react'
 
 import { ThemeToggle } from '@/components/theme/theme-toggle'
@@ -12,6 +12,7 @@ import { getGravatarUrl } from '@/lib/users/avatar'
 
 import { SiteMessageCenter } from './site-message-center'
 import { useSiteConfig } from './site-config-provider'
+import { useNotification } from '@/components/ui/notification-provider'
 
 function hasContent(value: string | null | undefined) {
   return typeof value === 'string' && value.trim().length > 0
@@ -20,9 +21,39 @@ function hasContent(value: string | null | undefined) {
 export function SiteHeader() {
   const { data: session, status } = useSession()
   const { config } = useSiteConfig()
+  const { notify } = useNotification()
+  const [migrationCodeLoading, setMigrationCodeLoading] = useState(false)
 
   const signOutHandler = async () => {
     await signOut({ callbackUrl: '/' })
+  }
+
+  const signInHandler = async () => {
+    await signIn('custom', { callbackUrl: '/' })
+  }
+
+  const createMigrationCode = async () => {
+    setMigrationCodeLoading(true)
+    try {
+      const response = await fetch('/api/guest/migration-code', { method: 'POST' })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || '生成迁移码失败')
+      }
+      notify({
+        variant: 'success',
+        title: `迁移码：${data.code}`,
+        description: '注册后首次进入系统时输入该代码即可合并匿名数据。',
+      })
+    } catch (error: unknown) {
+      notify({
+        variant: 'danger',
+        title: '生成迁移码失败',
+        description: error instanceof Error ? error.message : '请稍后再试。',
+      })
+    } finally {
+      setMigrationCodeLoading(false)
+    }
   }
 
   return (
@@ -86,14 +117,30 @@ export function SiteHeader() {
                   </Link>
                 )
               })()}
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/settings">设置</Link>
+              </Button>
               <Button variant="outline" size="sm" onClick={signOutHandler}>
                 登出
               </Button>
             </>
           ) : (
-            <Link href="/login">
-              <Button size="sm">登录</Button>
-            </Link>
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/settings">设置</Link>
+              </Button>
+              <Button variant="default" size="sm" onClick={signInHandler}>
+                登录
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={createMigrationCode}
+                disabled={migrationCodeLoading}
+              >
+                {migrationCodeLoading ? '生成中...' : '生成迁移码'}
+              </Button>
+            </>
           )}
         </div>
       </div>

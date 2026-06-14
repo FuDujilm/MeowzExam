@@ -1,10 +1,11 @@
 'use server'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import { Prisma } from '@/lib/generated/prisma'
 import type { QuestionType as PrismaQuestionType } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
+import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { getLibraryForUser } from '@/lib/question-library-service'
 import type { ExamPresetQuestionStrategy } from '@/types/question-library'
 
@@ -273,9 +274,9 @@ async function selectQuestionsWithTagRules(options: {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未登录，无法开始模拟考试。' }, { status: 401 })
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
+    if (!resolvedUser) {
+      return NextResponse.json({ error: '无法创建考试用户，请稍后再试。' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -291,8 +292,8 @@ export async function POST(request: NextRequest) {
 
     const library = await getLibraryForUser({
       code: libraryCodeParam,
-      userId: session.user.id,
-      userEmail: session.user.email ?? null,
+      userId: resolvedUser.id,
+      userEmail: resolvedUser.email ?? null,
     })
 
     if (!library) {
@@ -316,7 +317,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userSettingsRecord = await prisma.userSettings.findUnique({
-      where: { userId: session.user.id },
+      where: { userId: resolvedUser.id },
       select: { examQuestionPreference: true },
     })
     const userPreference =
@@ -458,7 +459,7 @@ export async function POST(request: NextRequest) {
 
     const examResult = await prisma.examResult.create({
       data: {
-        userId: session.user.id,
+        userId: resolvedUser.id,
         examId: exam.id,
         score: 0,
         totalQuestions: shuffledQuestions.length,
@@ -491,7 +492,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       examId: exam.id,
       examResultId: examResult.id,
       questions: questionsForClient,
@@ -513,7 +514,7 @@ export async function POST(request: NextRequest) {
         shortName: library.shortName,
       },
       startTime: new Date().toISOString(),
-    })
+    }), resolvedUser)
   } catch (error) {
     console.error('Start exam error:', error)
     return NextResponse.json(

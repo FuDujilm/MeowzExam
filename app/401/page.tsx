@@ -4,11 +4,10 @@ export default function UnauthorizedPage() {
   return (
     <ErrorView
       statusCode="401"
-      title="需要登录后才能继续"
-      description="请先登录账号，系统才能同步您的题库进度与积分。"
-      hint="如果已经登录，可尝试刷新页面或重新进入。"
-      primaryAction={{ label: '前往登录', href: '/login' }}
-      secondaryAction={{ label: '返回首页', href: '/' }}
+      title="当前功能不可用"
+      description="基础练习和考试无需登录，解析、投票和后台管理暂不对匿名用户开放。"
+      hint="请返回首页继续使用公开功能。"
+      primaryAction={{ label: '返回首页', href: '/' }}
     />
   )
 }

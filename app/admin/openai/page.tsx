@@ -186,7 +186,7 @@ export default function OpenAIConfigPage() {
     try {
       const res = await fetch('/api/admin/openai/model-groups', { cache: 'no-store' })
       if (res.status === 401) {
-        router.push('/login')
+        router.push('/401')
         return
       }
       if (!res.ok) {
@@ -211,7 +211,7 @@ export default function OpenAIConfigPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
     }
   }, [status, router])
 

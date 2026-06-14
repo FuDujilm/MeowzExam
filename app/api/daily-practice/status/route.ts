@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { prisma } from '@/lib/db'
 import { getDateKey, getRewardForStreak, getNextRewardPreview } from '@/lib/daily-practice'
 
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     const todayCount = todayRecord?.questionCount ?? 0
     const todayCompleted = todayCount >= target
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       target,
       today: {
         count: todayCount,
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       streak: user.dailyPracticeStreak ?? 0,
       nextReward: getNextRewardPreview(user.dailyPracticeStreak ?? 0),
       records,
-    })
+    }), resolvedUser)
   } catch (error) {
     console.error('Daily practice status error:', error)
     return NextResponse.json({ error: '无法获取每日练习状态' }, { status: 500 })

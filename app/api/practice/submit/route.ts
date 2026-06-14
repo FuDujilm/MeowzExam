@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { getDateKey, differenceInDays, getRewardForStreak } from '@/lib/daily-practice'
 
 function normalizeAnswerList(raw: unknown): string[] {
@@ -98,14 +99,18 @@ function deriveCorrectAnswersFromOptions(optionsRaw: unknown): string[] {
 // POST /api/practice/submit - 提交答案
 export async function POST(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
 
     const body = await request.json().catch(() => null)
-    const { questionId, userAnswer, answerMapping, mode } = body ?? {}
+    const { questionId, userAnswer, answerMapping, mode, sessionId } = body ?? {}
     const practiceMode = typeof mode === 'string' ? mode : null
+    const sessionKey =
+      typeof sessionId === 'string' && sessionId.trim()
+        ? sessionId.trim().slice(0, 128)
+        : null
 
     if (!questionId || (!userAnswer && userAnswer !== '')) {
       return NextResponse.json(
@@ -227,6 +232,122 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      let practiceSession: {
+        id: string
+        totalQuestions: number
+        correctCount: number
+        incorrectCount: number
+      } | null = null
+
+      if (sessionKey && practiceMode && practiceMode !== 'guest' && practiceMode !== 'mock') {
+        const now = new Date()
+        const library = question.libraryCode
+          ? await tx.questionLibrary.findUnique({
+              where: { code: question.libraryCode },
+              select: { name: true, shortName: true },
+            })
+          : null
+
+        const session = await tx.practiceSession.upsert({
+          where: {
+            userId_sessionKey: {
+              userId: user.id,
+              sessionKey,
+            },
+          },
+          create: {
+            userId: user.id,
+            sessionKey,
+            mode: practiceMode,
+            libraryCode: question.libraryCode,
+            libraryName: library?.name ?? library?.shortName ?? question.libraryCode,
+            totalQuestions: 0,
+            correctCount: 0,
+            incorrectCount: 0,
+            startedAt: now,
+            lastAnsweredAt: now,
+          },
+          update: {
+            mode: practiceMode,
+            libraryCode: question.libraryCode,
+            libraryName: library?.name ?? library?.shortName ?? question.libraryCode,
+            lastAnsweredAt: now,
+          },
+        })
+
+        const existingSessionQuestion = await tx.practiceSessionQuestion.findUnique({
+          where: {
+            sessionId_questionId: {
+              sessionId: session.id,
+              questionId,
+            },
+          },
+        })
+
+        if (existingSessionQuestion) {
+          if (existingSessionQuestion.isCorrect !== isCorrect) {
+            await tx.practiceSessionQuestion.update({
+              where: { id: existingSessionQuestion.id },
+              data: {
+                isCorrect,
+                answeredAt: now,
+              },
+            })
+
+            practiceSession = await tx.practiceSession.update({
+              where: { id: session.id },
+              data: {
+                correctCount: { increment: isCorrect ? 1 : -1 },
+                incorrectCount: { increment: isCorrect ? -1 : 1 },
+                lastAnsweredAt: now,
+              },
+              select: {
+                id: true,
+                totalQuestions: true,
+                correctCount: true,
+                incorrectCount: true,
+              },
+            })
+          } else {
+            practiceSession = await tx.practiceSession.update({
+              where: { id: session.id },
+              data: { lastAnsweredAt: now },
+              select: {
+                id: true,
+                totalQuestions: true,
+                correctCount: true,
+                incorrectCount: true,
+              },
+            })
+          }
+        } else {
+          await tx.practiceSessionQuestion.create({
+            data: {
+              sessionId: session.id,
+              questionId,
+              isCorrect,
+              answeredAt: now,
+            },
+          })
+
+          practiceSession = await tx.practiceSession.update({
+            where: { id: session.id },
+            data: {
+              totalQuestions: { increment: 1 },
+              correctCount: { increment: isCorrect ? 1 : 0 },
+              incorrectCount: { increment: isCorrect ? 0 : 1 },
+              lastAnsweredAt: now,
+            },
+            select: {
+              id: true,
+              totalQuestions: true,
+              correctCount: true,
+              incorrectCount: true,
+            },
+          })
+        }
+      }
+
       let dailyPractice: { target: number; count: number; completed: boolean; rewardPoints: number } | null = null
 
       if (practiceMode === 'daily') {
@@ -339,10 +460,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return { userQuestion, pointsEarned, dailyPractice }
+      return { userQuestion, pointsEarned, dailyPractice, practiceSession }
     })
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       isCorrect,
       correctAnswers,
       explanation: question.explanation,
@@ -350,7 +471,8 @@ export async function POST(request: NextRequest) {
       userQuestion: result.userQuestion,
       pointsEarned: result.pointsEarned,
       dailyPractice: result.dailyPractice,
-    })
+      practiceSession: result.practiceSession,
+    }), resolvedUser)
   } catch (error) {
     console.error('提交答案失败:', error)
     return NextResponse.json(

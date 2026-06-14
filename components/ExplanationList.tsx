@@ -251,10 +251,6 @@ export function ExplanationList({
         title: message === '请先登录后再投票' ? '需要登录' : '操作未完成',
         description: message,
       })
-
-      if (message === '请先登录后再投票') {
-        window.location.href = '/login'
-      }
     }
   }
 

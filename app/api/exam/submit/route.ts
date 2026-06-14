@@ -1,17 +1,18 @@
 'use server'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 
 const DEFAULT_PASS_SCORE = 60
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
+    if (!resolvedUser) {
       return NextResponse.json(
-        { error: '未登录，无法提交模拟考试。' },
+        { error: '无法识别考试用户，请稍后再试。' },
         { status: 401 },
       )
     }
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (examResult.userId !== session.user.id) {
+    if (examResult.userId !== resolvedUser.id) {
       return NextResponse.json({ error: '无权操作该考试。' }, { status: 403 })
     }
 
@@ -168,12 +169,12 @@ export async function POST(request: NextRequest) {
       await prisma.userQuestion.upsert({
         where: {
           userId_questionId: {
-            userId: session.user.id,
+            userId: resolvedUser.id,
             questionId,
           },
         },
         create: {
-          userId: session.user.id,
+          userId: resolvedUser.id,
           questionId,
           correctCount: isCorrectResult ? 1 : 0,
           incorrectCount: isCorrectResult ? 0 : 1,
@@ -189,7 +190,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       success: true,
       score,
       totalQuestions,
@@ -208,7 +209,7 @@ export async function POST(request: NextRequest) {
             name: resolvedPreset.name,
           }
         : null,
-    })
+    }), resolvedUser)
   } catch (error: any) {
     console.error('Submit exam error:', error)
     return NextResponse.json(

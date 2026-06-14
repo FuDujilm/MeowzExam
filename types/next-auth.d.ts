@@ -8,6 +8,7 @@ declare module 'next-auth' {
       name?: string | null
       image?: string | null
       callsign?: string | null
+      userType?: 'REGISTERED' | 'GUEST'
       aiQuotaLimit?: number | null
       aiQuotaUsed?: number
       loginDisabled?: boolean
@@ -17,6 +18,7 @@ declare module 'next-auth' {
 
   interface User {
     callsign?: string | null
+    userType?: 'REGISTERED' | 'GUEST'
     aiQuotaLimit: number | null
     aiQuotaUsed: number
     loginDisabled: boolean

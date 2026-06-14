@@ -142,7 +142,7 @@ export default function AdminR2Page() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
       return
     }
     if (status === 'authenticated') {

@@ -156,6 +156,9 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.2
+      typescript-eslint:
+        specifier: 8.54.0
+        version: 8.54.0(eslint@9.36.0(jiti@2.6.0))(typescript@5.9.2)
 
 packages:
 

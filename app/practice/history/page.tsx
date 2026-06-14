@@ -15,7 +15,7 @@ import {
   ChevronRight,
   CheckCircle2,
   XCircle,
-  Filter
+  Filter,
 } from 'lucide-react'
 import {
   Select,
@@ -49,6 +49,19 @@ interface UserQuestion {
   incorrectCount: number
   lastAnswered: Date
   lastCorrect?: boolean
+}
+
+type ApiMessagePayload = {
+  error?: string
+  message?: string
+}
+
+function readApiMessage(data: unknown, key: keyof ApiMessagePayload): string | null {
+  if (typeof data !== 'object' || data === null || !(key in data)) {
+    return null
+  }
+  const value = (data as ApiMessagePayload)[key]
+  return typeof value === 'string' ? value : null
 }
 
 function HistoryContent() {
@@ -223,7 +236,7 @@ function HistoryContent() {
       const data = await response.json().catch(() => null)
 
       if (!response.ok) {
-        const message = (typeof data === 'object' && data && 'error' in data ? (data as any).error : null) || '请稍后再试'
+        const message = readApiMessage(data, 'error') || '请稍后再试'
 
         notify({
           variant: response.status === 402 ? 'warning' : 'danger',
@@ -233,7 +246,7 @@ function HistoryContent() {
         return false
       }
 
-      const message = (typeof data === 'object' && data && 'message' in data ? (data as any).message : null)
+      const message = readApiMessage(data, 'message')
         || (regenerate ? '新的解析已保存并替换旧版本。' : '新的解析已保存，将自动显示在解析列表中。')
 
       notify({

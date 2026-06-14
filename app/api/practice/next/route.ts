@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { Prisma } from '@/lib/generated/prisma'
+import type { Prisma, QuestionType } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { getLibraryForUser } from '@/lib/question-library-service'
 import { getDateKey } from '@/lib/daily-practice'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
 
 type QuestionWithOptions = Prisma.QuestionGetPayload<Prisma.QuestionDefaultArgs>
+type QuestionOptionPayload = {
+  id: string
+  text: string
+}
 
 function normalizeLibraryCode(value: string | null): string | null {
   return value ? value.trim().toUpperCase() : null
@@ -21,7 +26,7 @@ function buildLibraryFilter(libraryCode: string): Prisma.QuestionWhereInput {
         { libraryCode },
         {
           libraryCode: null,
-          type: libraryCode as any,
+          type: libraryCode as QuestionType,
         },
       ],
     }
@@ -43,7 +48,7 @@ function shuffleOptions(question: QuestionWithOptions) {
   const answerMapping: Record<string, string> = {}
 
   if (Array.isArray(question.options)) {
-    const originalOptions = [...question.options] as Array<any>
+    const originalOptions = [...question.options] as QuestionOptionPayload[]
     const shuffledContents = [...originalOptions].sort(() => Math.random() - 0.5)
     const optionIds = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     shuffledOptions = shuffledContents.map((opt, index) => {
@@ -72,7 +77,7 @@ function mapCorrectAnswers(
 
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录，无法获取练习题目。' }, { status: 401 })
     }
@@ -165,22 +170,6 @@ export async function GET(request: NextRequest) {
 
       switch (effectiveMode) {
       case 'sequential': {
-        const practicedQuestions = await prisma.userQuestion.findMany({
-          where: {
-            userId: user.id,
-            question: libraryFilter,
-          },
-          select: { questionId: true },
-        })
-
-        const practicedIds = practicedQuestions.map((item) => item.questionId)
-        const exclusion =
-          practicedIds.length > 0
-            ? { id: { notIn: practicedIds } }
-            : undefined
-
-        const baseWhere = combineWhereConditions(libraryFilter, exclusion)
-
         if (currentId) {
           const currentQuestion = await prisma.question.findUnique({
             where: { id: currentId },
@@ -189,7 +178,7 @@ export async function GET(request: NextRequest) {
 
           if (currentQuestion?.externalId) {
             question = await prisma.question.findFirst({
-              where: combineWhereConditions(baseWhere, {
+              where: combineWhereConditions(libraryFilter, {
                 externalId: { gt: currentQuestion.externalId },
               }),
               orderBy: { externalId: 'asc' },
@@ -198,8 +187,22 @@ export async function GET(request: NextRequest) {
         }
 
         if (!question) {
+          const practicedQuestions = await prisma.userQuestion.findMany({
+            where: {
+              userId: user.id,
+              question: libraryFilter,
+            },
+            select: { questionId: true },
+          })
+
+          const practicedIds = practicedQuestions.map((item) => item.questionId)
+          const exclusion =
+            practicedIds.length > 0
+              ? { id: { notIn: practicedIds } }
+              : undefined
+
           question = await prisma.question.findFirst({
-            where: baseWhere,
+            where: combineWhereConditions(libraryFilter, exclusion),
             orderBy: { externalId: 'asc' },
           })
         }
@@ -207,6 +210,28 @@ export async function GET(request: NextRequest) {
       }
 
       case 'random': {
+        const [totalQuestions, browsedCount] = await Promise.all([
+          prisma.question.count({ where: libraryFilter }),
+          prisma.userQuestion.count({
+            where: {
+              userId: user.id,
+              question: libraryFilter,
+            },
+          }),
+        ])
+
+        if (totalQuestions > 0 && browsedCount >= totalQuestions) {
+          return NextResponse.json(
+            {
+              error: '当前题库的随机练习已全部完成。',
+              completed: true,
+              totalQuestions,
+              browsedCount,
+            },
+            { status: 409 },
+          )
+        }
+
         const correctQuestions = await prisma.userQuestion.findMany({
           where: {
             userId: user.id,
@@ -225,9 +250,14 @@ export async function GET(request: NextRequest) {
               }
             : undefined
 
-        const baseWhere = combineWhereConditions(libraryFilter, exclusion)
+        let baseWhere = combineWhereConditions(libraryFilter, exclusion)
 
-        const total = await prisma.question.count({ where: baseWhere })
+        let total = await prisma.question.count({ where: baseWhere })
+        if (total === 0 && exclusion) {
+          baseWhere = libraryFilter
+          total = await prisma.question.count({ where: baseWhere })
+        }
+
         if (total === 0) {
           return NextResponse.json(
             { error: '该题库暂无可用题目，请稍后再试。' },
@@ -323,6 +353,28 @@ export async function GET(request: NextRequest) {
     }
 
     if (!question) {
+      if (mode === 'sequential') {
+        const totalQuestions = await prisma.question.count({ where: libraryFilter })
+        const browsedCount = await prisma.userQuestion.count({
+          where: {
+            userId: user.id,
+            question: libraryFilter,
+          },
+        })
+
+        if (totalQuestions > 0 && browsedCount >= totalQuestions) {
+          return NextResponse.json(
+            {
+              error: '你已完成当前题库的顺序练习。',
+              completed: true,
+              totalQuestions,
+              browsedCount,
+            },
+            { status: 409 },
+          )
+        }
+      }
+
       return NextResponse.json(
         { error: '暂无更多题目，试试其他模式吧。' },
         { status: 404 },
@@ -397,7 +449,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(payload)
+    return attachGuestCookieIfNeeded(NextResponse.json(payload), resolvedUser)
   } catch (error) {
     console.error('获取练习题目失败:', error)
     return NextResponse.json(

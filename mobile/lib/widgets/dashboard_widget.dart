@@ -9,6 +9,9 @@ class DashboardWidget extends StatelessWidget {
   final int dailyProgress;
   final List<int> weeklyProgress; // 7 days of question counts
   final List<double> weeklyAccuracy; // 7 days of accuracy percentages
+  final int weekAnswered;
+  final double weekAccuracy;
+  final int activeDaysThisWeek;
 
   const DashboardWidget({
     super.key,
@@ -18,17 +21,18 @@ class DashboardWidget extends StatelessWidget {
     required this.dailyProgress,
     this.weeklyProgress = const [], // No mock data by default
     this.weeklyAccuracy = const [],
+    this.weekAnswered = 0,
+    this.weekAccuracy = 0,
+    this.activeDaysThisWeek = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     // Fallback if data is empty
-    final safeWeeklyProgress = weeklyProgress.isEmpty 
-        ? List.filled(7, 0) 
-        : weeklyProgress;
-    final safeWeeklyAccuracy = weeklyAccuracy.isEmpty
-        ? List.filled(7, 0)
-        : weeklyAccuracy;
+    final safeWeeklyProgress =
+        weeklyProgress.isEmpty ? List.filled(7, 0) : weeklyProgress;
+    final safeWeeklyAccuracy =
+        weeklyAccuracy.isEmpty ? List.filled(7, 0) : weeklyAccuracy;
 
     return Column(
       children: [
@@ -50,20 +54,24 @@ class DashboardWidget extends StatelessWidget {
                         child: CircularPercentIndicator(
                           radius: 50.0,
                           lineWidth: 8.0,
-                          percent: totalQuestions > 0 
-                              ? (completedQuestions / totalQuestions).clamp(0.0, 1.0) 
+                          percent: totalQuestions > 0
+                              ? (completedQuestions / totalQuestions)
+                                  .clamp(0.0, 1.0)
                               : 0.0,
                           center: Text(
                             "${totalQuestions > 0 ? ((completedQuestions / totalQuestions) * 100).toStringAsFixed(0) : 0}%",
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           progressColor: Theme.of(context).colorScheme.primary,
-                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                           circularStrokeCap: CircularStrokeCap.round,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Center(child: Text('$completedQuestions / $totalQuestions')),
+                      Center(
+                          child: Text('$completedQuestions / $totalQuestions')),
                     ],
                   ),
                 ),
@@ -84,11 +92,11 @@ class DashboardWidget extends StatelessWidget {
                       const SizedBox(height: 24),
                       LinearPercentIndicator(
                         lineHeight: 12.0,
-                        percent: dailyGoal > 0 
-                            ? (dailyProgress / dailyGoal).clamp(0.0, 1.0) 
+                        percent: dailyGoal > 0
+                            ? (dailyProgress / dailyGoal).clamp(0.0, 1.0)
                             : 0.0,
                         progressColor: Colors.orange,
-                        backgroundColor: Colors.orange.withOpacity(0.2),
+                        backgroundColor: Colors.orange.withValues(alpha: 0.2),
                         barRadius: const Radius.circular(6),
                       ),
                       const SizedBox(height: 16),
@@ -98,15 +106,56 @@ class DashboardWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       if (dailyProgress >= dailyGoal && dailyGoal > 0)
-                         const Text('🎉 目标达成!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))
+                        const Text('🎉 目标达成!',
+                            style: TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold))
                       else
-                         Text('继续加油!', style: TextStyle(color: Colors.grey[600])),
+                        Text('继续加油!',
+                            style: TextStyle(color: Colors.grey[600])),
                     ],
                   ),
                 ),
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _WeeklyMetric(
+                    label: '本周答题',
+                    value: '$weekAnswered',
+                    suffix: '题',
+                    icon: Icons.assignment_turned_in,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _WeeklyMetric(
+                    label: '活跃天数',
+                    value: '$activeDaysThisWeek',
+                    suffix: '/ 7',
+                    icon: Icons.local_fire_department,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _WeeklyMetric(
+                    label: '周正确率',
+                    value: weekAccuracy.toStringAsFixed(0),
+                    suffix: '%',
+                    icon: Icons.track_changes,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         // 3. Weekly Trend (Chart)
@@ -143,7 +192,9 @@ class DashboardWidget extends StatelessWidget {
                               if (value.toInt() < days.length) {
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(days[value.toInt()], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  child: Text(days[value.toInt()],
+                                      style: const TextStyle(
+                                          color: Colors.grey, fontSize: 12)),
                                 );
                               }
                               return const SizedBox();
@@ -158,9 +209,15 @@ class DashboardWidget extends StatelessWidget {
                           barRods: [
                             BarChartRodData(
                               toY: e.value.toDouble(),
-                              color: e.value >= 10 ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                              color: e.value >= 10
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.5),
                               width: 12,
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4)),
                             ),
                           ],
                         );
@@ -199,7 +256,9 @@ class DashboardWidget extends StatelessWidget {
                             reservedSize: 32,
                             getTitlesWidget: (value, meta) {
                               if (value == 0 || value == 50 || value == 100) {
-                                return Text('${value.toInt()}%', style: const TextStyle(color: Colors.grey, fontSize: 10));
+                                return Text('${value.toInt()}%',
+                                    style: const TextStyle(
+                                        color: Colors.grey, fontSize: 10));
                               }
                               return const SizedBox();
                             },
@@ -219,7 +278,9 @@ class DashboardWidget extends StatelessWidget {
                               if (value.toInt() < days.length) {
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(days[value.toInt()], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  child: Text(days[value.toInt()],
+                                      style: const TextStyle(
+                                          color: Colors.grey, fontSize: 12)),
                                 );
                               }
                               return const SizedBox();
@@ -232,7 +293,8 @@ class DashboardWidget extends StatelessWidget {
                           spots: safeWeeklyAccuracy
                               .asMap()
                               .entries
-                              .map((e) => FlSpot(e.key.toDouble(), e.value.toDouble()))
+                              .map((e) =>
+                                  FlSpot(e.key.toDouble(), e.value.toDouble()))
                               .toList(),
                           isCurved: true,
                           barWidth: 3,
@@ -240,7 +302,10 @@ class DashboardWidget extends StatelessWidget {
                           dotData: const FlDotData(show: true),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .secondary
+                                .withValues(alpha: 0.1),
                           ),
                         ),
                       ],
@@ -250,6 +315,66 @@ class DashboardWidget extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeeklyMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String suffix;
+  final IconData icon;
+
+  const _WeeklyMetric({
+    required this.label,
+    required this.value,
+    required this.suffix,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: colorScheme.primary),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          textBaseline: TextBaseline.alphabetic,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          children: [
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(width: 2),
+            Text(
+              suffix,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
         ),
       ],
     );

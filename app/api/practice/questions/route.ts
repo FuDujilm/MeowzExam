@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Prisma, QuestionType } from '@/lib/generated/prisma'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { prisma } from '@/lib/db'
 import { getLibraryForUser } from '@/lib/question-library-service'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
+
+type QuestionOptionPayload = {
+  id: string
+  text: string
+}
 
 /**
  * GET /api/practice/questions
@@ -18,7 +25,7 @@ const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
  */
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json(
         { error: '未登录' },
@@ -53,7 +60,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Build Where Clause
-    let where: any = {}
+    let where: Prisma.QuestionWhereInput = {}
     
     if (isLegacyType) {
        // Legacy logic: match libraryCode OR (libraryCode=null AND type=CODE)
@@ -61,7 +68,7 @@ export async function GET(request: NextRequest) {
           OR: [
             { libraryCode: targetLibraryCode },
             {
-              AND: [{ libraryCode: null }, { type: targetLibraryCode as any }],
+              AND: [{ libraryCode: null }, { type: targetLibraryCode as QuestionType }],
             },
           ],
        }
@@ -95,6 +102,32 @@ export async function GET(request: NextRequest) {
 
     // 获取题目
     let questions
+
+    const total = await prisma.question.count({ where })
+
+    if (mode === 'random') {
+      const browsedCount = await prisma.userQuestion.count({
+        where: {
+          userId: resolvedUser.id,
+          question: where,
+        },
+      })
+
+      if (total > 0 && browsedCount >= total) {
+        return attachGuestCookieIfNeeded(
+          NextResponse.json(
+            {
+              error: '当前题库的随机练习已全部完成。',
+              completed: true,
+              totalQuestions: total,
+              browsedCount,
+            },
+            { status: 409 },
+          ),
+          resolvedUser,
+        )
+      }
+    }
 
     if (mode === 'random') {
       // 随机练习：检查用户是否开启错题权重
@@ -138,7 +171,6 @@ export async function GET(request: NextRequest) {
         const remainingCount = limit - selectedWrongQuestions.length
 
         if (remainingCount > 0) {
-          const total = await prisma.question.count({ where })
           const randomOffsets = new Set<number>()
 
           while (randomOffsets.size < Math.min(remainingCount, total)) {
@@ -166,8 +198,6 @@ export async function GET(request: NextRequest) {
 
       } else {
         // 未开启错题权重：完全随机
-        const total = await prisma.question.count({ where })
-
         const randomOffsets = new Set<number>()
         while (randomOffsets.size < Math.min(limit, total)) {
           randomOffsets.add(Math.floor(Math.random() * total))
@@ -221,15 +251,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取总题数
-    const total = await prisma.question.count({ where })
-
     // 随机打乱所有题目的选项顺序
     const questionsWithShuffledOptions = questions.map(q => {
       let shuffledOptions = q.options
       const answerMapping: Record<string, string> = {}
 
       if (Array.isArray(q.options)) {
-        const originalOptions = [...(q.options as any[])]
+        const originalOptions = [...(q.options as QuestionOptionPayload[])]
         // 打乱选项内容顺序
         const shuffledContents = [...originalOptions].sort(() => Math.random() - 0.5)
         // 重新分配ID（A、B、C、D）
@@ -278,17 +306,17 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       questions: questionsWithShuffledOptions,
       total,
       mode,
       hasMore: offset + questions.length < total
-    })
+    }), resolvedUser)
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Get practice questions error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to get questions' },
+      { error: error instanceof Error ? error.message : 'Failed to get questions' },
       { status: 500 }
     )
   }

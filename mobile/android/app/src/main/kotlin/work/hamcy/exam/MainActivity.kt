@@ -1,4 +1,4 @@
-package com.meowzexam.mobile
+package work.hamcy.exam
 
 import io.flutter.embedding.android.FlutterActivity
 

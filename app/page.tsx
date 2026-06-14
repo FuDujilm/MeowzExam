@@ -1,14 +1,19 @@
 'use client'
 
-import Image from 'next/image'
-import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
-import { useSiteConfig } from '@/components/site/site-config-provider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { useQuestionLibraries } from '@/lib/use-question-libraries'
 import { useNotification } from '@/components/ui/notification-provider'
@@ -22,17 +27,16 @@ import {
 import {
   AlertCircle,
   BookOpen,
-  Flame,
   Gift,
   GraduationCap,
   Heart,
   History,
   List,
-  Radio,
   Shuffle,
   TrendingDown,
   Trophy,
   CalendarCheck,
+  Settings,
 } from 'lucide-react'
 
 interface CheckInStatus {
@@ -61,26 +65,24 @@ interface DailyPracticeStatus {
   }
 }
 
-const HERO_FEATURES = [
-  {
-    title: '全面题库',
-    description: '涵盖 A/B/C 类全部考试题目，实时更新。',
-  },
-  {
-    title: '智能练习',
-    description: '错题本、模拟考试、AI 解析助您高效学习。',
-  },
-  {
-    title: '完全免费',
-    description: '公益项目，助力业余无线电爱好者。',
-  },
-]
+type ModuleConfig = {
+  id: string
+  name: string
+  description: string
+  icon: typeof BookOpen
+  color: string
+  bgColor: string
+  path: string
+  enabled?: boolean
+  disabledText?: string
+}
+
+const GUEST_GUIDE_STORAGE_KEY = 'meowz_guest_register_guide_seen'
 
 export default function Home() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { notify } = useNotification()
-  const { config } = useSiteConfig()
 
   const { libraries, loading: libraryLoading, error: libraryError } = useQuestionLibraries()
   const [selectedLibraryCode, setSelectedLibraryCode] = useState<string | null>(null)
@@ -88,10 +90,23 @@ export default function Home() {
   const [checkingIn, setCheckingIn] = useState(false)
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [dailyStatus, setDailyStatus] = useState<DailyPracticeStatus | null>(null)
-  const [libraryStats, setLibraryStats] = useState<{ browsedCount: number } | null>(null)
+  const [libraryStats, setLibraryStats] = useState<{
+    browsedCount: number
+    totalQuestions?: number
+    isCompleted?: boolean
+  } | null>(null)
+  const [guestGuideOpen, setGuestGuideOpen] = useState(false)
+  const [migrationCodeLoading, setMigrationCodeLoading] = useState(false)
 
   const loading = status === 'loading'
-  const isAuthenticated = Boolean(session?.user)
+
+  useEffect(() => {
+    if (status !== 'unauthenticated') return
+    const hasSeen = localStorage.getItem(GUEST_GUIDE_STORAGE_KEY) === '1'
+    if (!hasSeen) {
+      setGuestGuideOpen(true)
+    }
+  }, [status])
 
   // 从 localStorage 恢复上次选择的题库
   useEffect(() => {
@@ -109,19 +124,16 @@ export default function Home() {
   useEffect(() => {
     if (selectedLibraryCode) {
       localStorage.setItem('selectedLibraryCode', selectedLibraryCode)
-      // 加载题库统计
-      if (isAuthenticated) {
-        fetch(`/api/user/library-stats?code=${selectedLibraryCode}`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.browsedCount !== undefined) {
-              setLibraryStats(data)
-            }
-          })
-          .catch((err) => console.error('加载题库统计失败:', err))
-      }
+      fetch(`/api/user/library-stats?code=${selectedLibraryCode}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.browsedCount !== undefined) {
+            setLibraryStats(data)
+          }
+        })
+        .catch((err) => console.error('加载题库统计失败:', err))
     }
-  }, [selectedLibraryCode, isAuthenticated])
+  }, [selectedLibraryCode])
 
   const selectedLibrary = useMemo(
     () => libraries.find((library) => library.code === selectedLibraryCode) ?? null,
@@ -129,6 +141,15 @@ export default function Home() {
   )
 
   const activeLibraryCode = selectedLibrary?.code ?? ''
+  const resolvedTotalQuestions = libraryStats?.totalQuestions ?? selectedLibrary?.totalQuestions ?? 0
+  const libraryCompleted = Boolean(
+    libraryStats?.isCompleted ||
+      (
+        resolvedTotalQuestions > 0 &&
+        libraryStats &&
+        libraryStats.browsedCount >= resolvedTotalQuestions
+      ),
+  )
 
   const primaryPreset = useMemo(
     () => selectedLibrary?.presets?.[0] ?? null,
@@ -136,16 +157,18 @@ export default function Home() {
   )
 
   useEffect(() => {
-    if (!session?.user) {
-      return
-    }
+    if (status === 'loading') return
 
     const load = async () => {
-      await Promise.allSettled([loadCheckInStatus(), loadUserStats(), loadDailyStatus()])
+      const tasks = [loadUserStats(), loadDailyStatus()]
+      if (session?.user) {
+        tasks.push(loadCheckInStatus())
+      }
+      await Promise.allSettled(tasks)
     }
 
     load()
-  }, [session])
+  }, [session, status])
 
   const loadUserStats = async () => {
     try {
@@ -184,6 +207,15 @@ export default function Home() {
   }
 
   const handleCheckIn = async () => {
+    if (!session?.user) {
+      notify({
+        variant: 'warning',
+        title: '匿名模式不可签到',
+        description: '练习和考试可直接使用；签到积分需要注册账号。',
+      })
+      return
+    }
+
     if (checkingIn || checkInStatus?.hasCheckedIn) {
       return
     }
@@ -235,27 +267,59 @@ export default function Home() {
     }
   }
 
-  const practiceModesRow1 = useMemo(
+  const closeGuestGuide = () => {
+    localStorage.setItem(GUEST_GUIDE_STORAGE_KEY, '1')
+    setGuestGuideOpen(false)
+  }
+
+  const createMigrationCode = async () => {
+    setMigrationCodeLoading(true)
+    try {
+      const response = await fetch('/api/guest/migration-code', { method: 'POST' })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || '生成迁移码失败')
+      }
+      notify({
+        variant: 'success',
+        title: `迁移码：${data.code}`,
+        description: '注册后首次进入系统时输入该代码即可合并匿名数据。',
+      })
+      closeGuestGuide()
+    } catch (error: unknown) {
+      notify({
+        variant: 'danger',
+        title: '生成迁移码失败',
+        description: error instanceof Error ? error.message : '请稍后再试。',
+      })
+    } finally {
+      setMigrationCodeLoading(false)
+    }
+  }
+
+  const practiceModesRow1 = useMemo<ModuleConfig[]>(
     () => [
       {
         id: 'sequential',
         name: '顺序练习',
-        description: '按题库顺序逐题练习',
+        description: libraryCompleted ? '当前题库已练完，点击查看历史' : '按题库顺序逐题练习',
         icon: BookOpen,
         color: 'text-blue-500 dark:text-blue-200',
         bgColor: 'bg-blue-50 dark:bg-blue-500/20',
         path: activeLibraryCode ? `/practice?mode=sequential&type=${activeLibraryCode}` : '',
-        enabled: Boolean(activeLibraryCode),
+        enabled: Boolean(activeLibraryCode && !libraryCompleted),
+        disabledText: libraryCompleted ? '当前题库已练完，请到已练习题复盘' : '请选择题库后使用',
       },
       {
         id: 'random',
         name: '随机练习',
-        description: '随机抽取题目练习',
+        description: libraryCompleted ? '当前题库已练完，点击查看历史' : '随机抽取题目练习',
         icon: Shuffle,
         color: 'text-purple-500 dark:text-purple-200',
         bgColor: 'bg-purple-50 dark:bg-purple-500/20',
         path: activeLibraryCode ? `/practice?mode=random&type=${activeLibraryCode}` : '',
-        enabled: Boolean(activeLibraryCode),
+        enabled: Boolean(activeLibraryCode && !libraryCompleted),
+        disabledText: libraryCompleted ? '当前题库已练完，请到已练习题复盘' : '请选择题库后使用',
       },
       {
         id: 'error-rate',
@@ -268,10 +332,10 @@ export default function Home() {
         enabled: Boolean(activeLibraryCode),
       },
     ],
-    [activeLibraryCode],
+    [activeLibraryCode, libraryCompleted],
   )
 
-  const practiceModesRow2 = useMemo(
+  const practiceModesRow2 = useMemo<ModuleConfig[]>(
     () => [
       {
         id: 'wrong',
@@ -321,7 +385,7 @@ export default function Home() {
     [activeLibraryCode, dailyStatus],
   )
 
-  const otherFeatures = useMemo(
+  const otherFeatures = useMemo<ModuleConfig[]>(
     () => [
       {
         id: 'questions',
@@ -330,7 +394,7 @@ export default function Home() {
         icon: List,
         color: 'text-green-500 dark:text-emerald-200',
         bgColor: 'bg-green-50 dark:bg-emerald-500/20',
-        path: '/questions',
+        path: activeLibraryCode ? `/questions?library=${activeLibraryCode}` : '/questions',
       },
       {
         id: 'exam',
@@ -350,6 +414,15 @@ export default function Home() {
         color: 'text-yellow-600 dark:text-amber-200',
         bgColor: 'bg-yellow-50 dark:bg-amber-500/20',
         path: '/leaderboard',
+      },
+      {
+        id: 'settings',
+        name: '练习设置',
+        description: '错题权重、每日目标、考试偏好',
+        icon: Settings,
+        color: 'text-slate-600 dark:text-slate-200',
+        bgColor: 'bg-slate-100 dark:bg-slate-700/60',
+        path: '/settings',
       },
       {
         id: 'daily-practice',
@@ -374,21 +447,26 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {isAuthenticated ? (
-          <div className="space-y-8">
-            <section className="text-center">
-              <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">开始练习</h2>
-              <div className="flex flex-col items-center justify-center gap-3 md:flex-row">
-                <label className="text-lg text-gray-700 dark:text-gray-300" htmlFor="practice-type">
-                  选择训练目标：
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="space-y-6">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-slate-950 dark:text-slate-50">功能模块</h1>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  基础练习、考试和错题记录可匿名使用；解析与后台功能需要注册账号。
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="practice-type">
+                  当前题库
                 </label>
                 <Select
-                  value={selectedLibraryCode ?? undefined}
+                  value={selectedLibraryCode ?? ''}
                   onValueChange={(value) => setSelectedLibraryCode(value)}
                   disabled={libraryLoading || libraries.length === 0}
                 >
-                  <SelectTrigger id="practice-type" className="w-[320px]">
+                  <SelectTrigger id="practice-type" className="w-full sm:w-[320px]">
                     <SelectValue
                       placeholder={libraryLoading ? '正在加载题库…' : '请选择可用题库'}
                     />
@@ -401,231 +479,211 @@ export default function Home() {
                     ))}
                   </SelectContent>
                 </Select>
-                {!libraryLoading && libraries.length === 0 && (
-                  <p className="mt-2 text-sm text-gray-500">
-                    当前无可用题库，请联系管理员。
-                  </p>
-                )}
-                {libraryError && (
-                  <p className="mt-2 text-sm text-red-500">
-                    题库加载失败：{libraryError}
-                  </p>
-                )}
               </div>
-            </section>
+            </div>
+            {!libraryLoading && libraries.length === 0 && (
+              <p className="mt-4 text-sm text-gray-500">当前无可用题库，请联系管理员。</p>
+            )}
+            {libraryError && (
+              <p className="mt-4 text-sm text-red-500">题库加载失败：{libraryError}</p>
+            )}
+          </section>
 
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900 dark:to-indigo-900">
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <Card className="dark:border-slate-800 dark:bg-slate-900">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Radio className="h-5 w-5" />
+                <CardTitle>{selectedLibrary?.name ?? '请选择题库'}</CardTitle>
+                <CardDescription>
                   {selectedLibrary
-                    ? primaryPreset?.name ?? `${selectedLibrary.name} 模拟考试`
-                    : '请选择题库后开始模拟考试'}
-                </CardTitle>
-                <CardDescription className="text-base text-gray-700 dark:text-gray-200">
-                  {selectedLibrary
-                    ? primaryPreset
-                      ? primaryPreset.description ??
-                        `考试 ${primaryPreset.totalQuestions} 题 · ${primaryPreset.durationMinutes} 分钟 · ${primaryPreset.passScore} 分及格，其中单选 ${primaryPreset.singleChoiceCount} 题，多选 ${primaryPreset.multipleChoiceCount} 题${primaryPreset.trueFalseCount ? `，判断 ${primaryPreset.trueFalseCount} 题` : ''}。题库共 ${selectedLibrary.totalQuestions} 题。`
-                      : `题库共 ${selectedLibrary.totalQuestions} 道题，尚未配置考试预设。`
-                    : '导入题库后可查看对应的考试预设与题量统计。'}
+                    ? `${selectedLibrary.totalQuestions} 题 · 单选 ${selectedLibrary.singleChoiceCount} · 多选 ${selectedLibrary.multipleChoiceCount} · 判断 ${selectedLibrary.trueFalseCount}`
+                    : '导入题库后可开始练习。'}
                 </CardDescription>
-                {selectedLibrary && libraryStats && (
-                  <div className="mt-4 space-y-2 w-full">
+              </CardHeader>
+              <CardContent>
+                {selectedLibrary && libraryStats ? (
+                  <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-300">学习进度</span>
-                      <span className="font-medium text-gray-900 dark:text-gray-100">
-                        {libraryStats.browsedCount} / {selectedLibrary.totalQuestions} ({Math.round((libraryStats.browsedCount / (selectedLibrary.totalQuestions || 1)) * 100)}%)
+                      <span className="text-slate-600 dark:text-slate-300">学习进度</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                        {libraryStats.browsedCount} / {resolvedTotalQuestions}
                       </span>
                     </div>
-                    <Progress value={(libraryStats.browsedCount / (selectedLibrary.totalQuestions || 1)) * 100} className="h-2 bg-blue-200/50 dark:bg-blue-950/50" />
+                    <Progress value={(libraryStats.browsedCount / (resolvedTotalQuestions || 1)) * 100} className="h-2" />
                   </div>
-                )}
-              </CardHeader>
-            </Card>
-
-            <section>
-              <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">练习模式</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {[practiceModesRow1, practiceModesRow2].flat().map((mode) => {
-                  const Icon = mode.icon
-                  const isEnabled = Boolean(mode.enabled && mode.path)
-                  return (
-                    <Card
-                      key={mode.id}
-                      className={`transition-shadow dark:border-slate-700/60 dark:bg-slate-900/40 ${
-                        isEnabled
-                          ? 'cursor-pointer hover:shadow-lg'
-                          : 'cursor-not-allowed opacity-60 bg-gray-100 dark:bg-slate-800/50'
-                      }`}
-                      onClick={isEnabled ? () => router.push(mode.path as string) : undefined}
-                    >
-                      <CardHeader>
-                        <div className="flex items-center gap-3">
-                          <div className={`rounded-lg p-3 ${mode.bgColor}`}>
-                            <Icon className={`h-6 w-6 ${mode.color}`} />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">{mode.name}</CardTitle>
-                            <CardDescription>
-                              {mode.description}
-                              {!isEnabled && '（请选择题库后使用）'}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  )
-                })}
-              </div>
-            </section>
-
-            <section>
-              <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">其他功能</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Card
-                  className={
-                    checkInStatus?.hasCheckedIn
-                      ? 'cursor-not-allowed bg-gray-100 dark:bg-slate-800/70 dark:border-slate-700/60'
-                      : 'cursor-pointer bg-gradient-to-br from-blue-50 to-indigo-50 transition-shadow hover:shadow-lg dark:from-sky-500/10 dark:to-indigo-500/10 dark:border-slate-700/60'
-                  }
-                  onClick={!checkInStatus?.hasCheckedIn ? handleCheckIn : undefined}
-                >
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-500/20">
-                        <Gift className="h-6 w-6 text-blue-600 dark:text-blue-200" />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-lg dark:text-gray-50">每日签到</CardTitle>
-                        <CardDescription>
-                          {checkInStatus?.hasCheckedIn ? '今日已签到' : checkingIn ? '签到中…' : '点击签到获得积分'}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  {checkInStatus && (
-                    <CardContent>
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1 text-orange-600 dark:text-amber-300">
-                          <Flame className="h-4 w-4" />
-                          <span>连续 {checkInStatus.currentStreak} 天</span>
-                        </div>
-                        <div className="font-semibold text-blue-600 dark:text-blue-200">
-                          {checkInStatus.totalPoints} 积分
-                        </div>
-                      </div>
-                    </CardContent>
-                  )}
-                </Card>
-
-
-                {otherFeatures.map((feature) => {
-                  const Icon = feature.icon
-                  const isEnabled = feature.enabled !== false
-                  return (
-                    <Card
-                      key={feature.id}
-                      className={`transition-shadow dark:border-slate-700/60 dark:bg-slate-900/40 ${
-                        isEnabled
-                          ? 'cursor-pointer hover:shadow-lg'
-                          : 'cursor-not-allowed opacity-60 bg-gray-100 dark:bg-slate-800/50'
-                      }`}
-                      onClick={isEnabled ? () => router.push(feature.path) : undefined}
-                    >
-                      <CardHeader>
-                        <div className="flex items-center gap-3">
-                          <div className={`rounded-lg p-3 ${feature.bgColor}`}>
-                            <Icon className={`h-6 w-6 ${feature.color}`} />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">{feature.name}</CardTitle>
-                            <CardDescription>
-                              {feature.description}
-                              {!isEnabled && feature.id === 'exam' && '（请选择题库后使用）'}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  )
-                })}
-              </div>
-            </section>
-
-            <section>
-              <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">学习统计</h3>
-              <Card>
-                <CardHeader>
-                  <CardTitle>学习进度</CardTitle>
-                  <CardDescription>查看您的练习统计和考试成绩</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-                    <StatCard label="今日答题" value={userStats?.todayAnswered ?? 0} className="bg-blue-50 dark:bg-blue-500/20" />
-                    <StatCard label="累计答题" value={userStats?.totalAnswered ?? 0} className="bg-green-50 dark:bg-emerald-500/20" />
-                    <StatCard label="模拟考试" value={userStats?.examCount ?? 0} className="bg-orange-50 dark:bg-orange-500/20" />
-                    <StatCard label="正确率" value={`${userStats?.accuracy ?? 0}%`} className="bg-purple-50 dark:bg-purple-500/20" />
-                    <StatCard
-                      label={userStats?.pointsName || '积分'}
-                      value={userStats?.totalPoints ?? 0}
-                      className="bg-yellow-50 dark:bg-amber-500/20"
-                    />
-                    <StatCard label="当前排名" value={`#${userStats?.currentRank ?? '-'}`} className="bg-pink-50 dark:bg-pink-500/20" />
-                  </div>
-                  <Button variant="outline" className="w-full" onClick={() => router.push('/stats')}>
-                    查看详细统计
-                  </Button>
-                </CardContent>
-              </Card>
-            </section>
-          </div>
-        ) : (
-          <section className="space-y-8 text-center">
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex items-center gap-3">
-                {config.logoUrl ? (
-                  <span className="relative h-12 w-12 overflow-hidden rounded-full border border-blue-200 bg-blue-50 dark:bg-blue-500/20 dark:border-gray-700 dark:bg-gray-900">
-                    <Image
-                      src={config.logoUrl}
-                      alt={config.siteTitle}
-                      fill
-                      sizes="48px"
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </span>
                 ) : (
-                  <Radio className="h-12 w-12 text-blue-600 dark:text-blue-200" />
+                  <p className="text-sm text-slate-500">暂无进度数据。</p>
                 )}
-                <h2 className="text-4xl font-bold text-gray-900 dark:text-white">{config.siteTitle}</h2>
-              </div>
-              <p className="text-xl text-gray-600 dark:text-gray-300">{config.siteDescription}</p>
-            </div>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {HERO_FEATURES.map((feature) => (
-                <div key={feature.title} className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-                  <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>
-                  <p className="text-gray-600 dark:text-gray-400">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/login">
-                <Button size="lg" className="px-8 py-3 w-full sm:w-auto">
-                  立即开始练习
-                </Button>
-              </Link>
-              <Link href="/practice?mode=guest&type=A_CLASS">
-                <Button variant="outline" size="lg" className="px-8 py-3 w-full sm:w-auto">
-                  游客试用 (无需登录)
-                </Button>
-              </Link>
+              </CardContent>
+            </Card>
+            <Card className="dark:border-slate-800 dark:bg-slate-900">
+              <CardHeader>
+                <CardTitle>{primaryPreset?.name ?? '模拟考试'}</CardTitle>
+                <CardDescription>
+                  {primaryPreset
+                    ? `${primaryPreset.totalQuestions} 题 · ${primaryPreset.durationMinutes} 分钟 · ${primaryPreset.passScore} 分合格`
+                    : '当前题库尚未配置考试预设。'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-3 gap-3">
+                <StatCard label="今日答题" value={userStats?.todayAnswered ?? 0} className="bg-blue-50 dark:bg-blue-500/20" />
+                <StatCard label="累计答题" value={userStats?.totalAnswered ?? 0} className="bg-green-50 dark:bg-emerald-500/20" />
+                <StatCard label="正确率" value={`${userStats?.accuracy ?? 0}%`} className="bg-purple-50 dark:bg-purple-500/20" />
+              </CardContent>
+            </Card>
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">练习模式</h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {[practiceModesRow1, practiceModesRow2].flat().map((mode) => {
+                const Icon = mode.icon
+                const isEnabled = Boolean(mode.enabled && mode.path)
+                return (
+                  <ModuleCard
+                    key={mode.id}
+                    title={mode.name}
+                    description={mode.description}
+                    icon={Icon}
+                    iconClassName={mode.color}
+                    iconWrapClassName={mode.bgColor}
+                    enabled={isEnabled}
+                    disabledText={mode.disabledText ?? '请选择题库后使用'}
+                    onClick={isEnabled ? () => router.push(mode.path as string) : undefined}
+                  />
+                )
+              })}
             </div>
           </section>
-        )}
+
+          <section>
+            <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">功能模块</h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <ModuleCard
+                title="每日签到"
+                description={
+                  session?.user
+                    ? checkInStatus?.hasCheckedIn
+                      ? '今日已签到'
+                      : checkingIn
+                        ? '签到中...'
+                        : '点击签到获得积分'
+                    : '注册账号后可签到积分'
+                }
+                icon={Gift}
+                iconClassName="text-blue-600 dark:text-blue-200"
+                iconWrapClassName="bg-blue-100 dark:bg-blue-500/20"
+                enabled={Boolean(session?.user && !checkInStatus?.hasCheckedIn)}
+                onClick={handleCheckIn}
+              />
+              {otherFeatures.map((feature) => {
+                const Icon = feature.icon
+                const isEnabled = feature.enabled !== false
+                return (
+                  <ModuleCard
+                    key={feature.id}
+                    title={feature.name}
+                    description={feature.description}
+                    icon={Icon}
+                    iconClassName={feature.color}
+                    iconWrapClassName={feature.bgColor}
+                    enabled={isEnabled}
+                    disabledText={feature.id === 'exam' ? '请选择题库后使用' : undefined}
+                    onClick={isEnabled ? () => router.push(feature.path) : undefined}
+                  />
+                )
+              })}
+            </div>
+          </section>
+
+          <GuestRegisterGuide
+            open={guestGuideOpen}
+            loading={migrationCodeLoading}
+            onContinue={closeGuestGuide}
+            onCreateMigrationCode={createMigrationCode}
+          />
+        </div>
       </main>
     </div>
+  )
+}
+
+function ModuleCard({
+  title,
+  description,
+  icon: Icon,
+  iconClassName,
+  iconWrapClassName,
+  enabled,
+  disabledText,
+  onClick,
+}: {
+  title: string
+  description: string
+  icon: typeof BookOpen
+  iconClassName: string
+  iconWrapClassName: string
+  enabled: boolean
+  disabledText?: string
+  onClick?: () => void
+}) {
+  return (
+    <Card
+      className={`transition-shadow dark:border-slate-700/60 dark:bg-slate-900/40 ${
+        enabled
+          ? 'cursor-pointer hover:shadow-lg'
+          : 'cursor-not-allowed opacity-70 bg-gray-100 dark:bg-slate-800/50'
+      }`}
+      onClick={enabled ? onClick : undefined}
+    >
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className={`rounded-lg p-3 ${iconWrapClassName}`}>
+            <Icon className={`h-6 w-6 ${iconClassName}`} />
+          </div>
+          <div>
+            <CardTitle className="text-lg">{title}</CardTitle>
+            <CardDescription>
+              {description}
+              {!enabled && disabledText ? `（${disabledText}）` : ''}
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+    </Card>
+  )
+}
+
+function GuestRegisterGuide({
+  open,
+  loading,
+  onContinue,
+  onCreateMigrationCode,
+}: {
+  open: boolean
+  loading: boolean
+  onContinue: () => void
+  onCreateMigrationCode: () => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onContinue()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>匿名使用已开启</DialogTitle>
+          <DialogDescription>
+            你可以直接练习、考试和保存错题。注册账号后，可用迁移码把匿名数据合并到账号。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          解析、投票、签到积分和后台管理需要注册账号；基础刷题功能不受影响。
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCreateMigrationCode} disabled={loading}>
+            {loading ? '生成中...' : '生成迁移码'}
+          </Button>
+          <Button onClick={onContinue}>继续匿名使用</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

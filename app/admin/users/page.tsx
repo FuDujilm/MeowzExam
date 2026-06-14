@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
           if (response.status === 401) {
             message = '登录状态已失效，请重新登录后再试。'
             type = 'auth'
-            router.push('/login')
+            router.push('/401')
           } else if (response.status === 403) {
             message = '权限不足：当前账号不在管理员名单中，无法查看用户列表。'
             type = 'permission'
@@ -205,7 +205,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      router.push('/401')
       return
     }
 

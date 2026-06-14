@@ -92,6 +92,7 @@ export const config = {
           image: profile.picture || null,
           aiQuotaLimit: null,
           aiQuotaUsed: 0,
+          userType: 'REGISTERED',
           loginDisabled: false,
           manualExplanationDisabled: false,
         }
@@ -129,6 +130,7 @@ export const config = {
       if (session.user) {
         session.user.id = user.id
         session.user.callsign = user.callsign ?? null
+        session.user.userType = user.userType ?? 'REGISTERED'
         session.user.name = getUserDisplayName({
           callsign: user.callsign,
           name: user.name,
@@ -143,9 +145,6 @@ export const config = {
       }
       return token
     },
-  },
-  pages: {
-    signIn: "/login",
   },
   session: {
     strategy: "database",

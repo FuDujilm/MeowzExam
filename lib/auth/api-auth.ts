@@ -2,16 +2,21 @@ import { NextRequest } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { extractTokenFromHeader, verifyToken } from './jwt'
+import { getOrCreateGuestUser } from './guest-user'
 
 export interface ResolvedUser {
   id: string
   email: string
   callsign?: string | null
-  authType: 'session' | 'token'
+  authType: 'session' | 'token' | 'guest'
+  isGuest: boolean
+  guestKey?: string
+  shouldSetGuestCookie?: boolean
 }
 
 export async function resolveRequestUser(
-  request: NextRequest
+  request: NextRequest,
+  options: { allowGuest?: boolean } = {},
 ): Promise<ResolvedUser | null> {
   // 优先使用 NextAuth 会话（Web 端）
   const session = await auth()
@@ -31,6 +36,7 @@ export async function resolveRequestUser(
       return {
         ...user,
         authType: 'session',
+        isGuest: false,
       }
     }
   }
@@ -41,7 +47,18 @@ export async function resolveRequestUser(
   )
 
   if (!tokenFromHeader) {
-    return null
+    if (!options.allowGuest) return null
+
+    const guest = await getOrCreateGuestUser(request)
+    return {
+      id: guest.user.id,
+      email: guest.user.email,
+      callsign: guest.user.callsign,
+      authType: 'guest',
+      isGuest: true,
+      guestKey: guest.guestKey,
+      shouldSetGuestCookie: guest.isNewCookie,
+    }
   }
 
   const decoded = verifyToken(tokenFromHeader)
@@ -65,5 +82,6 @@ export async function resolveRequestUser(
   return {
     ...user,
     authType: 'token',
+    isGuest: false,
   }
 }

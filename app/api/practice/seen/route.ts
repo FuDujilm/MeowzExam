@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 
 // POST /api/practice/seen - 标记题目已浏览
 export async function POST(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ success: true, userQuestion: record })
+    return attachGuestCookieIfNeeded(NextResponse.json({ success: true, userQuestion: record }), resolvedUser)
   } catch (error) {
     console.error('标记题目已浏览失败:', error)
     return NextResponse.json({ error: '标记题目已浏览失败' }, { status: 500 })

@@ -22,6 +22,11 @@ model User {
   emailVerified DateTime?
   image         String?
   callsign      String?   @unique // 业余无线电呼号（可选）
+  userType      UserType  @default(REGISTERED)
+  guestKeyHash  String?   @unique
+  guestLastSeenAt DateTime?
+  guestMigratedAt DateTime?
+  migrationPromptedAt DateTime?
   aiQuotaLimit  Int?
   aiQuotaUsed   Int       @default(0)
   loginDisabled Boolean   @default(false)
@@ -50,6 +55,9 @@ model User {
   siteMessagesCreated SiteMessage[] @relation("SiteMessageCreatedBy")
   questionLibraryAccesses QuestionLibraryAccess[] @relation("QuestionLibraryAccessUser")
   dailyPracticeRecords DailyPracticeRecord[]
+  guestMigrationCodes GuestMigrationCode[] @relation("GuestMigrationCodeGuest")
+  migrationCodesUsed GuestMigrationCode[] @relation("GuestMigrationCodeUsedBy")
+  practiceSessions PracticeSession[]
 
   // 积分信息
   totalPoints Int @default(0) // 总积分
@@ -59,6 +67,24 @@ model User {
   dailyPracticeLastCompleted DateTime?
 
   @@map("users")
+}
+
+model GuestMigrationCode {
+  id             String    @id @default(cuid())
+  codeHash       String    @unique
+  guestUserId    String
+  usedById       String?
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  guestUser User @relation("GuestMigrationCodeGuest", fields: [guestUserId], references: [id], onDelete: Cascade)
+  usedBy    User? @relation("GuestMigrationCodeUsedBy", fields: [usedById], references: [id], onDelete: SetNull)
+
+  @@index([guestUserId])
+  @@index([usedById])
+  @@index([expiresAt])
+  @@map("guest_migration_codes")
 }
 
 // NextAuth Account model
@@ -188,6 +214,7 @@ model Question {
   examQuestions ExamQuestion[] // 考试中的题目
   favoriteQuestions FavoriteQuestion[] // 被收藏的记录
   explanations  Explanation[]  // 结构化解析
+  practiceSessionQuestions PracticeSessionQuestion[]
 
   @@index([type])
   @@index([difficulty])
@@ -328,6 +355,47 @@ model FavoriteQuestion {
   @@map("favorite_questions")
 }
 
+model PracticeSession {
+  id         String   @id @default(cuid())
+  userId     String
+  sessionKey String
+  mode       String
+  libraryCode String?
+  libraryName String?
+
+  totalQuestions Int @default(0)
+  correctCount   Int @default(0)
+  incorrectCount Int @default(0)
+
+  startedAt DateTime @default(now())
+  lastAnsweredAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions PracticeSessionQuestion[]
+
+  @@unique([userId, sessionKey])
+  @@index([userId, lastAnsweredAt])
+  @@index([libraryCode])
+  @@map("practice_sessions")
+}
+
+model PracticeSessionQuestion {
+  id        String   @id @default(cuid())
+  sessionId String
+  questionId String
+  isCorrect Boolean
+  answeredAt DateTime @default(now())
+
+  session  PracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, questionId])
+  @@index([questionId])
+  @@map("practice_session_questions")
+}
+
 // 模拟考试表
 model Exam {
   id       String      @id @default(cuid())
@@ -441,6 +509,11 @@ enum QuestionType {
   B_CLASS // B类（50题）
   C_CLASS // C类（100题）
   GENERIC // 通用题库
+}
+
+enum UserType {
+  REGISTERED
+  GUEST
 }
 
 enum SiteMessageLevel {

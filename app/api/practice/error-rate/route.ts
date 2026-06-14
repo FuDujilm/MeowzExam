@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { Prisma } from '@/lib/generated/prisma'
+import type { Prisma, QuestionType } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { getLibraryForUser } from '@/lib/question-library-service'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
+
+type QuestionOptionPayload = {
+  id: string
+  text: string
+}
 
 function normalizeLibraryCode(value: string | null): string | null {
   return value ? value.trim().toUpperCase() : null
@@ -17,7 +23,7 @@ function buildLibraryFilter(libraryCode: string): Prisma.QuestionWhereInput {
       OR: [
         { libraryCode },
         {
-          AND: [{ libraryCode: null }, { type: libraryCode as any }],
+          AND: [{ libraryCode: null }, { type: libraryCode as QuestionType }],
         },
       ],
     }
@@ -28,7 +34,7 @@ function buildLibraryFilter(libraryCode: string): Prisma.QuestionWhereInput {
 // GET /api/practice/error-rate - 按错误率获取题目
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -71,15 +77,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 })
     }
 
-    // 获取所有该类别的题目
-    const allQuestions = await prisma.question.findMany({
-      where: libraryFilter,
-    })
-
     // 获取用户的答题记录
     const userQuestions = await prisma.userQuestion.findMany({
       where: {
         userId: user.id,
+        incorrectCount: { gt: 0 },
         question: libraryFilter,
       },
       include: {
@@ -87,28 +89,16 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 创建答题记录映射
-    const userQuestionMap = new Map(
-      userQuestions.map(uq => [uq.questionId, uq])
-    )
-
     // 计算每道题的错误率
-    const questionsWithErrorRate = allQuestions.map(q => {
-      const userQuestion = userQuestionMap.get(q.id)
-
-      let errorRate: number
-      if (!userQuestion || (userQuestion.correctCount === 0 && userQuestion.incorrectCount === 0)) {
-        // 未做过的题目，错误率为100%
-        errorRate = 1.0
-      } else {
-        const totalAttempts = userQuestion.correctCount + userQuestion.incorrectCount
-        errorRate = userQuestion.incorrectCount / totalAttempts
-      }
-
+    const questionsWithErrorRate = userQuestions.map(userQuestion => {
+      const totalAttempts = userQuestion.correctCount + userQuestion.incorrectCount
+      const errorRate = totalAttempts > 0
+        ? userQuestion.incorrectCount / totalAttempts
+        : 0
       return {
-        question: q,
+        question: userQuestion.question,
         errorRate,
-        userQuestion: userQuestion || null,
+        userQuestion,
       }
     })
 
@@ -143,7 +133,7 @@ export async function GET(request: NextRequest) {
     const answerMapping: Record<string, string> = {}
 
     if (Array.isArray(question.options)) {
-      const originalOptions = [...(question.options as any[])]
+      const originalOptions = [...(question.options as QuestionOptionPayload[])]
       const shuffledContents = [...originalOptions].sort(() => Math.random() - 0.5)
       const optionIds = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
@@ -169,7 +159,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       question: {
         ...question,
         options: shuffledOptions,
@@ -178,7 +168,7 @@ export async function GET(request: NextRequest) {
       userQuestion: nextQuestion.userQuestion,
       isFavorite: !!favorite,
       errorRate: nextQuestion.errorRate,
-    })
+    }), resolvedUser)
   } catch (error) {
     console.error('获取错误率题目失败:', error)
     return NextResponse.json(

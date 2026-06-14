@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 
 // GET /api/user/points-history - 获取用户积分历史
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -41,12 +42,12 @@ export async function GET(request: NextRequest) {
 
     const pointsName = config?.pointsName || '积分'
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       history,
       items: history,
       total: history.length,
       pointsName,
-    })
+    }), resolvedUser)
   } catch (error) {
     console.error('获取积分历史失败:', error)
     return NextResponse.json(

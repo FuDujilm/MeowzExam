@@ -2,6 +2,8 @@
 import { auth } from '@/auth'
 import { listAccessibleLibraries } from '@/lib/question-library-service'
 
+export const runtime = 'nodejs'
+
 export async function GET() {
   try {
     const session = await auth()

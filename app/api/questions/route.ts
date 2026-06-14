@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { getLibraryForUser } from '@/lib/question-library-service'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
@@ -80,7 +81,7 @@ function extractTags(value: unknown): string[] {
 // GET /api/questions - 获取题目列表(支持分页和筛选)
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -191,7 +192,7 @@ export async function GET(request: NextRequest) {
       libraryShortName: library?.shortName ?? null,
     }))
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       questions,
       pagination: {
         page,
@@ -199,7 +200,7 @@ export async function GET(request: NextRequest) {
         total,
         totalPages,
       },
-    })
+    }), resolvedUser)
   } catch (error) {
     console.error('获取题目列表失败:', error)
     return NextResponse.json(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { Prisma } from '@/lib/generated/prisma'
 import { prisma } from '@/lib/db'
 import { resolveRequestUser } from '@/lib/auth/api-auth'
+import { attachGuestCookieIfNeeded } from '@/lib/auth/guest-user'
 import { getLibraryForUser } from '@/lib/question-library-service'
 
 const LEGACY_TYPE_CODES = new Set(['A_CLASS', 'B_CLASS', 'C_CLASS'])
@@ -28,7 +29,7 @@ function buildLibraryFilter(libraryCode: string): Prisma.QuestionWhereInput {
 // GET /api/practice/history - 获取已练习的题目列表
 export async function GET(request: NextRequest) {
   try {
-    const resolvedUser = await resolveRequestUser(request)
+    const resolvedUser = await resolveRequestUser(request, { allowGuest: true })
     if (!resolvedUser) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
@@ -149,10 +150,10 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({
+    return attachGuestCookieIfNeeded(NextResponse.json({
       questions: questionsWithShuffledOptions,
       total: questionsWithShuffledOptions.length,
-    })
+    }), resolvedUser)
   } catch (error) {
     console.error('获取练习历史失败:', error)
     return NextResponse.json(
