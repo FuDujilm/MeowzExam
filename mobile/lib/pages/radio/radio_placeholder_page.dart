@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'radio_theme.dart';
+
 class RadioPlaceholderPage extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -14,11 +16,12 @@ class RadioPlaceholderPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
     return Scaffold(
-      backgroundColor: const Color(0xff061426),
+      backgroundColor: colors.page,
       appBar: AppBar(
-        backgroundColor: const Color(0xff071a31),
-        foregroundColor: Colors.white,
+        backgroundColor: colors.appBar,
+        foregroundColor: colors.text,
         title: Text(title),
       ),
       body: Center(
@@ -31,17 +34,17 @@ class RadioPlaceholderPage extends StatelessWidget {
                 width: 88,
                 height: 88,
                 decoration: BoxDecoration(
-                  color: const Color(0xff10243d),
+                  color: colors.panelAlt,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xff214366)),
+                  border: Border.all(color: colors.border),
                 ),
-                child: Icon(icon, color: const Color(0xff58a6ff), size: 42),
+                child: Icon(icon, color: colors.accent, size: 42),
               ),
               const SizedBox(height: 24),
               Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: colors.text,
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
@@ -50,8 +53,8 @@ class RadioPlaceholderPage extends StatelessWidget {
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xff91a2ba),
+                style: TextStyle(
+                  color: colors.muted,
                   height: 1.5,
                 ),
               ),

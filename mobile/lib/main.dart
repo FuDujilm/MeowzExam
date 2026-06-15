@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
+import 'services/theme_controller.dart';
 import 'pages/main_screen.dart';
 import 'models/user.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final themeController = ThemeController();
+  themeController.load();
 
   runApp(
     MultiProvider(
       providers: [
         Provider(create: (_) => AuthService()),
+        ChangeNotifierProvider.value(value: themeController),
       ],
       child: const MyApp(),
     ),
@@ -22,14 +26,32 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = context.watch<ThemeController>();
+    final scheme = themeController.colorScheme;
+    final seedColor = themeController.seedColor;
+    final lightColorScheme = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: Brightness.light,
+    );
+    final darkColorScheme = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: Brightness.dark,
+    );
+    final hasCustomTheme = themeController.settings.customSeedColor != null;
+
     return MaterialApp(
-      title: 'MeowzExam Mobile',
+      title: 'Beacon',
+      themeMode: themeController.themeMode,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff2f7cff),
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const Color(0xff061426),
+        colorScheme: lightColorScheme,
+        scaffoldBackgroundColor:
+            hasCustomTheme ? lightColorScheme.surface : scheme.lightScaffold,
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: darkColorScheme,
+        scaffoldBackgroundColor:
+            hasCustomTheme ? darkColorScheme.surface : scheme.darkScaffold,
         useMaterial3: true,
       ),
       home: const MainScreen(),
@@ -353,7 +375,7 @@ class _LoginPageState extends State<LoginPage> {
               const Icon(Icons.school, size: 80, color: Colors.deepPurple),
               const SizedBox(height: 24),
               Text(
-                'MeowzExam',
+                'Beacon',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.deepPurple,

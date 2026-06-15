@@ -4,8 +4,14 @@ import '../developer/developer_page.dart';
 import '../home/calendar_page.dart';
 import '../home/leaderboard_page.dart';
 import '../practice/practice_page.dart';
+import '../../models/practice_history.dart';
+import '../../models/radio_profile.dart';
+import '../../services/exam_service.dart';
+import '../../services/local_database_service.dart';
+import '../../services/user_settings_service.dart';
 import 'frequency_table_page.dart';
 import 'radio_placeholder_page.dart';
+import 'radio_theme.dart';
 
 class RadioHomePage extends StatefulWidget {
   const RadioHomePage({super.key});
@@ -15,8 +21,76 @@ class RadioHomePage extends StatefulWidget {
 }
 
 class _RadioHomePageState extends State<RadioHomePage> {
+  final _userSettingsService = UserSettingsService();
+  final _examService = ExamService();
+  final _databaseService = LocalDatabaseService();
   int _developerTapCount = 0;
+  bool _examStatsLoading = true;
+  int _todayAnswered = 0;
+  int _weekAnswered = 0;
+  double _weekAccuracy = 0;
+  int _completedQuestions = 0;
+  int _totalQuestions = 0;
+  int _recentExamPassed = 0;
+  int _recentExamTotal = 0;
+  String _currentLibraryName = '题库';
+  RadioProfile _radioProfile = RadioProfile.defaults;
   DateTime? _lastDeveloperTapAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExamStats();
+  }
+
+  Future<void> _loadExamStats() async {
+    try {
+      final settings = await _userSettingsService.getSettings();
+      final radioProfile = await _databaseService.getRadioProfile();
+      final remoteCallsign = settings['callsign'] as String?;
+      final resolvedRadioProfile =
+          remoteCallsign != null && remoteCallsign.trim().isNotEmpty
+              ? radioProfile.copyWith(
+                  callsign: remoteCallsign.trim().toUpperCase(),
+                )
+              : radioProfile;
+      if (resolvedRadioProfile.callsign != radioProfile.callsign) {
+        await _databaseService.saveRadioProfile(resolvedRadioProfile);
+      }
+      final libraryCode = settings['examType'] as String? ?? 'A_CLASS';
+      final results = await Future.wait([
+        _userSettingsService.getUserStats(),
+        _userSettingsService.getLibraryStats(libraryCode),
+        _examService.getExamSummaries(),
+      ]);
+
+      final userStats = results[0] as Map<String, dynamic>;
+      final libraryStats = results[1] as Map<String, dynamic>;
+      final examSummaries = results[2] as List<ExamSummary>;
+      final examSummary = examSummaries.isNotEmpty ? examSummaries.first : null;
+
+      if (!mounted) return;
+      setState(() {
+        _todayAnswered = (userStats['todayAnswered'] as num?)?.toInt() ?? 0;
+        _weekAnswered = (userStats['weekAnswered'] as num?)?.toInt() ?? 0;
+        _weekAccuracy =
+            (userStats['weekAccuracy'] as num?)?.toDouble() ?? 0;
+        _completedQuestions =
+            (libraryStats['browsedCount'] as num?)?.toInt() ?? 0;
+        _totalQuestions =
+            (libraryStats['totalQuestions'] as num?)?.toInt() ?? 0;
+        _currentLibraryName =
+            libraryStats['libraryName'] as String? ?? libraryCode;
+        _radioProfile = resolvedRadioProfile;
+        _recentExamPassed = examSummary?.recentFivePassed ?? 0;
+        _recentExamTotal = examSummary?.recentFiveTotal ?? 0;
+        _examStatsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _examStatsLoading = false);
+    }
+  }
 
   void _handleTitleTap() {
     final now = DateTime.now();
@@ -37,13 +111,15 @@ class _RadioHomePageState extends State<RadioHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xff061426),
+      backgroundColor: colors.page,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            backgroundColor: const Color(0xff071a31),
-            foregroundColor: Colors.white,
+            backgroundColor: colors.appBar,
+            foregroundColor: colors.text,
             pinned: true,
             expandedHeight: 288,
             leading: IconButton(
@@ -59,7 +135,10 @@ class _RadioHomePageState extends State<RadioHomePage> {
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              background: _HeroPanel(onTitleTap: _handleTitleTap),
+              background: _HeroPanel(
+                radioProfile: _radioProfile,
+                onTitleTap: _handleTitleTap,
+              ),
             ),
           ),
           SliverPadding(
@@ -180,6 +259,15 @@ class _RadioHomePageState extends State<RadioHomePage> {
                   ),
                   const SizedBox(height: 12),
                   _ExamPanel(
+                    isLoading: _examStatsLoading,
+                    todayAnswered: _todayAnswered,
+                    weekAnswered: _weekAnswered,
+                    weekAccuracy: _weekAccuracy,
+                    completedQuestions: _completedQuestions,
+                    totalQuestions: _totalQuestions,
+                    recentExamPassed: _recentExamPassed,
+                    recentExamTotal: _recentExamTotal,
+                    currentLibraryName: _currentLibraryName,
                     onPractice: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const PracticePage()),
                     ),
@@ -217,25 +305,40 @@ class _RadioHomePageState extends State<RadioHomePage> {
 }
 
 class _HeroPanel extends StatelessWidget {
+  final RadioProfile radioProfile;
   final VoidCallback onTitleTap;
 
-  const _HeroPanel({required this.onTitleTap});
+  const _HeroPanel({
+    required this.radioProfile,
+    required this.onTitleTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : colors.text;
+    final heroGradient = isDark
+        ? const [
+            Color(0xff081a36),
+            Color(0xff04375a),
+            Color(0xff081426),
+          ]
+        : [
+            colors.accent.withValues(alpha: 0.22),
+            colors.page,
+            colors.panelAlt,
+          ];
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        const DecoratedBox(
+        DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xff081a36),
-                Color(0xff04375a),
-                Color(0xff081426),
-              ],
+              colors: heroGradient,
             ),
           ),
         ),
@@ -245,7 +348,7 @@ class _HeroPanel extends StatelessWidget {
           child: Icon(
             Icons.settings_input_antenna,
             size: 210,
-            color: Colors.white.withValues(alpha: 0.08),
+            color: colors.accent.withValues(alpha: isDark ? 0.08 : 0.11),
           ),
         ),
         Positioned(
@@ -258,21 +361,13 @@ class _HeroPanel extends StatelessWidget {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onTitleTap,
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '业余无线电',
+                      'Beacon',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      '工具箱',
-                      style: TextStyle(
-                        color: Colors.white,
+                        color: titleColor,
                         fontSize: 46,
                         fontWeight: FontWeight.w900,
                         height: 1.05,
@@ -282,10 +377,10 @@ class _HeroPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'HAM RADIO TOOLBOX',
+              Text(
+                'Beacon业余无线电工具箱',
                 style: TextStyle(
-                  color: Color(0xffb4c7e3),
+                  color: isDark ? const Color(0xffb4c7e3) : colors.muted,
                   letterSpacing: 0,
                   fontWeight: FontWeight.w800,
                 ),
@@ -294,11 +389,15 @@ class _HeroPanel extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xff07182c).withValues(alpha: 0.82),
+                  color: isDark
+                      ? const Color(0xff07182c).withValues(alpha: 0.82)
+                      : colors.panel.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xff214366)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xff214366) : colors.border,
+                  ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Expanded(
                       child: Column(
@@ -307,9 +406,9 @@ class _HeroPanel extends StatelessWidget {
                           Row(
                             children: [
                               Text(
-                                'BG4FQK',
+                                radioProfile.callsign,
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: titleColor,
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -319,13 +418,21 @@ class _HeroPanel extends StatelessWidget {
                                   color: Color(0xff52dc62), size: 9),
                               SizedBox(width: 4),
                               Text('在线',
-                                  style: TextStyle(color: Color(0xff9fc2e8))),
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? const Color(0xff9fc2e8)
+                                        : colors.muted,
+                                  )),
                             ],
                           ),
                           SizedBox(height: 8),
                           Text(
-                            '北京 · CN87uj',
-                            style: TextStyle(color: Color(0xff9fb1ca)),
+                            '${radioProfile.qth} · ${radioProfile.grid}',
+                            style: TextStyle(
+                              color: isDark
+                                  ? const Color(0xff9fb1ca)
+                                  : colors.muted,
+                            ),
                           ),
                         ],
                       ),
@@ -340,7 +447,7 @@ class _HeroPanel extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'A 级',
+                          radioProfile.licenseClass,
                           style: TextStyle(
                             color: Color(0xff6cff72),
                             fontSize: 26,
@@ -348,8 +455,15 @@ class _HeroPanel extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '2027-05-01 到期',
-                          style: TextStyle(color: Color(0xff8fa1bc)),
+                          radioProfile.licenseExpiry ==
+                                  RadioProfile.defaults.licenseExpiry
+                              ? radioProfile.licenseExpiry
+                              : '${radioProfile.licenseExpiry} 到期',
+                          style: TextStyle(
+                            color: isDark
+                                ? const Color(0xff8fa1bc)
+                                : colors.muted,
+                          ),
                         ),
                       ],
                     ),
@@ -377,13 +491,15 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
+
     return Row(
       children: [
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: colors.text,
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
@@ -413,8 +529,10 @@ class _ToolTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
+
     return Material(
-      color: const Color(0xff0d2139),
+      color: colors.panelAlt,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -422,7 +540,7 @@ class _ToolTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xff1d385d)),
+            border: Border.all(color: colors.border),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -443,8 +561,8 @@ class _ToolTile extends StatelessWidget {
                 maxLines: 2,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xffdce9fb),
+                style: TextStyle(
+                  color: colors.text,
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                   height: 1.2,
@@ -506,13 +624,15 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
+
     return Container(
       height: 150,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xff0d2139),
+        color: colors.panelAlt,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xff1d385d)),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -522,8 +642,8 @@ class _MetricCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colors.text,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -534,13 +654,13 @@ class _MetricCard extends StatelessWidget {
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: colors.text,
               fontSize: 25,
               fontWeight: FontWeight.w900,
             ),
           ),
-          Text(unit, style: const TextStyle(color: Color(0xff91a2ba))),
+          Text(unit, style: TextStyle(color: colors.muted)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 6,
@@ -550,13 +670,13 @@ class _MetricCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xff173458),
+                      color: colors.accent.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       chip,
-                      style: const TextStyle(
-                        color: Color(0xff8ddcff),
+                      style: TextStyle(
+                        color: colors.accent,
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                       ),
@@ -572,39 +692,126 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _ExamPanel extends StatelessWidget {
+  final bool isLoading;
+  final int todayAnswered;
+  final int weekAnswered;
+  final double weekAccuracy;
+  final int completedQuestions;
+  final int totalQuestions;
+  final int recentExamPassed;
+  final int recentExamTotal;
+  final String currentLibraryName;
   final VoidCallback onPractice;
   final VoidCallback onLeaderboard;
 
   const _ExamPanel({
+    required this.isLoading,
+    required this.todayAnswered,
+    required this.weekAnswered,
+    required this.weekAccuracy,
+    required this.completedQuestions,
+    required this.totalQuestions,
+    required this.recentExamPassed,
+    required this.recentExamTotal,
+    required this.currentLibraryName,
     required this.onPractice,
     required this.onLeaderboard,
   });
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xff0d2139),
+        color: colors.panelAlt,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xff1d385d)),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'CRAC 考试训练',
             style: TextStyle(
-              color: Colors.white,
+              color: colors.text,
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '题库练习、模拟考试、错题回顾和学习统计统一放在工具箱内。',
-            style: TextStyle(color: Color(0xff91a2ba), height: 1.4),
+          Text(
+            currentLibraryName,
+            style: TextStyle(color: colors.muted, height: 1.4),
           ),
+          const SizedBox(height: 14),
+          if (isLoading)
+            const LinearProgressIndicator()
+          else
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ExamStatTile(
+                        label: '今日答题',
+                        value: '$todayAnswered',
+                        unit: '题',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ExamStatTile(
+                        label: '本周答题',
+                        value: '$weekAnswered',
+                        unit: '题',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ExamStatTile(
+                        label: '本周正确率',
+                        value: '${weekAccuracy.toStringAsFixed(1)}%',
+                        unit: '',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ExamStatTile(
+                        label: '近五次合格',
+                        value: '$recentExamPassed/$recentExamTotal',
+                        unit: '',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: totalQuestions == 0
+                        ? 0
+                        : (completedQuestions / totalQuestions)
+                            .clamp(0, 1)
+                            .toDouble(),
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '题库进度 $completedQuestions / $totalQuestions',
+                    style: TextStyle(color: colors.muted),
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -621,6 +828,69 @@ class _ExamPanel extends StatelessWidget {
                 onPressed: onLeaderboard,
                 icon: const Icon(Icons.leaderboard),
               ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExamStatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final String unit;
+
+  const _ExamStatTile({
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.panel,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: colors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: colors.text,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (unit.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    unit,
+                    style: TextStyle(color: colors.muted),
+                  ),
+                ),
+              ],
             ],
           ),
         ],

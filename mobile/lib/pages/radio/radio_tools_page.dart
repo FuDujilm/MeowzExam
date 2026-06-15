@@ -4,6 +4,7 @@ import '../home/calendar_page.dart';
 import '../practice/practice_page.dart';
 import 'frequency_table_page.dart';
 import 'radio_placeholder_page.dart';
+import 'radio_theme.dart';
 
 class RadioToolsPage extends StatefulWidget {
   const RadioToolsPage({super.key});
@@ -20,12 +21,13 @@ class _RadioToolsPageState extends State<RadioToolsPage> {
   @override
   Widget build(BuildContext context) {
     final tools = _tools(context);
+    final colors = radioThemeColors(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xff061426),
+      backgroundColor: colors.page,
       appBar: AppBar(
-        backgroundColor: const Color(0xff071a31),
-        foregroundColor: Colors.white,
+        backgroundColor: colors.appBar,
+        foregroundColor: colors.text,
         title: const Text('工具'),
         actions: [
           IconButton(
@@ -39,7 +41,7 @@ class _RadioToolsPageState extends State<RadioToolsPage> {
         children: [
           Container(
             width: 96,
-            color: const Color(0xff07182c),
+            color: colors.panel,
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 16),
               itemCount: _categories.length,
@@ -64,8 +66,8 @@ class _RadioToolsPageState extends State<RadioToolsPage> {
                       _categories[index],
                       style: TextStyle(
                         color: selected
-                            ? Colors.white
-                            : const Color(0xff8092ad),
+                            ? colors.text
+                            : colors.muted,
                         fontWeight:
                             selected ? FontWeight.w900 : FontWeight.w700,
                       ),
@@ -182,8 +184,9 @@ class _ToolRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = radioThemeColors(context);
     return Material(
-      color: const Color(0xff0d2139),
+      color: colors.panelAlt,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -192,7 +195,7 @@ class _ToolRow extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xff1d385d)),
+            border: Border.all(color: colors.border),
           ),
           child: Row(
             children: [
@@ -212,8 +215,8 @@ class _ToolRow extends StatelessWidget {
                   children: [
                     Text(
                       tool.title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.text,
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                       ),
@@ -221,12 +224,12 @@ class _ToolRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       tool.subtitle,
-                      style: const TextStyle(color: Color(0xff91a2ba)),
+                      style: TextStyle(color: colors.muted),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Color(0xff91a2ba)),
+              Icon(Icons.chevron_right, color: colors.muted),
             ],
           ),
         ),

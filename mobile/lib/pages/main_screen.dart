@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'home/calendar_page.dart';
 import 'profile/profile_page.dart';
 import 'radio/radio_home_page.dart';
+import 'radio/radio_log_page.dart';
 import 'radio/radio_placeholder_page.dart';
 import 'radio/radio_tools_page.dart';
 
@@ -18,7 +18,7 @@ class _MainScreenState extends State<MainScreen> {
   List<Widget> get _pages => <Widget>[
         const RadioHomePage(),
         const RadioToolsPage(),
-        const CalendarPage(),
+        const RadioLogPage(),
         const RadioPlaceholderPage(
           title: '发现',
           icon: Icons.explore,
@@ -35,11 +35,12 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: NavigationBar(
-        backgroundColor: const Color(0xff07182c),
-        indicatorColor: const Color(0xff153961),
+        backgroundColor: colorScheme.surface,
+        indicatorColor: colorScheme.secondaryContainer,
         surfaceTintColor: Colors.transparent,
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,

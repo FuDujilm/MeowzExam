@@ -24,7 +24,14 @@ class UserSettingsService {
   Future<Map<String, dynamic>> getSettings() async {
     try {
       final response = await _apiClient.client.get('user/settings');
-      return response.data['settings'] ?? {};
+      final settings = Map<String, dynamic>.from(
+        response.data['settings'] as Map? ?? {},
+      );
+      final user = response.data['user'];
+      if (user is Map && user['callsign'] != null) {
+        settings['callsign'] = user['callsign'];
+      }
+      return settings;
     } catch (e) {
       debugPrint('Failed to load settings: $e');
       return {};

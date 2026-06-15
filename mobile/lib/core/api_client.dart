@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'configure_dio.dart';
 import 'constants.dart';
 
 class ApiClient {
@@ -23,6 +24,7 @@ class ApiClient {
         'Accept': 'application/json',
       },
     ));
+    configureDio(_dio);
 
     _ready = _initBaseUrl();
 

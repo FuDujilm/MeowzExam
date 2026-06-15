@@ -161,127 +161,134 @@ class _PracticePageState extends State<PracticePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-
     return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          // 1. Library Selection
-          Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: ListTile(
-              leading: const Icon(Icons.library_books),
-              title: const Text('当前题库'),
-              subtitle: Text(_currentLibraryName),
-              trailing: const Icon(Icons.change_circle_outlined),
-              onTap: () {
-                _showLibraryPicker(context);
-              },
-            ),
-          ),
-
-          const Text('核心练习',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 8),
-
-          _PracticeModeTile(
-            title: '顺序练习',
-            subtitle: '按照顺序逐一练习',
-            icon: Icons.list_alt,
-            color: Colors.blue,
-            onTap: () => _navigateToQuiz(context, 'sequential'),
-          ),
-          _PracticeModeTile(
-            title: '随机练习',
-            subtitle: '随机抽取题目进行练习',
-            icon: Icons.shuffle,
-            color: Colors.purple,
-            onTap: () => _navigateToQuiz(context, 'random'),
-          ),
-          _PracticeModeTile(
-            title: '模拟考试',
-            subtitle: '全真模拟考试环境',
-            icon: Icons.timer,
-            color: Colors.red,
-            onTap: () => _navigateToQuiz(context, 'mock'),
-          ),
-
-          const SizedBox(height: 24),
-          const Text('专项强化',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 8),
-
-          _PracticeModeTile(
-            title: '高频错题',
-            subtitle: '针对薄弱环节进行强化',
-            icon: Icons.warning_amber_rounded,
-            color: Colors.orange,
-            onTap: () => _navigateToQuiz(context, 'high_error'),
-          ),
-          _PracticeModeTile(
-            title: '错题回顾',
-            subtitle: '查看并复习做错的题目',
-            icon: Icons.history_edu,
-            color: Colors.teal,
-            onTap: () => _navigateToQuiz(context, 'wrong'),
-          ),
-          _PracticeModeTile(
-            title: '每日精选',
-            subtitle: '每日 30 道精选题目',
-            icon: Icons.calendar_today,
-            color: Colors.green,
-            onTap: () => _navigateToQuiz(context, 'daily'),
-          ),
-
-          const SizedBox(height: 24),
-          const Text('辅助工具',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 8),
-
-          _PracticeModeTile(
-            title: '浏览题库',
-            subtitle: '搜索和查看所有题目',
-            icon: Icons.search,
-            color: Colors.grey,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LibraryPreviewPage()),
-              );
-            },
-          ),
-          _PracticeModeTile(
-            title: '我的收藏',
-            subtitle: '查看收藏的题目',
-            icon: Icons.bookmark,
-            color: Colors.pink,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => FavoriteQuestionsPage(
-                    libraryCode: _currentLibraryCode,
-                  ),
-                ),
-              );
-            },
-          ),
-          _PracticeModeTile(
-            title: '练习历史',
-            subtitle: '查看过往练习记录',
-            icon: Icons.history,
-            color: Colors.blueGrey,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PracticeHistoryPage(
-                    libraryCode: _currentLibraryCode,
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+      appBar: AppBar(
+        title: const Text('考试题库'),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                // 1. Library Selection
+                Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: ListTile(
+                    leading: const Icon(Icons.library_books),
+                    title: const Text('当前题库'),
+                    subtitle: Text(_currentLibraryName),
+                    trailing: const Icon(Icons.change_circle_outlined),
+                    onTap: () {
+                      _showLibraryPicker(context);
+                    },
+                  ),
+                ),
+
+                const Text('核心练习',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 8),
+
+                _PracticeModeTile(
+                  title: '顺序练习',
+                  subtitle: '按照顺序逐一练习',
+                  icon: Icons.list_alt,
+                  color: Colors.blue,
+                  onTap: () => _navigateToQuiz(context, 'sequential'),
+                ),
+                _PracticeModeTile(
+                  title: '随机练习',
+                  subtitle: '随机抽取题目进行练习',
+                  icon: Icons.shuffle,
+                  color: Colors.purple,
+                  onTap: () => _navigateToQuiz(context, 'random'),
+                ),
+                _PracticeModeTile(
+                  title: '模拟考试',
+                  subtitle: '全真模拟考试环境',
+                  icon: Icons.timer,
+                  color: Colors.red,
+                  onTap: () => _navigateToQuiz(context, 'mock'),
+                ),
+
+                const SizedBox(height: 24),
+                const Text('专项强化',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 8),
+
+                _PracticeModeTile(
+                  title: '高频错题',
+                  subtitle: '针对薄弱环节进行强化',
+                  icon: Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  onTap: () => _navigateToQuiz(context, 'high_error'),
+                ),
+                _PracticeModeTile(
+                  title: '错题回顾',
+                  subtitle: '查看并复习做错的题目',
+                  icon: Icons.history_edu,
+                  color: Colors.teal,
+                  onTap: () => _navigateToQuiz(context, 'wrong'),
+                ),
+                _PracticeModeTile(
+                  title: '每日精选',
+                  subtitle: '每日 30 道精选题目',
+                  icon: Icons.calendar_today,
+                  color: Colors.green,
+                  onTap: () => _navigateToQuiz(context, 'daily'),
+                ),
+
+                const SizedBox(height: 24),
+                const Text('辅助工具',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 8),
+
+                _PracticeModeTile(
+                  title: '浏览题库',
+                  subtitle: '搜索和查看所有题目',
+                  icon: Icons.search,
+                  color: Colors.grey,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const LibraryPreviewPage()),
+                    );
+                  },
+                ),
+                _PracticeModeTile(
+                  title: '我的收藏',
+                  subtitle: '查看收藏的题目',
+                  icon: Icons.bookmark,
+                  color: Colors.pink,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FavoriteQuestionsPage(
+                          libraryCode: _currentLibraryCode,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _PracticeModeTile(
+                  title: '练习历史',
+                  subtitle: '查看过往练习记录',
+                  icon: Icons.history,
+                  color: Colors.blueGrey,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PracticeHistoryPage(
+                          libraryCode: _currentLibraryCode,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
     );
   }
 }
