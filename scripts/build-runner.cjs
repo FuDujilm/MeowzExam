@@ -9,6 +9,8 @@ const MAX_CAPTURED_OUTPUT = 20000;
 const FALLBACK_PATTERNS = [
   'next.js package not found',
   "couldn't find the next.js package",
+  'turbopackinternalerror',
+  'unexpected turbopack error occurred',
 ];
 
 async function main() {
@@ -32,7 +34,7 @@ async function main() {
   }
 
   console.warn(
-    '\n[build-runner] Turbopack crashed with "Next.js package not found". ' +
+    '\n[build-runner] Turbopack failed before completing the production build. ' +
       'Retrying the build with webpack...\n'
   );
 

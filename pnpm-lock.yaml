@@ -114,9 +114,6 @@ importers:
       '@next/eslint-plugin-next':
         specifier: ^16.1.6
         version: 16.1.6
-      '@next/swc-linux-x64-gnu':
-        specifier: ^16.0.3
-        version: 16.0.6
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.1.13
@@ -771,11 +768,6 @@ packages:
     cpu: [arm64]
     os: [linux]
     libc: [musl]
-
-  '@next/swc-linux-x64-gnu@16.0.6':
-    resolution: {integrity: sha512-PZJushBgfvKhJBy01yXMdgL+l5XKr7uSn5jhOQXQXiH3iPT2M9iG64yHpPNGIKitKrHJInwmhPVGogZBAJOCPw==}
-    engines: {node: '>= 10'}
-    os: [linux]
 
   '@next/swc-linux-x64-gnu@16.1.6':
     resolution: {integrity: sha512-2eEBDkFlMMNQnkTyPBhQOAyn2qMxyG2eE7GPH2WIDGEpEILcBPI/jdSv4t6xupSP+ot/jkfrCShLAa7+ZUPcJQ==}
@@ -4510,8 +4502,6 @@ snapshots:
 
   '@next/swc-linux-arm64-musl@16.1.6':
     optional: true
-
-  '@next/swc-linux-x64-gnu@16.0.6': {}
 
   '@next/swc-linux-x64-gnu@16.1.6':
     optional: true

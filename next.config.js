@@ -101,13 +101,10 @@ const nextConfig = {
   },
   images: remotePatterns.length ? { remotePatterns } : undefined,
   outputFileTracingRoot: projectRoot,
-  outputFileTracingExcludes: tracingExcludes.length
-    ? { "*": tracingExcludes }
-    : undefined,
   outputFileTracingExcludes:
-    blockedGlobs.length > 0
+    tracingExcludes.length || blockedGlobs.length
       ? {
-          "*": blockedGlobs,
+          "*": [...tracingExcludes, ...blockedGlobs],
           "next-server": blockedGlobs,
         }
       : undefined,
