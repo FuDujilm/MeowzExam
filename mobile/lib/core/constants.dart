@@ -4,9 +4,8 @@ class AppConstants {
   // Use relative path for Web (assumes served from same origin or proxied)
   // For Mobile, use specific IP or localhost for emulator
   // Note: User confirmed Next.js runs on port 3001
-  static const String baseUrl = kIsWeb 
-      ? '/api/' 
-      : 'http://192.168.31.187:3001/api/'; 
-  
+  static const String baseUrl =
+      kIsWeb ? '/api/' : 'http://192.168.31.187:3001/api/';
+
   static const String tokenKey = 'auth_token';
 }

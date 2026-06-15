@@ -6,6 +6,7 @@ import '../../services/local_data_backup_service.dart';
 import '../../services/local_database_service.dart';
 import '../../services/theme_controller.dart';
 import '../../services/user_settings_service.dart';
+import 'discovery_settings_page.dart';
 import 'theme_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -51,9 +52,10 @@ class _ProfilePageState extends State<ProfilePage> {
     final isLoggedIn = await context.read<AuthService>().isLoggedIn();
     final settings = await _userSettingsService.getSettings();
     final radioProfile = await _databaseService.getRadioProfile();
-    final callsign = (settings['callsign'] as String?)?.trim().isNotEmpty == true
-        ? settings['callsign'] as String
-        : radioProfile.callsign;
+    final callsign =
+        (settings['callsign'] as String?)?.trim().isNotEmpty == true
+            ? settings['callsign'] as String
+            : radioProfile.callsign;
 
     if (!mounted) return;
     setState(() {
@@ -366,6 +368,17 @@ class _ProfilePageState extends State<ProfilePage> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ThemePage()),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.explore),
+                  title: const Text('发现源配置'),
+                  subtitle: const Text('地区推荐、资讯源、卫星过境 TLE'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const DiscoverySettingsPage(),
+                    ),
                   ),
                 ),
                 const Divider(),

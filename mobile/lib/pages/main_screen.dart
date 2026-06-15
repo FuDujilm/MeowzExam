@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'discovery/discovery_page.dart';
 import 'profile/profile_page.dart';
 import 'radio/radio_home_page.dart';
 import 'radio/radio_log_page.dart';
-import 'radio/radio_placeholder_page.dart';
 import 'radio/radio_tools_page.dart';
 
 class MainScreen extends StatefulWidget {
@@ -19,11 +19,7 @@ class _MainScreenState extends State<MainScreen> {
         const RadioHomePage(),
         const RadioToolsPage(),
         const RadioLogPage(),
-        const RadioPlaceholderPage(
-          title: '发现',
-          icon: Icons.explore,
-          subtitle: '传播资讯、活动公告和电台社区内容将在这里聚合。',
-        ),
+        const DiscoveryPage(),
         const ProfilePage(),
       ];
 

@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/app_theme_settings.dart';
@@ -9,7 +8,8 @@ import '../models/qso_log.dart';
 import '../models/radio_profile.dart';
 
 class LocalDatabaseService {
-  static final LocalDatabaseService _instance = LocalDatabaseService._internal();
+  static final LocalDatabaseService _instance =
+      LocalDatabaseService._internal();
 
   factory LocalDatabaseService() => _instance;
 
@@ -69,6 +69,33 @@ class LocalDatabaseService {
         value TEXT NOT NULL
       )
     ''');
+  }
+
+  Future<String?> getSetting(String key) async {
+    final db = await database;
+    final rows = await db.query(
+      'app_settings',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
+  }
+
+  Future<void> saveSetting(String key, String value) async {
+    final db = await database;
+    await db.insert(
+      'app_settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteSetting(String key) async {
+    final db = await database;
+    await db.delete('app_settings', where: 'key = ?', whereArgs: [key]);
   }
 
   Future<List<QsoLog>> getQsoLogs() async {
@@ -133,8 +160,7 @@ class LocalDatabaseService {
       await saveThemeSettings(
         AppThemeSettings(
           mode: AppThemeSettings.modeFromKey(theme['mode'] as String?),
-          colorSchemeKey:
-              theme['colorSchemeKey'] as String? ?? 'beacon',
+          colorSchemeKey: theme['colorSchemeKey'] as String? ?? 'beacon',
           customSeedColor: theme['customSeedColor'] as int?,
         ),
       );
