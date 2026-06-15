@@ -8,6 +8,7 @@ import '../../services/discovery_service.dart';
 import '../../services/local_database_service.dart';
 import '../../services/satellite_service.dart';
 import 'discovery_detail_page.dart';
+import 'satellite_detail_page.dart';
 
 class DiscoveryPage extends StatefulWidget {
   const DiscoveryPage({super.key});
@@ -1436,7 +1437,7 @@ class _SatellitePanel extends StatefulWidget {
 }
 
 class _SatellitePanelState extends State<_SatellitePanel> {
-  late Future<List<SatellitePass>> _future;
+  late Future<List<SatelliteSummary>> _future;
 
   @override
   void initState() {
@@ -1444,8 +1445,8 @@ class _SatellitePanelState extends State<_SatellitePanel> {
     _future = _load();
   }
 
-  Future<List<SatellitePass>> _load() {
-    return widget.service.getUpcomingPasses(
+  Future<List<SatelliteSummary>> _load() {
+    return widget.service.getSubscribedSatellites(
       grid: widget.radioProfile.grid,
       tleSourceUrls: widget.preferences.tleSourceUrls,
       satelliteNames: widget.preferences.satelliteNames,
@@ -1454,7 +1455,7 @@ class _SatellitePanelState extends State<_SatellitePanel> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<SatellitePass>>(
+    return FutureBuilder<List<SatelliteSummary>>(
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1472,17 +1473,22 @@ class _SatellitePanelState extends State<_SatellitePanel> {
             ),
           );
         }
-        final passes = snapshot.data ?? const [];
-        if (passes.isEmpty) {
+        final satellites = snapshot.data ?? const [];
+        if (satellites.isEmpty) {
           return const _StateMessage(
             icon: Icons.satellite_alt,
-            title: '暂无过境',
-            subtitle: '未来 48 小时没有满足条件的过境。',
+            title: '暂无订阅卫星',
+            subtitle: '请在我的 > 系统设置 > 发现源配置中添加关注卫星。',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => setState(() => _future = _load()),
-          child: _SatelliteBoard(passes: passes),
+          child: _SatelliteBoard(
+            satellites: satellites,
+            radioProfile: widget.radioProfile,
+            tleSourceUrls: widget.preferences.tleSourceUrls,
+            service: widget.service,
+          ),
         );
       },
     );
@@ -1490,33 +1496,52 @@ class _SatellitePanelState extends State<_SatellitePanel> {
 }
 
 class _SatelliteBoard extends StatelessWidget {
-  final List<SatellitePass> passes;
+  final List<SatelliteSummary> satellites;
+  final RadioProfile radioProfile;
+  final List<String> tleSourceUrls;
+  final SatelliteService service;
 
-  const _SatelliteBoard({required this.passes});
+  const _SatelliteBoard({
+    required this.satellites,
+    required this.radioProfile,
+    required this.tleSourceUrls,
+    required this.service,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final current = passes.first;
+    final available = satellites.where((item) => item.nextPass != null).length;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
-        _Panel(
-          title: '当前可见卫星',
-          icon: Icons.satellite_alt,
-          iconColor: const Color(0xFF22C55E),
-          child: _CurrentSatelliteCard(pass: current),
+        _SatelliteHeaderCard(
+          total: satellites.length,
+          available: available,
+          source: satellites.first.tleSource,
+          grid: radioProfile.grid,
         ),
         const SizedBox(height: 20),
         _Panel(
-          title: '卫星过境预报',
-          icon: Icons.flight,
+          title: '已订阅卫星',
+          icon: Icons.satellite_alt,
           iconColor: const Color(0xFF60A5FA),
           child: Column(
-            children: passes
-                .take(8)
-                .map((pass) => Padding(
+            children: satellites
+                .map((satellite) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: _SatellitePassCard(pass: pass),
+                      child: _SatelliteSummaryCard(
+                        satellite: satellite,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SatelliteDetailPage(
+                              satelliteName: satellite.name,
+                              radioProfile: radioProfile,
+                              tleSourceUrls: tleSourceUrls,
+                              service: service,
+                            ),
+                          ),
+                        ),
+                      ),
                     ))
                 .toList(),
           ),
@@ -1526,16 +1551,24 @@ class _SatelliteBoard extends StatelessWidget {
   }
 }
 
-class _CurrentSatelliteCard extends StatelessWidget {
-  final SatellitePass pass;
+class _SatelliteHeaderCard extends StatelessWidget {
+  final int total;
+  final int available;
+  final String source;
+  final String grid;
 
-  const _CurrentSatelliteCard({required this.pass});
+  const _SatelliteHeaderCard({
+    required this.total,
+    required this.available,
+    required this.source,
+    required this.grid,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: scheme.primary.withValues(alpha: 0.32)),
@@ -1548,64 +1581,173 @@ class _CurrentSatelliteCard extends StatelessWidget {
           ],
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 110,
-            height: 82,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0F3A66), Color(0xFF020617)],
-              ),
-            ),
-            child: const Icon(Icons.public, color: Colors.white, size: 48),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  pass.satelliteName,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: scheme.primary.withValues(alpha: 0.16),
                 ),
-                const SizedBox(height: 8),
+                child: Icon(Icons.public, color: scheme.primary, size: 30),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '卫星追踪',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '订阅卫星过境、转发器和手机对星',
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: _SatelliteMetric(label: '订阅', value: '$total')),
+              Expanded(
+                  child:
+                      _SatelliteMetric(label: '48h 可见', value: '$available')),
+              Expanded(child: _SatelliteMetric(label: 'Grid', value: grid)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.storage, size: 16, color: scheme.outline),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  source,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: scheme.outline, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SatelliteSummaryCard extends StatelessWidget {
+  final SatelliteSummary satellite;
+  final VoidCallback onTap;
+
+  const _SatelliteSummaryCard({
+    required this.satellite,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final pass = satellite.nextPass;
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: scheme.primaryContainer.withValues(alpha: 0.65),
+                    ),
+                    child: Icon(Icons.satellite_alt, color: scheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          satellite.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          satellite.noradCatId == null
+                              ? 'NORAD 未知'
+                              : 'NORAD ${satellite.noradCatId}',
+                          style: TextStyle(color: scheme.outline, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: scheme.outline),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (pass == null)
+                Text(
+                  '未来 48 小时暂无过境',
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                )
+              else ...[
                 Row(
                   children: [
                     Expanded(
                       child: _SatelliteMetric(
-                        label: '高度',
+                        label: '下一次',
+                        value: DateFormat('HH:mm').format(pass.aos),
+                      ),
+                    ),
+                    Expanded(
+                      child: _SatelliteMetric(
+                        label: '最高仰角',
                         value: '${pass.maxElevation.toStringAsFixed(0)}°',
                       ),
                     ),
                     Expanded(
                       child: _SatelliteMetric(
-                        label: '方位角',
-                        value: '${pass.aosAzimuth.toStringAsFixed(0)}°',
-                      ),
-                    ),
-                    const Expanded(
-                      child: _SatelliteMetric(
-                        label: '频率',
-                        value: '145.960 MHz',
+                        label: '时长',
+                        value: '${pass.duration.inMinutes}分',
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 LinearProgressIndicator(
-                  value: 0.72,
+                  value: (pass.maxElevation / 90).clamp(0.08, 1).toDouble(),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1628,68 +1770,6 @@ class _SatelliteMetric extends StatelessWidget {
         const SizedBox(height: 3),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
       ],
-    );
-  }
-}
-
-class _SatellitePassCard extends StatelessWidget {
-  final SatellitePass pass;
-
-  const _SatellitePassCard({required this.pass});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.48),
-        border:
-            Border.all(color: scheme.outlineVariant.withValues(alpha: 0.55)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: scheme.primaryContainer.withValues(alpha: 0.65),
-            ),
-            child: Icon(Icons.satellite_alt, color: scheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: Text(
-              pass.satelliteName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              DateFormat('HH:mm').format(pass.aos),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              '${pass.maxElevation.toStringAsFixed(0)}°',
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              '${pass.duration.inMinutes}分',
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Icon(Icons.notifications_none, color: scheme.primary),
-        ],
-      ),
     );
   }
 }

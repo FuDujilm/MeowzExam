@@ -316,6 +316,7 @@ class DiscoveryPageResult {
 
 class SatellitePass {
   final String satelliteName;
+  final int? noradCatId;
   final DateTime aos;
   final DateTime los;
   final double maxElevation;
@@ -325,6 +326,7 @@ class SatellitePass {
 
   const SatellitePass({
     required this.satelliteName,
+    this.noradCatId,
     required this.aos,
     required this.los,
     required this.maxElevation,
@@ -334,4 +336,75 @@ class SatellitePass {
   });
 
   Duration get duration => los.difference(aos);
+}
+
+class SatelliteSummary {
+  final String name;
+  final int? noradCatId;
+  final SatellitePass? nextPass;
+  final int upcomingPassCount;
+  final String tleSource;
+
+  const SatelliteSummary({
+    required this.name,
+    this.noradCatId,
+    this.nextPass,
+    required this.upcomingPassCount,
+    required this.tleSource,
+  });
+}
+
+class SatelliteDetail {
+  final String name;
+  final int? noradCatId;
+  final List<SatellitePass> passes;
+  final List<SatelliteTransponder> transponders;
+  final String tleSource;
+  final DateTime? tleUpdatedAt;
+
+  const SatelliteDetail({
+    required this.name,
+    this.noradCatId,
+    required this.passes,
+    required this.transponders,
+    required this.tleSource,
+    this.tleUpdatedAt,
+  });
+
+  SatellitePass? get nextPass => passes.isEmpty ? null : passes.first;
+}
+
+class SatelliteTransponder {
+  final String description;
+  final String type;
+  final String mode;
+  final int? uplinkLow;
+  final int? downlinkLow;
+  final bool alive;
+  final String status;
+  final DateTime? updatedAt;
+
+  const SatelliteTransponder({
+    required this.description,
+    required this.type,
+    required this.mode,
+    this.uplinkLow,
+    this.downlinkLow,
+    required this.alive,
+    required this.status,
+    this.updatedAt,
+  });
+
+  factory SatelliteTransponder.fromJson(Map<String, dynamic> json) {
+    return SatelliteTransponder(
+      description: json['description'] as String? ?? '未命名转发器',
+      type: json['type'] as String? ?? 'Transponder',
+      mode: json['mode'] as String? ?? json['uplink_mode'] as String? ?? '',
+      uplinkLow: (json['uplink_low'] as num?)?.toInt(),
+      downlinkLow: (json['downlink_low'] as num?)?.toInt(),
+      alive: json['alive'] as bool? ?? false,
+      status: json['status'] as String? ?? 'unknown',
+      updatedAt: DateTime.tryParse(json['updated'] as String? ?? ''),
+    );
+  }
 }

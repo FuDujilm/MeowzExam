@@ -9,8 +9,99 @@ import 'local_database_service.dart';
 class SatelliteService {
   static const _tleCacheKey = 'satellite_tle_cache';
   static const _tleCacheTimeKey = 'satellite_tle_cache_time';
+  static const _satnogsBaseUrl = 'https://db.satnogs.org/api';
   final _databaseService = LocalDatabaseService();
   final _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+
+  Future<List<SatelliteSummary>> getSubscribedSatellites({
+    required String grid,
+    required List<String> tleSourceUrls,
+    required List<String> satelliteNames,
+    Duration window = const Duration(hours: 48),
+  }) async {
+    final names = satelliteNames.isEmpty
+        ? const ['ISS (ZARYA)', 'AO-91', 'SO-50', 'PO-101']
+        : satelliteNames;
+    final passes = await getUpcomingPasses(
+      grid: grid,
+      tleSourceUrls: tleSourceUrls,
+      satelliteNames: names,
+      window: window,
+    );
+    final entries = await _loadTleEntries(tleSourceUrls);
+    final summaries = <SatelliteSummary>[];
+
+    for (final name in names) {
+      final matchedEntry = _findEntry(entries, name);
+      final matchedPasses = passes
+          .where((pass) => _matchesSatellite(pass.satelliteName, name))
+          .toList();
+      summaries.add(SatelliteSummary(
+        name: matchedEntry?.name ?? name,
+        noradCatId: matchedEntry?.noradCatId,
+        nextPass: matchedPasses.isEmpty ? null : matchedPasses.first,
+        upcomingPassCount: matchedPasses.length,
+        tleSource: _tleSourceLabel(tleSourceUrls),
+      ));
+    }
+    return summaries;
+  }
+
+  Future<SatelliteDetail> getSatelliteDetail({
+    required String grid,
+    required List<String> tleSourceUrls,
+    required String satelliteName,
+    Duration window = const Duration(hours: 72),
+  }) async {
+    final passes = await getUpcomingPasses(
+      grid: grid,
+      tleSourceUrls: tleSourceUrls,
+      satelliteNames: [satelliteName],
+      window: window,
+    );
+    final entries = await _loadTleEntries(tleSourceUrls);
+    final entry = _findEntry(entries, satelliteName);
+    final transponders = await getTransponders(
+      satelliteName: entry?.name ?? satelliteName,
+      noradCatId: entry?.noradCatId ??
+          (passes.isEmpty ? null : passes.first.noradCatId),
+    );
+    return SatelliteDetail(
+      name: entry?.name ?? satelliteName,
+      noradCatId: entry?.noradCatId ??
+          (passes.isEmpty ? null : passes.first.noradCatId),
+      passes: passes,
+      transponders: transponders,
+      tleSource: _tleSourceLabel(tleSourceUrls),
+      tleUpdatedAt: DateTime.tryParse(
+        await _databaseService.getSetting(_tleCacheTimeKey) ?? '',
+      ),
+    );
+  }
+
+  Future<List<SatelliteTransponder>> getTransponders({
+    required String satelliteName,
+    int? noradCatId,
+  }) async {
+    if (noradCatId != null) {
+      try {
+        final response = await _dio.get<List<dynamic>>(
+          '$_satnogsBaseUrl/transmitters/',
+          queryParameters: {'satellite__norad_cat_id': noradCatId},
+        );
+        final data = response.data ?? const [];
+        final transponders = data
+            .map((item) =>
+                SatelliteTransponder.fromJson(item as Map<String, dynamic>))
+            .where((item) => item.alive || item.status == 'active')
+            .toList();
+        if (transponders.isNotEmpty) return transponders;
+      } catch (_) {
+        // Fall through to built-in common amateur satellite frequencies.
+      }
+    }
+    return _fallbackTransponders(satelliteName);
+  }
 
   Future<List<SatellitePass>> getUpcomingPasses({
     required String grid,
@@ -80,10 +171,12 @@ class SatelliteService {
       if (!line1.startsWith('1 ') || !line2.startsWith('2 ')) continue;
       final inclination = double.tryParse(_slice(line2, 8, 16).trim()) ?? 51.6;
       final meanMotion = double.tryParse(_slice(line2, 52, 63).trim()) ?? 15.5;
+      final noradCatId = int.tryParse(_slice(line1, 2, 7).trim());
       entries.add(_TleEntry(
         name: name,
         line1: line1,
         line2: line2,
+        noradCatId: noradCatId,
         inclination: inclination,
         meanMotion: meanMotion,
       ));
@@ -123,6 +216,7 @@ class SatelliteService {
         final aosAzimuth = (cycle + observer.longitude + 360) % 360;
         passes.add(SatellitePass(
           satelliteName: entry.name,
+          noradCatId: entry.noradCatId,
           aos: aos,
           los: aos.add(Duration(minutes: durationMinutes)),
           maxElevation: maxElevation,
@@ -163,6 +257,78 @@ class SatelliteService {
     if (value.length <= start) return '';
     return value.substring(start, min(end, value.length));
   }
+
+  _TleEntry? _findEntry(List<_TleEntry> entries, String name) {
+    for (final entry in entries) {
+      if (_matchesSatellite(entry.name, name)) return entry;
+    }
+    return null;
+  }
+
+  bool _matchesSatellite(String sourceName, String filter) {
+    final source = sourceName.toUpperCase();
+    final target = filter.toUpperCase();
+    return source.contains(target) || target.contains(source);
+  }
+
+  String _tleSourceLabel(List<String> urls) {
+    if (urls.isEmpty) return '内置 TLE';
+    final uri = Uri.tryParse(urls.first);
+    return uri?.host.isNotEmpty == true ? uri!.host : '自定义 TLE';
+  }
+
+  List<SatelliteTransponder> _fallbackTransponders(String satelliteName) {
+    final name = satelliteName.toUpperCase();
+    if (name.contains('ISS')) {
+      return const [
+        SatelliteTransponder(
+          description: 'Mode V APRS',
+          type: 'Transceiver',
+          mode: 'AFSK 1200',
+          uplinkLow: 145825000,
+          downlinkLow: 145825000,
+          alive: true,
+          status: 'active',
+        ),
+        SatelliteTransponder(
+          description: 'Mode V/V FM',
+          type: 'Transceiver',
+          mode: 'FM',
+          uplinkLow: 144490000,
+          downlinkLow: 145800000,
+          alive: true,
+          status: 'active',
+        ),
+      ];
+    }
+    if (name.contains('SO-50')) {
+      return const [
+        SatelliteTransponder(
+          description: 'Mode V/U FM Repeater',
+          type: 'Transponder',
+          mode: 'FM',
+          uplinkLow: 145850000,
+          downlinkLow: 436795000,
+          alive: true,
+          status: 'active',
+        ),
+      ];
+    }
+    if (name.contains('AO-91')) {
+      return const [
+        SatelliteTransponder(
+          description: 'Mode U/V FM Repeater',
+          type: 'Transponder',
+          mode: 'FM',
+          uplinkLow: 435250000,
+          downlinkLow: 145960000,
+          alive: true,
+          status: 'active',
+        ),
+      ];
+    }
+    return const [];
+  }
 }
 
 class _GeoPoint {
@@ -176,6 +342,7 @@ class _TleEntry {
   final String name;
   final String line1;
   final String line2;
+  final int? noradCatId;
   final double inclination;
   final double meanMotion;
 
@@ -183,6 +350,7 @@ class _TleEntry {
     required this.name,
     required this.line1,
     required this.line2,
+    this.noradCatId,
     required this.inclination,
     required this.meanMotion,
   });
